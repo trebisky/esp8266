@@ -2,8 +2,6 @@
 *.bin
 bootrom.bin
 kongo_iram0.bin
-wrap
-dumper
 bootrom.elf
 bootsym.elf
 *.o

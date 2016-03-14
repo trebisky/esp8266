@@ -1,7 +1,8 @@
 # Makefile for ESP8266 development
 # Tom Trebisky  12-26-2015
 
-all:	dumper wrap
+all:
+	echo "You need to be more specific"
 
 install:
 	cp dumper /home/tom/bin
@@ -51,18 +52,6 @@ showsym:	bootsym.elf
 	xtensa-lx106-elf-nm bootsym.elf
 
 # ------------------------------------------
-
-# binary to elf "wrapper" follows
-# from 2014 Mightyframe project.
-
-wrap:	wrap.c
-	cc -o wrap wrap.c
-
-# dump selected parts of binary image.
-dumper:	dumper.c
-	cc -o dumper dumper.c
-
-# ------------------------------------------
 # Do the following:
 #
 # generate the multi-section disassembly
@@ -94,6 +83,4 @@ second:	first.dis
 	./loads >second.dis
 
 clean:
-	rm -f wrap
-	rm -f dumper
 	rm -f *.sy
