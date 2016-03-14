@@ -1,0 +1,90 @@
+#!/bin/ruby
+
+# Script to get temperatures from ESP8266 gadget
+# with BMP180 temperature sensor
+
+require 'socket'
+require 'timeout'
+
+$server = "192.168.0.39"
+$port = 82
+
+class Temps
+    def initialize ( s, p )
+	@host = s
+	@port = p
+	begin
+	    @sock = TCPSocket.open( @host, @port )
+	rescue Errno::ECONNREFUSED
+	    puts "Refusing connection"
+	rescue => why
+	    puts "Error: #{why}"
+	end
+    end
+    def init
+	@cals = cals
+	@ossval = 2 # 2^oss
+    end
+    def cals
+	rv = Array.new
+	@sock.print ( "cal\n" )
+	11.times {
+	    rv << @sock.readline().chomp.to_i
+	}
+	rv
+    end
+    def data
+	@sock.print ( "data\n" )
+	@sock.readline().chomp
+    end
+    def temp
+	(tt, pp) = data.split
+	rawt = tt.to_i
+	rawp = pp.to_i
+
+	( ac1, ac2, ac3, ac4, ac5, ac6, b1, b2, mb, mc, md ) = @cals
+
+	# reduce temperature
+	x1 = (rawt - ac6) * ac5 / 32768
+        x2 = mc * 2048 / (x1 + md)
+        b5 = x1 + x2
+        t = (b5 + 8) / 16
+	tc = t / 10.0
+
+	# reduce pressure
+	b6 = b5 - 4000
+	x1 = b2 * (b6 * b6 / 4096) / 2048
+	x2 = ac2 * b6 / 2048
+	x3 = x1 + x2
+	b3 = ((ac1 * 4 + x3) * @ossval + 2) / 4
+	x1 = ac3 * b6 / 8192
+	x2 = (b1 * (b6 * b6 / 4096)) / 65536
+	x3 = (x1 + x2 + 2) / 4
+	b4 = ac4 * (x3 + 32768) / 32768
+	b7 = (rawp - b3) * (50000/@ossval)
+
+	p = (b7 / b4) * 2
+	x1 = (p / 256) * (p / 256)
+	x1 = (x1 * 3038) / 65536
+	x2 = (-7357 * p) / 65536
+	p = p +(x1 + x2 + 3791) / 16
+
+	rv = tc, p
+	return rv
+    end
+
+end
+
+t = Temps.new $server, $port
+t.init
+
+i = 1
+loop {
+    (tc, p) = t.temp
+    tf = 32.0 + tc * 9.0 / 5
+    print "#{i} #{tc} #{tf} #{p}\n"
+    sleep 1.0
+    i += 1
+}
+
+# THE END

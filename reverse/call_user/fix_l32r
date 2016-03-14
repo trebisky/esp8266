@@ -1,0 +1,301 @@
+#!/bin/ruby
+
+# Tom Trebisky  2-8-2016
+# fix_ldr script --
+#
+# We have two goals here.
+#
+# 1) find all ldr instructions and add a comment giving
+#	the value that will be loaded by the ldr
+# 2) find the target address where that value resides
+# 	and tidy up the usual mess of wrongly disassembled
+#	instructions there, replacing them with a .long
+#	holding the value (same as in the comment above).
+#
+# This was taken from "loads" in the bootrom directory and
+#	hacked into shape for the call_user disassembly
+
+# This is our input file.
+##disname = "first.dis"
+#disname = "call_user_start.pre2"
+disname = "call_user_start.dis1"
+
+# This is a temporary file we write to during
+#  the first pass.
+tmpname = "tmp.dis"
+
+$verbose = nil
+
+$addr = Array.new
+$adds = Hash.new
+
+# This routine gets the longword from the binary image.
+# expects a string argument in hex.
+# Calling this was PAINFULLY slow, but will hopefully
+# now be faster as we eliminate the ruby script "middleman"
+# and the dumper program now does a seek and small read
+# rather than reading the entire image to pull 4 bytes from it.
+
+def getl ( addr )
+    #rv = `./dumper -v #{addr}`
+    #rv = `./dump_user_v #{addr}`
+    rv = `dumper -v -ahello #{addr}`
+    rv.chomp
+end
+
+# This in lieu of the above makes testing much faster
+def getlx ( addr )
+    "40000000"
+end
+
+tf = File.new(tmpname,"w")
+
+# The first time we ran this,
+# We were really only interested in a small part of this 155,000 line file.
+# Starting at 4010 0000 and going to 4010 6818
+# Note that this is less than 32K of code (half the size of the boot ROM).
+# There are 820 l32r instructions in the range of interest.
+# We skip 56 of these because they are in the ROM.
+# The second time through,
+# we realized we were also interested in l32r statements in the 4024 to 4026 range.
+
+copy = true
+
+oldrun = false
+newrun = true
+
+# Pass 1 through the disassembly, harvest the addresses.
+# Hash just keeps track of references and is optional.
+# Also tidy up the lines containing the l32r
+IO.foreach(disname) { |rl|
+    l = rl.chomp
+    if l =~ /^;/
+	tf.puts l
+	next
+    end
+
+if oldrun
+    # Here is the trigger to start processing.
+    if l =~ /^4010/
+	#print "Start " + l + "\n" if copy == true
+	copy = false
+    end
+
+    # Here is the trigger to stop processing.
+    if l =~ /^4024/
+	copy = true
+	#print "End " + l + "\n"
+    end
+end
+
+if newrun
+    # Here is the trigger to start processing.
+    if l =~ /^4024/
+	#print "Start " + l + "\n" if copy == true
+	copy = false
+    end
+
+    # Here is the trigger to stop processing.
+    if l =~ /^4026d483/
+	copy = true
+	#print "End " + l + "\n"
+    end
+end
+
+    if copy
+	tf.puts l
+	next
+    end
+
+    # We are processing, so watch for l32r mnemonics
+    w = l.split
+    if w[2] !~ /l32r/
+	tf.puts l
+	next
+    end
+
+    #puts l
+
+    #add = w[4].sub(/0x/,"")
+    add = w[4]
+    # We get 56 of these
+    if add =~ /^4000/
+	#print w[0] + "\t" + w[1] + "\t\t" + w[2] +
+	#    "\t" + w[3] + " " + w[4] + " ; (ROM)\n"
+	tf.print w[0] + "\t" + w[1] + "\t\t" + w[2] +
+	    "\t" + w[3] + " " + w[4] + " ; (ROM)\n"
+	next
+    end
+
+if oldrun
+    # None of these
+    if add !~ /^401/
+	tf.print w[0] + "\t" + w[1] + "\t\t" + w[2] +
+	    "\t" + w[3] + " " + w[4] + " ; (---)\n"
+	next
+    end
+end
+
+    #puts add
+    #print w[0] + "\t" + w[1] + "\t\t" + w[2] +
+#	"\t" + w[3] + " " + w[4] +
+#	"\t; ( " + getl(add) + " )\n"
+    tf.print w[0] + "\t" + w[1] + "\t\t" + w[2] +
+	"\t" + w[3] + " " + w[4] +
+	"\t; ( " + getl(add) + " )\n"
+
+    # These do show up and we don't have bytes for them
+    # to clean up, so omit them from the hash.
+    next if add =~ /^4020/
+    next if add =~ /^4021/
+    next if add =~ /^4022/
+    next if add =~ /^4023/
+
+    if $adds.include? add
+        $adds[add] += 1
+    else
+        $adds[add] = 1
+	$addr << add
+    end
+
+}
+
+tf.close
+
+# END of first pass.  We have cleaned up all the lines with l32r in them.
+# The goal of the second pass is to find the lines referenced by the l32r
+# and gather the 4 bytes into a single line.
+# This pass reads the temp file and writes to stdout
+
+# We end up with 225 addresses here to fix.
+#$adds.each { |k,num|
+#    l = getl k
+#    print k + " " + num.to_s + " " + l + "\n"
+#}
+
+# sort the address list (no redundancies)
+$addr.sort!
+
+#$addr.each { |a|
+#    puts a
+#}
+
+def outbytes ( addr, b, n )
+    printf "%08x:\t", addr
+    print b[0,n].join("") + "\n"
+    return b[n,b.length-n]
+end
+
+$careful = nil
+
+def outlong ( addr, b )
+    n = 4
+    printf "%08x:\t", addr
+    print b[0,n].join("")
+    print "\t.long 0x" + b[0,n].reverse.join("") + "\n"
+	if $careful
+	#-- an assertion check, no longer needed.
+	check = b[0,n].reverse.join("").hex
+	#x_check = getl("%08x" % addr)
+	#print " fetch at #{"%08x" % addr} gets " + x_check + "\n"
+	bin_check = getl("%08x" % addr).hex
+	if ( check != bin_check )
+	    printf("At %08x, got %08x, should be %08x\n", addr, check, bin_check )
+	    exit
+	end
+	end
+    return b[n,b.length-n]
+end
+
+saved = Array.new
+
+copy = true
+target = $addr.shift.hex
+
+# -- Pass 2 chug through the file generating the .long data
+#    that is referenced by the l32r
+IO.foreach(tmpname) { |l|
+    l.chomp!
+
+if oldrun
+    copy = false if l =~ /^4010/
+    copy = true if l =~ /^4024/
+end
+
+if newrun
+    copy = false if l =~ /^4024/
+    copy = true if l =~ /^4026d483/
+end
+
+    if copy
+	puts l
+	next
+    end
+
+    # romping to end of file.
+    unless target
+	puts l
+	next
+    end
+
+    # a line we always copy verbatim
+    w = l.split
+    if w[0] !~ /:$/
+	puts l
+	next
+    end
+
+    # extract bytes, compute range
+    addr = w[0].sub(":","")
+    addr1 = addr.hex
+    bytes = w[1].scan(/../)
+    addr2 = addr1 + bytes.length - 1
+
+    # not there yet
+    if target > addr2
+	puts l
+	next
+    end
+
+    # target is within current range
+    saved = saved + bytes
+
+    # For debug, show areas we will regroup
+    # print ";- " + l + "\n"
+
+    # dump extra bytes in front of target
+    if target > addr1
+	saved = outbytes( addr1, saved, target - addr1 )
+    end
+
+    # Eureka, we can dump the target
+    if saved.length >= 4
+	#saved = outbytes( target, saved, 4 )
+	saved = outlong( target, saved )
+	rem_addr = target + 4
+	ntarget = $addr.shift
+	if ntarget
+	    target = ntarget.hex
+	else
+	    target = nil
+	end
+
+	# we have left over bytes, but are done searching
+	if saved.length > 0 and target == nil
+	    saved = outbytes( rem_addr, saved, saved.length )
+	end
+
+	# next target does not immediately follow
+	if saved.length > 0 and target > rem_addr
+	    saved = outbytes( rem_addr, saved, saved.length )
+	end
+
+	# remaining case with saved bytes is that the target
+	# immediately follows.  We never have 4 bytes in this
+	# case and can just go on to read the next line
+    end
+}
+
+system "rm #{tmpname}"
+
+# THE END

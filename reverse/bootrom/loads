@@ -1,0 +1,158 @@
+#!/bin/ruby
+
+# Find all the l32r of interest.
+
+disname = "first.dis"
+tmpname = "tmp.dis"
+
+$verbose = nil
+
+$addr = Array.new
+$adds = Hash.new
+
+# This method gets the longword from the binary image.
+# expects a string argument in hex
+def getl ( addr )
+    rv = `./dumper -v #{addr}`
+    rv.chomp
+end
+
+tf = File.new(tmpname,"w")
+
+# Pass 1 through the disassembly, harvest the addresses.
+# Hash just keeps track of references and is optional.
+# Also tidy up the lines containing the l32r
+IO.foreach(disname) { |rl|
+    l = rl.chomp
+    w = l.split
+    if w[2] !~ /l32r/
+	tf.puts l
+	next
+    end
+    add = w[4].sub(/0x/,"")
+    if add !~ /^40/
+	tf.print w[0] + "\t" + w[1] + "\t\t" + w[2] +
+	    "\t" + w[3] + " " + w[4] + "\n"
+	next
+    end
+    if $adds.include? add
+        $adds[add] += 1
+    else
+        $adds[add] = 1
+	$addr << add
+    end
+    tf.print w[0] + "\t" + w[1] + "\t\t" + w[2] +
+	"\t" + w[3] + " " + w[4] +
+	"\t; ( " + getl(add) + " )\n"
+}
+
+tf.close
+
+# show counts
+$adds.each { |k,num|
+    l = getl k
+    #print k + " " + num.to_s + " " + l + "\n"
+}
+
+# sort the address list (no redundancies)
+$addr.sort!
+
+def outbytes ( addr, b, n )
+    printf "%08x:\t", addr
+    print b[0,n].join("") + "\n"
+    return b[n,b.length-n]
+end
+
+def outlong ( addr, b )
+    n = 4
+    printf "%08x:\t", addr
+    print b[0,n].join("")
+    print "\t.long 0x" + b[0,n].reverse.join("") + "\n"
+	#-- an assertion check, no longer needed.
+	check = b[0,n].reverse.join("").hex
+	#x_check = getl("%08x" % addr)
+	#print " fetch at #{"%08x" % addr} gets " + x_check + "\n"
+	bin_check = getl("%08x" % addr).hex
+	if ( check != bin_check )
+	    printf("At %08x, got %08x, should be %08x\n", addr, check, bin_check )
+	    exit
+	end
+    return b[n,b.length-n]
+end
+
+saved = Array.new
+
+target = $addr.shift.hex
+
+# -- Pass 2 chug through the file generating the .long data
+#    that is referenced by the l32r
+IO.foreach(tmpname) { |l|
+    l.chomp!
+
+    # romping to end of file.
+    unless target
+	puts l
+	next
+    end
+
+    # a line we always copy verbatim
+    w = l.split
+    if w[0] !~ /:$/
+	puts l
+	next
+    end
+
+    # extract bytes, compute range
+    addr = w[0].sub(":","")
+    addr1 = addr.hex
+    bytes = w[1].scan(/../)
+    addr2 = addr1 + bytes.length - 1
+
+    # not there yet
+    if target > addr2
+	puts l
+	next
+    end
+
+    # target is within current range
+    saved = saved + bytes
+
+    # For debug, show areas we will regroup
+    # print ";- " + l + "\n"
+
+    # dump extra bytes in front of target
+    if target > addr1
+	saved = outbytes( addr1, saved, target - addr1 )
+    end
+
+    # Eureka, we can dump the target
+    if saved.length >= 4
+	#saved = outbytes( target, saved, 4 )
+	saved = outlong( target, saved )
+	rem_addr = target + 4
+	ntarget = $addr.shift
+	if ntarget
+	    target = ntarget.hex
+	else
+	    target = nil
+	end
+
+	# we have left over bytes, but are done searching
+	if saved.length > 0 and target == nil
+	    saved = outbytes( rem_addr, saved, saved.length )
+	end
+
+	# next target does not immediately follow
+	if saved.length > 0 and target > rem_addr
+	    saved = outbytes( rem_addr, saved, saved.length )
+	end
+
+	# remaining case with saved bytes is that the target
+	# immediately follows.  We never have 4 bytes in this
+	# case and can just go on to read the next line
+    end
+}
+
+system "rm #{tmpname}"
+
+# THE END

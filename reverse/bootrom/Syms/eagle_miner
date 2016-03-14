@@ -1,0 +1,21 @@
+#!/bin/ruby
+
+infile = "eagle.rom.addr.v6.ld"
+
+# We are pulling stuff out of lines like this:
+# PROVIDE ( Cache_Read_Disable = 0x400047f0 );
+
+
+File.new(infile).each { |l|
+    if l !~ /^PROVIDE/
+	next
+    end
+
+    l = l.sub(/^PROVIDE \( /,"")
+    l = l.sub(/\s*\);/,"")
+    l = l.sub(/= 0x/,"")
+    w = l.split
+
+    #puts l
+    print( w[1] + " " + w[0] + "\n" )
+}

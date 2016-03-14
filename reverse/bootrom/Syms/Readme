@@ -1,0 +1,17 @@
+Various miner scripts extract information
+from 3 files that seem useful into *.sy files.
+
+1-12-2016
+
+Then I merge symbols by hand.
+Note that these files are sorted into address order.
+
+I put all the ram symbols into dataram.sy
+I put all the rom symbols into rom.sy
+
+The bottom line is that ALL the symbols are in eagle.
+The Kongo files (python or disassembly) do not add anything new.
+Odds are that the 1.5.0 SDK "made public" some symbols that
+were not in the exported symbol list in prior releases.
+
+I hand added the symbol _rom_start

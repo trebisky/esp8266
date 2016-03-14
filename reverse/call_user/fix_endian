@@ -1,0 +1,42 @@
+#!/bin/ruby
+
+# Fix brain damaged little endian byte order dump
+# for opcodes  2-8-2016  Tom Trebisky
+
+# Original behavior worked on this one file,
+# but now we accept a filename.
+if ARGV.size < 1
+    disname = "call_user_start.pre1"
+else
+    disname = ARGV[0]
+end
+
+re = /^(\S+)(\s+)(\S+)/
+
+File.new(disname).each { |l|
+    #puts l
+    if l =~ /^$/
+	puts l
+	next
+    end
+    if l =~ /^;/
+	puts l
+	next
+    end
+    if l =~ /^\s/
+	puts l
+	next
+    end
+    w = l.split
+    if w.size < 3
+	puts l
+	next
+    end
+    #puts w.size
+    md = re.match l
+    bytes = md[3].scan(/../)
+
+    puts md[1] + md[2] + bytes.reverse.join("") + md.post_match
+}
+
+# THE END

@@ -1,0 +1,17 @@
+#!/bin/ruby
+
+#infile = "kongo_iram0_ORIG.txt"
+infile = "kongo_romsyms.py"
+
+# We want to find all lines like this
+# MakeName(0x400047f0, "Cache_Read_Disable")
+
+File.new(infile).each { |l|
+    if l !~ /^MakeName/
+	next
+    end
+    l = l.sub(/^MakeName\(0x/,"")
+    l = l.sub(/"\)/,"")
+    l = l.sub(/, "/," ")
+    puts l
+}

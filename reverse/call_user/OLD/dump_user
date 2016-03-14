@@ -1,0 +1,9 @@
+#!/bin/ruby
+
+exit if ARGV.size < 1
+
+loc = ARGV[0]
+
+cmd = "dumper -ahello #{loc}"
+
+system cmd

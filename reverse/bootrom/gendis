@@ -1,0 +1,72 @@
+#!/bin/ruby
+
+symfile = "calls.sy"
+outname = "first.dis"
+
+if ARGV.size < 1
+    elffile = "bootsym.elf"
+else
+    elffile = ARGV[0]
+end
+
+# objdump will suppress zones with zero bytes, displaying
+# simply "..." (3 dots) for any number of zeros.
+# The -z option tells it to show all those zeros.
+#$discmd = "xtensa-lx106-elf-objdump -mxtensa -d bootrom.elf "
+$discmd = "xtensa-lx106-elf-objdump -mxtensa -d #{elffile} -z "
+$tname = "tmp.dis"
+$outfile = nil
+
+# Trim verbose rubbish from start of each section
+def fixdis
+    copy = nil
+    f = File.new($tname, "r")
+    f.each { |l|
+	if copy
+	    $outfile.print l
+	end
+	if l =~ /^Disassembl/
+	    copy = true
+	end
+    }
+    f.close
+end
+
+def rawdis ( range )
+    cmd = $discmd + range
+    puts cmd
+    system cmd + " >#{$tname}"
+    fixdis
+    system "rm " + $tname
+end
+
+system "cp /dev/null #{outname}"
+$outfile = File.new( outname, "a" )
+
+adds = Array.new
+
+# eliminate duplicates
+last = nil
+File.new(symfile).each { |l|
+    item = l.split[0]
+    if last == nil
+	adds << item
+	last = item
+    elsif item != last
+	adds << item
+	last = item
+    end
+}
+
+len = adds.size
+# puts len
+
+(1..len-1).each { |j|
+    rawdis "--start-address=0x#{adds[j-1]} --stop-address=0x#{adds[j]}"
+}
+
+rawdis "--start-address=0x#{adds[len-1]} --stop-address=0x40010000"
+
+$outfile.close
+
+# THE END

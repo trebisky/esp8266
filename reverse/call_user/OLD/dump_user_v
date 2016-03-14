@@ -1,0 +1,11 @@
+#!/bin/ruby
+# used by the loads script
+
+exit if ARGV.size < 1
+
+loc = ARGV[0]
+
+#cmd = "dumper -v -bhello-0x00000.bin #{loc}"
+cmd = "dumper -v -ahello #{loc}"
+
+system cmd

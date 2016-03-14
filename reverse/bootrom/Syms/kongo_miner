@@ -1,0 +1,18 @@
+#!/bin/ruby
+
+infile = "kongo_iram0_ORIG.txt"
+
+# We want to find all lines like this
+# 000000a4 <_ResetHandler>:
+
+File.new(infile).each { |l|
+    if l !~ />:/
+	next
+    end
+
+    l = l.sub(/\>:/,"")
+    l = l.sub(/\</,"")
+    l = l.sub(/^0/,"4")
+
+    puts l
+}

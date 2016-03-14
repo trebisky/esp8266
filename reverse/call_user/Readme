@@ -1,0 +1,41 @@
+The goal here is to disassemble and annotate the code path from
+call_user_start() all the way to user_init().
+
+On 2-8-2016 I got fed up with the backwards byte order nonsense
+    and wrote a couple of scripts:
+
+1) the "fix_endian" script.
+    This is simple and flips the byte order in the hex dump of
+    values preceding the instruction mnemonic.
+
+Prior to running this, I renamed call_user_start.dis to
+call_user_start.pre1 - This file already has lots of annotation,
+which should be preserved after running this program.
+I ran the program like so:
+
+    ./fix_endian >call_user_start.pre2
+
+The name of the input file is inside the script.
+
+2) the "fix_l32r" script.  The began as the "loads" script
+    in the bootrom directory.  It needed a fair bit of fiddling.
+    Ultimately I will run it as:
+
+    ./fix_l324 >call_user_start.dis
+
+It reads the "pre2" file (the name is inside the script once again.
+
+-----------
+
+Note that this file has over 155,000 lines of disassembly
+(compared to 23,000 for the boot rom).  It also contains a big
+block of stuff at 4024xxxx addresses, as well as stuff in ram
+
+-----------------
+
+After doing a lot of annotation during 2/2016, I rewrote my
+fix_l32r script to also process statements in the 4024xxxx to 4026xxxx
+range and ran the whole disassembly through it.
+This was done the evening of 3/7/2016.
+
+The file prior to this was saved as call_user_start.dis1

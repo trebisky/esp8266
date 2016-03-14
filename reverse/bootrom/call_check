@@ -1,0 +1,57 @@
+#!/bin/ruby
+
+# Harvest all the call0 addresses and see which
+# are in our list of named addresses.
+
+symfile = "calls.sy"
+disname = "first.dis"
+
+$verbose = nil
+
+# load our table of known addresses
+adds = Array.new
+
+# eliminate duplicates
+# we work from a sorted list, so it
+# is no trouble ditching duplicates.
+last = nil
+File.new(symfile).each { |l|
+    item = l.split[0]
+    if last == nil
+	adds << item
+	last = item
+    elsif item != last
+	adds << item
+	last = item
+    end
+}
+
+$newadds = Hash.new
+
+def newadd ( add )
+    if $newadds.include? add
+	$newadds[add] += 1
+    else
+	$newadds[add] = 1
+    end
+end
+
+File.new(disname).each { |l|
+    next if l !~ /call0/
+    add = l.split[3].sub(/0x/,"")
+    if adds.include?(add)
+	print add + " OK\n" if $verbose
+    else
+	print add + " ?\n" if $verbose
+	newadd add
+    end
+}
+
+$newadds.each { |k,v|
+    #print k + " " + v.to_s + "  NEW\n"
+    if k =~ /^4000/
+	print k + " " + "sub_" + k.sub(/^4000/,"") + "\n"
+    end
+}
+
+# THE END

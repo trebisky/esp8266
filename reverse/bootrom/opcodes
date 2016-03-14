@@ -1,0 +1,34 @@
+#!/bin/ruby
+
+# Find all the l32r of interest.
+
+disname = "boot.txt"
+
+$ops = Hash.new
+
+# quit on this line:
+# 4000e328 <_rom_store_table>:
+
+IO.foreach(disname) { |rl|
+    l = rl.chomp
+    next if l =~ /^;/
+    w = l.split
+    next if w.size < 2
+    break if w[1] == "<_rom_store_table>:"
+    next if w.size < 3
+    next if w[0] !~ /:$/
+    op = w[2]
+    if $ops.include? op
+        $ops[op] += 1
+    else
+        $ops[op] = 1
+    end
+}
+
+$ops.each { |k,num|
+#    print k + "  " + num.to_s + "\n"
+    print "%04d" % num + "  " + k + "\n"
+}
+
+
+# THE END
