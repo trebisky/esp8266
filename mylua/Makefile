@@ -1,6 +1,6 @@
 # I hate remembering these long commands
 
-TTY = /dev/ttyUSB1
+TTY = /dev/ttyUSB0
 
 wifi:
 	./luatool.py -p $(TTY) -f wifi.lua

@@ -1,0 +1,193 @@
+#!/usr/bin/ruby
+
+# from MMTsocket.rb
+
+require 'socket'
+require 'timeout'
+
+class TTsocket
+	attr_reader	:status
+
+	@@timeout = 1.5
+	@@simulate = nil
+
+	def initialize ( host, port, timeout=nil )
+	    @sock = nil
+	    @status = nil
+
+	    @simulate = @@simulate
+	    return if @simulate
+
+	    timeout = @@timeout unless timeout
+	    # I can only call it a ruby bug, but sometimes this
+	    # gets:
+	    #     /usr/lib/ruby/1.8/timeout.rb:60:in `timeout': execution expired
+	    #     from /mmt/scripts/TTsocket.rb:136:in `initialize
+	    # we could trap the string "execution expired", but we certainly
+	    # should not need to ....
+
+	#    begin
+	#	if timeout > 0
+	#	    timeout ( timeout ) {
+	#		@sock = TCPSocket.open( host, port )
+	#	    }
+	#	else
+	#	    @sock = TCPSocket.open( host, port )
+	#	end
+	#    rescue Timeout::Error
+	#	@status = "Timeout"
+	#    rescue Errno::ECONNREFUSED
+	#	@status = "Refusing connection"
+	#    rescue => why
+	#	@status = "Error: #{why}"
+	#    end
+
+	    begin
+		@sock = TCPSocket.open( host, port )
+	    rescue Errno::ECONNREFUSED
+		@status = "Refusing connection"
+	    rescue => why
+		@status = "Error: #{why}"
+	    end
+
+	end
+
+	def TTsocket.set_timeout ( set )
+	    @@timeout = set
+	end
+
+	def TTsocket.temps
+	    TTsocket.new( "192.168.0.49", 1013 )
+	end
+
+	def TTsocket.tmon_get
+	    c = TTsocket.temps
+	    return nil if c.status
+	    c.send( "" )
+	    rv = c.readline
+	    c.done
+	    rv
+	end
+
+	def done ()
+	    @sock.close if @sock
+	end
+	def show ()
+	    each { |x| print x }
+	end
+	def showit ( what )
+	    send( what )
+	    show()
+	end
+	def version()
+	    showit( "version" )
+	end
+	def readline ()
+	    return nil unless @sock
+	    @sock.readline().chomp
+	end
+
+	# when called from command, and we send a bogus command
+	# we will probably get a two line reply.
+	# The hexapod would send:
+	#   ? bogus
+	#   .EOF
+	def check ()
+	    return "OK" if @simulate
+	    return "IES" unless @sock
+	    @sock.readline().chomp
+	end
+	def each ()
+	    if @simulate
+		@simulate.split("\n").each { |l|
+		    yield l+"\n" if l != ""
+		}
+	    	return
+	    end
+	    return unless @sock
+	    loop do
+		begin
+		    x = @sock.readline()
+		rescue EOFError
+		    break
+		end
+		break if x =~ /^.EOF/
+		yield x
+	    end
+	end
+	def dump ()	# XXX ??
+	    each { |data|
+		print data.length, data
+	    }
+	end
+
+	# get an array with all the tag names
+	def tags ( what="all" )
+	    send( what )
+	    r = Array.new
+	    each { |l| r << l.chomp.split[0] }
+	    r
+	end
+
+	# get a hash with all the values
+	def values ( what="all" )
+	    send( what )
+	    r = Hash.new
+	    each { |l|
+	    	(t,v) = l.chomp.split(' ',2)
+		r[t] = v
+	    }
+	    r
+	end
+
+	# get a single value
+	def get ( tag )
+	    send( "get #{tag}" )
+	    rv = nil
+	    each { |l|
+	    	(t,v) = l.chomp.split(' ',2)
+		rv = v if t == tag
+	    }
+	    rv
+	end
+
+	def command ( cmd, args=nil )
+	    send( cmd )
+	    args.each { |a| send a.to_s } if args
+	    check()
+	end
+
+	def send ( msg )
+	    return unless @sock
+	    @sock.print( msg + "\n" )
+	end
+
+end
+
+def get_ts
+    #td = Time.now.to_a
+    s,m,h,d,mo,y,wd,yd,dst,z = Time.now.to_a
+
+    hh = "%02d" % h
+    mm = "%02d" % m
+    ss = "%02d" % s
+
+    mom = "%02d" % mo
+    dd = "%02d" % d
+
+    hms = hh + ":" + mm + ":" + ss
+    mdy = mom + "-" + dd + "-" + y.to_s
+    return mdy + " " + hms
+end
+
+puts get_ts
+
+loop {
+    x = TTsocket.tmon_get
+    ts = get_ts
+    print ts + " " + x + "\n"
+    STDOUT.flush
+    sleep 5.0
+}
+
+# THE END

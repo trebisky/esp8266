@@ -60,7 +60,9 @@ LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
 .PHONY: all flash clean info term
 
-TARGET	= dht_tt
+TARGET	= tmon
+
+OBJS = tmon.o dht_tt_subs.o
 
 all: $(TARGET)
 
@@ -68,15 +70,21 @@ all: $(TARGET)
 	$(vecho) "CC $<"
 	$(Q) $(CC) $(INCLUDES) $(CFLAGS)  -c $<
 
-dht_tt: dht_tt.o
+$(TARGET): $(OBJS)
 	$(vecho) "LD $@"
-	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) dht_tt.o -Wl,--end-group -o $@
+	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) $(OBJS) -Wl,--end-group -o $@
 
+# This is important -- without the right options it works sometimes,
+# but other times screws up.
+# Flash options - anything with a 12E module will be dio
+# dio/8m works for my unit #1
+#FLOPS = -fm dio -fs 4m
+FLOPS = -fm dio -fs 8m
 
 # This loads our code into the flash on the device itself
 flash:	$(TARGET)
 	$(ESPTOOL) elf2image $(TARGET)
-	-$(ESPTOOL) --port $(PORT) write_flash 0x00000 $(TARGET)-0x00000.bin 0x40000 $(TARGET)-0x40000.bin
+	-$(ESPTOOL) --port $(PORT) write_flash $(FLOPS) 0x00000 $(TARGET)-0x00000.bin 0x40000 $(TARGET)-0x40000.bin
 
 # This is a good way to verify that the boot loader on the ESP8266 is running
 info:
@@ -90,9 +98,6 @@ bootrom.bin:
 
 bootrom.dis:
 	xtensa-lx106-elf-objdump -D -b binary -mxtensa bootrom.bin >bootrom.dis
-
-syms:
-	xtensa-lx106-elf-nm dht_tt | sort >dht_tt.syms
 
 term:
 	picocom -b 115200 $(PORT)
