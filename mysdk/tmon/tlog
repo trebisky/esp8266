@@ -1,10 +1,16 @@
 #!/usr/bin/ruby
 
+# Ruby client to pull data from an ESP8266 temperature
+# sensor gadet (version 1).  This worked well, but we
+#have a much improved scheme for version 2 and beyond.
+#
 # from MMTsocket.rb
+# Tom Trebisky  4-13-2016
 
 require 'socket'
 require 'timeout'
 
+# A lot of extra and needless methods here.
 class TTsocket
 	attr_reader	:status
 
@@ -180,12 +186,16 @@ def get_ts
     return mdy + " " + hms
 end
 
-puts get_ts
+#puts get_ts
 
 loop {
     x = TTsocket.tmon_get
     ts = get_ts
-    print ts + " " + x + "\n"
+    if x
+	print ts + " " + x + "\n"
+    else
+	print ts + " no connection\n"
+    end
     STDOUT.flush
     sleep 5.0
 }

@@ -234,12 +234,19 @@ timer_func1 ( void *arg )
 void
 dht_init( void )
 {
+    unsigned short xx[8];
+    unsigned short yy;
+
     os_timer_disarm ( &timer1 );
     os_timer_setfn ( &timer1, timer_func1, NULL );
     os_timer_arm ( &timer1, DELAY, 1 );
 
     // pin_input ( GPIO );
     os_printf ( "Ready\n" );
+
+    read_sar_dout ( xx );
+    yy = system_adc_read ();
+    yy = readvdd33 ();
 }
 
 void user_init()
