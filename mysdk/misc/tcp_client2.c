@@ -224,7 +224,7 @@ start_client ( void )
     load_ip ( tp->remote_ip );
 
     espconn_regist_connectcb ( c, tcp_connect_cb );
-    espconn_regist_connectcb ( c, tcp_disconnect_cb );
+    espconn_regist_disconcb ( c, tcp_disconnect_cb );
     espconn_regist_reconcb ( c, tcp_reconnect_cb );
     espconn_regist_recvcb ( c, tcp_client_rcv );
     espconn_regist_sentcb ( c, tcp_client_sent );

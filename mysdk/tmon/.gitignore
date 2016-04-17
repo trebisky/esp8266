@@ -1,2 +1,4 @@
 tmon
 logs
+*.gz
+version1

@@ -60,9 +60,9 @@ LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
 .PHONY: all flash clean info term
 
-TARGET	= tmon
+TARGET	= sleep
 
-OBJS = tmon.o dht_tt_subs.o
+OBJS = sleep.o
 
 all: $(TARGET)
 
@@ -102,14 +102,7 @@ bootrom.dis:
 term:
 	picocom -b 115200 $(PORT)
 
-save:
-	cp *.c tlog Makefile version1
-
-ship:
-	tar czvf tmon_v1.tar.gz Makefile *.c tlog
-
 clean:
 	$(Q) rm -f $(TARGET)
 	$(Q) rm -f *.o
 	$(Q) rm -f *.bin
-	$(Q) rm -f *.gz

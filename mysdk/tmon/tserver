@@ -1,0 +1,50 @@
+#!/usr/bin/ruby
+
+# Ruby server to absorb temperature data
+# Tom Trebisky  4-13-2016
+
+require 'socket'
+require 'timeout'
+
+myport = 2001
+
+def get_ts
+    #td = Time.now.to_a
+    s,m,h,d,mo,y,wd,yd,dst,z = Time.now.to_a
+
+    hh = "%02d" % h
+    mm = "%02d" % m
+    ss = "%02d" % s
+
+    mom = "%02d" % mo
+    dd = "%02d" % d
+
+    hms = hh + ":" + mm + ":" + ss
+    mdy = mom + "-" + dd + "-" + y.to_s
+    return mdy + " " + hms
+end
+
+server = TCPServer.open myport
+puts "Listening on port #{myport}"
+STDOUT.flush
+
+loop {
+    #puts "Listening ..."
+    x = server.accept()
+    #puts "Connection !!"
+    begin
+        temps = nil
+	ts = get_ts
+        Timeout.timeout(2.0) {
+	    # client.puts "blah blah"
+	    temps = x.gets
+        }
+	print ts + " " + temps
+    rescue Timeout::Error
+	print ts + " Read timed out\n"
+    end
+    STDOUT.flush
+    x.close
+}
+
+# THE END
