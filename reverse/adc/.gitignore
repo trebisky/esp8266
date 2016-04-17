@@ -1,0 +1,14 @@
+*.bin
+*.elf
+*.o
+adc
+adc.pre1
+adc.pre2
+adc_stuff.c
+find32
+fix_endian
+fix_l32r
+Makefile
+Readme
+short_user
+short_user_abs
