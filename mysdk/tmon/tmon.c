@@ -17,6 +17,15 @@
 #define TEST_PORT 13	/* daytime */
 #define DATA_PORT 2001	/* on trona */
 
+/* Usually we finish in 0.2 seconds,
+ * so allowing 0.5 seconds should be adequate
+ * When we first power up, connecting to the
+ * wireless can take quite a while, typically
+ * about 5.3 seconds.
+ */
+#define WATCHDOG_INIT	10000
+#define WATCHDOG_TCP	500
+
 #ifdef notdef
 static char *ssid = "polecat";
 static char *pass = "Slow and steady.";
@@ -31,9 +40,9 @@ static char *pass = "The gift of God is eternal life!";
 void show_ip ( void );
 void next_time ( void );
 void harvest_data ( void );
-unsigned long xthal_get_ccount ( void );
+void set_watchdog ( int );
 
-unsigned long start_time;
+unsigned long xthal_get_ccount ( void );
 
 void
 show_mac ( void )
@@ -206,6 +215,12 @@ setup_server ( void )
 /* CLIENT stuff starts */
 /* ------------------------------- */
 
+int dht_hum;
+int dht_tc;
+int dht_status;
+
+unsigned long start_time;
+
 /* rare, and I don't care */
 void ICACHE_FLASH_ATTR
 tcp_reconnect_cb ( void *arg, sint8 err )
@@ -251,7 +266,32 @@ tcp_send_data ( void *arg )
 void ICACHE_FLASH_ATTR
 send_temps ( void *arg )
 {
+    int dht_tf;
+    int time;
+    int div;
+
     // harvest_data ();
+
+    /* Calculate elapsed time in hundredths of seconds */
+    /* system_get_cpu_freq() returns 80 in typical cases */
+    div = system_get_cpu_freq() * (1000 * 1000 / 100 );
+    time = xthal_get_ccount () - start_time;
+    time /= div;
+
+    if ( ! dht_status ) {
+	dht_count = os_sprintf ( dht_msg, "%d %d BAD BAD BAD\n", time, 0 );
+	os_printf ( "TCP sending %d bytes\n", dht_count );
+	espconn_send ( arg, dht_msg, dht_count );
+	return;
+    }
+
+    dht_tf = 320 + (dht_tc * 9) / 5;
+
+    // os_printf ( "humidity = %d\n", dht_hum );
+    // os_printf ( "temperature (C) = %d\n", dht_tc );
+    // os_printf ( "temperature (F) = %d\n", dht_tf );
+
+    dht_count = os_sprintf ( dht_msg, "%d %d %d %d %d\n", time, 0, dht_hum, dht_tc, dht_tf );
     os_printf ( "TCP sending %d bytes\n", dht_count );
     espconn_send ( arg, dht_msg, dht_count );
 }
@@ -326,6 +366,15 @@ start_client ( void )
     os_printf ( "local port %d ", tp->local_port );
     os_printf ( "at %s\n", ip2str ( buf, (char *) tp->remote_ip ) );
 
+    /* Do this here so if there is a long delay getting
+     * a wireless connection on the first startupt, this
+     * will ensure the DHT chip is ready to go.
+     */
+    harvest_data ();
+
+    /* TCP connect should be fast */
+    set_watchdog ( WATCHDOG_TCP );
+
     espconn_connect ( c );
 }
 
@@ -382,11 +431,8 @@ start_timer ( void )
 void
 harvest_data ( void )
 {
-    int dht_hum;
-    int dht_tc;
-    int dht_tf;
-    int dht_status;
 
+#ifdef notdef
     unsigned short v33;
     unsigned short adc;
 
@@ -395,23 +441,29 @@ harvest_data ( void )
 
     //os_printf ( "Vdd33 = %d\n", v33 );
     //os_printf ( "ADC = %d\n", adc );
+#endif
 
     dht_status = dht_sensor ( DHT_GPIO, &dht_tc, &dht_hum );
 
-    if ( ! dht_status ) {
-	dht_count = os_sprintf ( dht_msg, "%d %d BAD BAD BAD\n" );
+    if ( ! dht_status )
 	os_printf ( "No data from DHT\n" );
-	return;
-    }
+    else
+	os_printf ( "Got data from DHT\n" );
+}
 
-    dht_tf = 320 + (dht_tc * 9) / 5;
+void
+set_ip_static ( void )
+{
+    struct ip_info info;
 
-    // os_printf ( "humidity = %d\n", dht_hum );
-    // os_printf ( "temperature (C) = %d\n", dht_tc );
-    // os_printf ( "temperature (F) = %d\n", dht_tf );
+    wifi_station_dhcpc_stop ();
+    wifi_softap_dhcps_stop();
 
-    dht_count = os_sprintf ( dht_msg, "%d %d %d %d %d\n", v33, adc, dht_hum, dht_tc, dht_tf );
-    os_printf ( "Got data from DHT\n" );
+    /* This is esp_temp - 192.168.0.9 */
+    IP4_ADDR(&info.ip, 192, 168, 0, 9);
+    IP4_ADDR(&info.gw, 192, 168, 0, 1);
+    IP4_ADDR(&info.netmask, 255, 255, 255, 0);
+    wifi_set_ip_info(STATION_IF, &info);
 }
 
 /* delay in seconds.
@@ -430,32 +482,40 @@ next_time ( void )
     system_deep_sleep ( INTERVAL * 1000 * 1000 );
 }
 
+
+#define TIMER_REPEAT	1
+#define TIMER_ONCE	0
+
+static os_timer_t dog;
+
 void
-set_ip_static ( void )
+run_watchdog ( void *arg )
 {
-    struct ip_info info;
-
-    wifi_station_dhcpc_stop ();
-    wifi_softap_dhcps_stop();
-
-    /* This is esp_temp - 192.168.0.9 */
-    IP4_ADDR(&info.ip, 192, 168, 0, 9);
-    IP4_ADDR(&info.gw, 192, 168, 0, 1);
-    IP4_ADDR(&info.netmask, 255, 255, 255, 0);
-    wifi_set_ip_info(STATION_IF, &info);
+    os_printf ( "Watchdog triggered\n" );
+    next_time ();
 }
 
-void user_init()
+void
+set_watchdog ( int delay )
+{
+    os_timer_disarm ( &dog );
+    os_timer_setfn ( &dog, run_watchdog, NULL );
+    os_timer_arm ( &dog, delay, TIMER_ONCE );
+}
+
+void
+user_init ( void )
 {
     struct station_config conf;
     unsigned long time;
 
     start_time = xthal_get_ccount ();
+    set_watchdog ( WATCHDOG_INIT );
 
     // This is used to setup the serial communication
     uart_div_modify(0, UART_CLK_FREQ / 115200);
 
-    harvest_data ();
+    // harvest_data ();
 
     time = xthal_get_ccount () - start_time;
     os_printf ( "Time to collect data: %d clocks\n", time );

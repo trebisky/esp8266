@@ -102,11 +102,14 @@ bootrom.dis:
 term:
 	picocom -b 115200 $(PORT)
 
+SFILES = tserver Makefile *.c
+
 save:
-	cp *.c tlog Makefile version1
+#	cp *.c tlog Makefile version1
+	cp *.c tserver Makefile version1
 
 ship:
-	tar czvf tmon_v1.tar.gz Makefile *.c tlog
+	tar czvf tmon_v2.tar.gz $(SFILES)
 
 clean:
 	$(Q) rm -f $(TARGET)
