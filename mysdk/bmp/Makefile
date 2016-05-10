@@ -60,10 +60,9 @@ LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
 .PHONY: all flash clean info term
 
-TARGET = blink2
-#TARGET = prod
-#TARGET = hello_loop
-#TARGET = hello
+TARGET	= bmp
+
+OBJS = bmp.o gpio.o
 
 all: $(TARGET)
 
@@ -71,17 +70,16 @@ all: $(TARGET)
 	$(vecho) "CC $<"
 	$(Q) $(CC) $(INCLUDES) $(CFLAGS)  -c $<
 
-$(TARGET): $(TARGET).o
+$(TARGET): $(OBJS)
 	$(vecho) "LD $@"
-	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) $< -Wl,--end-group -o $@
+	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) $(OBJS) -Wl,--end-group -o $@
 
 # This is important -- without the right options it works sometimes,
 # but other times screws up.
 # Flash options - anything with a 12E module will be dio
 # dio/8m works for my unit #1
 #FLOPS = -fm dio -fs 4m
-# works for nodemcu board ...
-#FLOPS = -fm dio -fs 8m
+FLOPS = -fm dio -fs 8m
 
 # This loads our code into the flash on the device itself
 flash:	$(TARGET)
@@ -98,8 +96,8 @@ bootrom.bin:
 	#esptool -p $(PORT) dump_mem 0x40000000 65536 esp8266_rom.bin
 	esptool -p $(PORT) dump_mem 0x40000000 65536 bootrom.bin
 
-dis:
-	xtensa-lx106-elf-objdump -D -mxtensa $(TARGET) >$(TARGET).dis
+bootrom.dis:
+	xtensa-lx106-elf-objdump -D -b binary -mxtensa bootrom.bin >bootrom.dis
 
 term:
 	picocom -b 115200 $(PORT)

@@ -45,17 +45,9 @@ void user_init()
     os_printf("\n");
     os_printf("SDK version:%s\n", system_get_sdk_version());
 
-    /*
-    gpio_init ();
-    */
-
     PIN_FUNC_SELECT ( FUNC_MUX, FUNC_F );
 
-    /* low */
     gpio_output_set(0, LED_BIT, LED_BIT, 0);
-
-    /* high */
-    // gpio_output_set(LED_BIT, 0, LED_BIT, 0);
 }
 
 /* THE END */
