@@ -12,6 +12,7 @@ dht:
 	./luatool.py -p $(TTY) -f dht22.lua
 
 bmp:
+	#./luatool.py -p $(TTY) --delete temps_dhtlib.lua
 	./luatool.py -p $(TTY) -f bmp.lua
 	#./luatool.py -p $(TTY) -f bmp180.lua
 

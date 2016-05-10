@@ -1846,6 +1846,9 @@
 40000f95:	0df0      	ret.n
 40000f97:	00
 
+; ets_isr_mask ( mask )
+;  simply calls _xtos_ints_off ( mask ) - could be a macro or alias
+
 40000f98 <ets_isr_mask>:
 40000f98:	12c1f0        	addi	a1, a1, -16
 40000f9b:	0901      	s32i.n	a0, a1, 0
@@ -1855,6 +1858,9 @@
 40000fa5:	0df0      	ret.n
 40000fa7:	00
 
+; ets_isr_unmask ( mask )
+;  simply calls _xtos_ints_on ( mask ) - could be a macro or alias
+
 40000fa8 <ets_isr_unmask>:
 40000fa8:	12c1f0        	addi	a1, a1, -16
 40000fab:	0901      	s32i.n	a0, a1, 0
@@ -1863,6 +1869,7 @@
 40000fb2:	12c110        	addi	a1, a1, 16
 40000fb5:	0df0      	ret.n
 40000fb7:	00
+
 40000fb8:	d0dcff3f	.long 0x3fffdcd0
 
 40000fbc <ets_set_user_start>:
@@ -1870,6 +1877,7 @@
 40000fbf:	2903      	s32i.n	a2, a3, 0
 40000fc1:	0df0      	ret.n
 40000fc3:	00
+
 40000fc4:	00020060	.long 0x60000200	; GPIO base address
 40000fc8:	a0d6ff3f	.long 0x3fffd6a0
 40000fcc:	74d6ff3f	.long 0x3fffd674
@@ -5098,7 +5106,7 @@
 40002ecc:	12c1f0        	addi	a1, a1, -16	; stack
 40002ecf:	d26102        	s32i	a13, a1, 8	; save a13
 40002ed2:	c911      	s32i.n	a12, a1, 4	; save a12
-40002ed4:	0901      	s32i.n	a0, a1, 0	; return
+40002ed4:	0901      	s32i.n	a0, a1, 0	; save return
 
 40002ed6:	cd02      	mov.n	a12, a2
 40002ed8:	c5e50a        	call0	4000dd38 <xthal_get_ccount>
@@ -8291,10 +8299,10 @@
 40004c3d:	0c02      	movi.n	a2, 0
 40004c3f:	0df0      	ret.n
 40004c41:	000000        	ill
+
 40004c44:	344e0040	.long 0x40004e34
 40004c48:	d0dfff3f	.long 0x3fffdfd0
 40004c4c:	fc4e0040	.long 0x40004efc
-40004c50:	22
 
 40004c50 <gpio_init>:
 40004c50:	22a004        	movi	a2, 4
@@ -8309,14 +8317,17 @@
 40004c65:	0532fc        	call0	40000f88 <ets_isr_attach>
 40004c68:	1c02      	movi.n	a2, 16
 40004c6a:	c532fc        	call0	40000f98 <ets_isr_mask>
+
+; set all pins as inputs
 40004c6d:	0c02      	movi.n	a2, 0
 40004c6f:	0c03      	movi.n	a3, 0
 40004c71:	0c04      	movi.n	a4, 0
 40004c73:	510bfb		l32r	a5, 400038a0	; ( 0000ffff )
 40004c76:	850500        	call0	40004cd0 <gpio_output_set>
+
 40004c79:	2c8c      	movi.n	a12, 40
 40004c7b:	d1d2f0		l32r	a13, 40000fc4	; ( 60000200 )
-40004c7e:	f2a068        	movi	a15, 104
+40004c7e:	f2a068        	movi	a15, 104	; a15 = 0x68
 40004c81:	e1f1ff		l32r	a14, 40004c48	; ( 3fffdfd0 )
 40004c84:	02a000        	movi	a0, 0
 40004c87:	026e00        	s32i	a0, a14, 0
@@ -8349,6 +8360,19 @@
 40004ccd:	0df0      	ret.n
 40004ccf:	0061bd        	excw
 
+; This is advertised in the SDK document --
+;
+; gpio_output_set ( set, clear, enable, disable )
+;
+;  0x60000304 <-- set
+;  0x60000308 <-- clear
+;  0x60000310 <-- enable
+;  0x60000314 <-- disable
+; 
+; to set high:  gpio_output_set ( m, 0, m, 0 )
+; to set low:  gpio_output_set ( 0, m, m, 0 )
+; for input:  gpio_output_set ( 0, 0, 0, m )
+
 40004cd0 <gpio_output_set>:
 40004cd0:	61bdf0		l32r	a6, 40000fc4	; ( 60000200 )
 40004cd3:	c02000        	memw
@@ -8362,49 +8386,58 @@
 40004ceb:	0df0      	ret.n
 40004ced:	000000        	ill
 
+; simply reads from 0x60000318
+
 40004cf0 <gpio_input_get>:
 40004cf0:	21b5f0		l32r	a2, 40000fc4	; ( 60000200 )
 40004cf3:	c02000        	memw
-40004cf6:	2222
-40004cf8:	460df000	.long 0x00f00d46
+40004cf6:	222246        	l32i	a2, a2, 0x118
+40004cf9:	0df0      	ret.n
+40004cfb:	00
+
 40004cfc:	28030060	.long 0x60000328
 40004d00:	e0dfff3f	.long 0x3fffdfe0
 
+; call as gpio_register_set ( reg, val )
+
 40004d04 <gpio_register_set>:
-40004d04:	12c1f0        	addi	a1, a1, -16
-40004d07:	026100        	s32i	a0, a1, 0
-40004d0a:	c26101        	s32i	a12, a1, 4
-40004d0d:	d921      	s32i.n	a13, a1, 8
-40004d0f:	cd02      	mov.n	a12, a2
-40004d11:	30d320        	or	a13, a3, a3
+40004d04:	12c1f0        	addi	a1, a1, -16	; stack
+40004d07:	026100        	s32i	a0, a1, 0	; save a0
+40004d0a:	c26101        	s32i	a12, a1, 4	; save a12
+40004d0d:	d921      	s32i.n	a13, a1, 8	; save a13
+40004d0f:	cd02      	mov.n	a12, a2		; a12 = reg
+40004d11:	30d320        	or	a13, a3, a3	; a13 = val
 40004d14:	c525fc        	call0	40000f74 <ets_intr_lock>
 40004d17:	21f9ff		l32r	a2, 40004cfc	; ( 60000328 )
-40004d1a:	e00c11        	slli	a0, a12, 2
-40004d1d:	2a00      	add.n	a0, a0, a2
+40004d1a:	e00c11        	slli	a0, a12, 2	; a0 = a12 << 2
+40004d1d:	2a00      	add.n	a0, a0, a2	; a0 = a0 + a2
 40004d1f:	c02000        	memw
-40004d22:	d900      	s32i.n	a13, a0, 0
-40004d24:	f6bc0c        	bgeui	a12, 16, 40004d34 <gpio_register_set+0x30>
+40004d22:	d900      	s32i.n	a13, a0, 0	; write value
+
+40004d24:	f6bc0c        	bgeui	a12, 16, 40004d34
 40004d27:	51f6ff		l32r	a5, 40004d00	; ( 3fffdfe0 )
 40004d2a:	d03724        	extui	a3, a13, 7, 3
 40004d2d:	5a4c      	add.n	a4, a12, a5
 40004d2f:	324400        	s8i	a3, a4, 0
-40004d32:	8cc3      	beqz.n	a3, 40004d42 <gpio_register_set+0x3e>
+40004d32:	8cc3      	beqz.n	a3, 40004d42
+
 40004d34:	8524fc        	call0	40000f80 <ets_intr_unlock>
-40004d37:	c811      	l32i.n	a12, a1, 4
-40004d39:	d821      	l32i.n	a13, a1, 8
-40004d3b:	0801      	l32i.n	a0, a1, 0
-40004d3d:	12c110        	addi	a1, a1, 16
+40004d37:	c811      	l32i.n	a12, a1, 4	; restore a12
+40004d39:	d821      	l32i.n	a13, a1, 8	; restore a13
+40004d3b:	0801      	l32i.n	a0, a1, 0	; restore a0
+40004d3d:	12c110        	addi	a1, a1, 16	; stack
 40004d40:	0df0      	ret.n
-40004d42:	7cf9      	movi.n	a9, -1
-40004d44:	001c40        	ssl	a12
-40004d47:	0c18      	movi.n	a8, 1
-40004d49:	72c5f0        	addi	a7, a5, -16
+
+40004d42:	7cf9      	movi.n	a9, -1		; a9 = -1
+40004d44:	001c40        	ssl	a12		; set shift left amount
+40004d47:	0c18      	movi.n	a8, 1		; a8 = 1
+40004d49:	72c5f0        	addi	a7, a5, -16	; a7 = a5 -16
 40004d4c:	6807      	l32i.n	a6, a7, 0
 40004d4e:	0088a1        	sll	a8, a8
 40004d51:	908830        	xor	a8, a8, a9
 40004d54:	806610        	and	a6, a6, a8
 40004d57:	6907      	s32i.n	a6, a7, 0
-40004d59:	c6f5ff        	j	40004d34 <gpio_register_set+0x30>
+40004d59:	c6f5ff        	j	40004d34
 
 40004d5c <gpio_register_get>:
 40004d5c:	51e8ff		l32r	a5, 40004cfc	; ( 60000328 )
@@ -8412,7 +8445,7 @@
 40004d62:	5a44      	add.n	a4, a4, a5
 40004d64:	c02000        	memw
 40004d67:	4804      	l32i.n	a4, a4, 0
-40004d69:	f6b215        	bgeui	a2, 16, 40004d82 <gpio_register_get+0x26>
+40004d69:	f6b215        	bgeui	a2, 16, 40004d82
 40004d6c:	31e5ff		l32r	a3, 40004d00	; ( 3fffdfe0 )
 40004d6f:	3a22      	add.n	a2, a2, a3
 40004d71:	220200        	l8ui	a2, a2, 0
@@ -8423,13 +8456,13 @@
 40004d80:	0df0      	ret.n
 40004d82:	2d04      	mov.n	a2, a4
 40004d84:	0df0      	ret.n
-40004d86:	000021        	srai	a0, a0, 0
+40004d86:	0000
 
 40004d88 <gpio_intr_pending>:
 40004d88:	21b0ff		l32r	a2, 40004c48	; ( 3fffdfd0 )
 40004d8b:	2802      	l32i.n	a2, a2, 0
 40004d8d:	0df0      	ret.n
-40004d8f:	0012c1        	mul16u	a1, a2, a0
+40004d8f:	00
 
 40004d90 <gpio_pin_intr_state_set>:
 40004d90:	12c1f0        	addi	a1, a1, -16
@@ -8453,7 +8486,7 @@
 40004dc4:	0821      	l32i.n	a0, a1, 8
 40004dc6:	12c110        	addi	a1, a1, 16
 40004dc9:	0df0      	ret.n
-40004dcb:	0012c1        	mul16u	a1, a2, a0
+40004dcb:	00
 
 40004dcc <gpio_intr_ack>:
 40004dcc:	12c1f0        	addi	a1, a1, -16
@@ -8486,12 +8519,12 @@
 40004e12:	66bceb        	bnei	a12, 16, 40004e01 <gpio_intr_ack+0x35>
 40004e15:	8516fc        	call0	40000f80 <ets_intr_unlock>
 40004e18:	c22101        	l32i	a12, a1, 4
-40004e1b:	d8
-40004e1c:	21e83108	.long 0x0831e821
-40004e20:	01
+40004e1b:	d821      	l32i.n	a13, a1, 8
+40004e1d:	e831      	l32i.n	a14, a1, 12
+40004e1f:	0801      	l32i.n	a0, a1, 0
 40004e21:	12c110        	addi	a1, a1, 16
 40004e24:	0df0      	ret.n
-40004e26:	000041        	srli	a0, a0, 0
+40004e26:	0000
 
 40004e28 <gpio_intr_handler_register>:
 40004e28:	4188ff		l32r	a4, 40004c48	; ( 3fffdfd0 )
@@ -8536,7 +8569,7 @@
 40004e88:	0801      	l32i.n	a0, a1, 0
 40004e8a:	12c110        	addi	a1, a1, 16
 40004e8d:	0df0      	ret.n
-40004e8f:	0012c1        	mul16u	a1, a2, a0
+40004e8f:	00
 
 40004e90 <gpio_pin_wakeup_enable>:
 40004e90:	12c1f0        	addi	a1, a1, -16
@@ -8579,7 +8612,7 @@
 40004ef3:	303074        	extui	a3, a3, 0, 8
 40004ef6:	66b3e2        	bnei	a3, 16, 40004edc <gpio_pin_wakeup_disable+0x8>
 40004ef9:	0df0      	ret.n
-40004efb:	0012c1        	mul16u	a1, a2, a0
+40004efb:	00
 
 40004efc <gpio_intr_test>:
 40004efc:	12c1f0        	addi	a1, a1, -16
@@ -8587,19 +8620,23 @@
 40004f02:	026101        	s32i	a0, a1, 4
 40004f05:	85deff        	call0	40004cf0 <gpio_input_get>
 40004f08:	376212        	bbci	a2, 3, 40004f1e <gpio_intr_test+0x22>
+
 40004f0b:	0c22      	movi.n	a2, 2
 40004f0d:	7cc3      	movi.n	a3, -4
 40004f0f:	0c24      	movi.n	a4, 2
 40004f11:	0c05      	movi.n	a5, 0
 40004f13:	c5dbff        	call0	40004cd0 <gpio_output_set>
+
 40004f16:	0801      	l32i.n	a0, a1, 0
 40004f18:	c60300        	j	40004f2b <gpio_intr_test+0x2f>
 40004f1b:	000000        	ill
+
 40004f1e:	0c02      	movi.n	a2, 0
 40004f20:	7ce3      	movi.n	a3, -2
 40004f22:	0c24      	movi.n	a4, 2
 40004f24:	0c05      	movi.n	a5, 0
 40004f26:	85daff        	call0	40004cd0 <gpio_output_set>
+
 40004f29:	0801      	l32i.n	a0, a1, 0
 40004f2b:	2d00      	mov.n	a2, a0
 40004f2d:	c5e9ff        	call0	40004dcc <gpio_intr_ack>
@@ -8607,6 +8644,7 @@
 40004f32:	12c110        	addi	a1, a1, 16
 40004f35:	0df0      	ret.n
 40004f37:	00
+
 40004f38:	ff0f00ff	.long 0xff000fff
 40004f3c:	00f00000	.long 0x0000f000
 
@@ -19496,36 +19534,40 @@
 4000bd7f:	0df0      	ret.n
 4000bd81:	000000        	ill
 
+; alias for ets_isr_unmask ( mask )
+
 4000bd84 <_xtos_ints_on>:
 4000bd84:	4187d1		l32r	a4, 400003a0	; ( 3fffc200 )
-4000bd87:	706200        	rsil	a7, 2
-4000bd8a:	3804      	l32i.n	a3, a4, 0
-4000bd8c:	6814      	l32i.n	a6, a4, 4
-4000bd8e:	205320        	or	a5, a3, a2
-4000bd91:	5904      	s32i.n	a5, a4, 0
-4000bd93:	605510        	and	a5, a5, a6
+4000bd87:	706200        	rsil	a7, 2		; read and set interrupt level
+4000bd8a:	3804      	l32i.n	a3, a4, 0	; fetch x[0]
+4000bd8c:	6814      	l32i.n	a6, a4, 4	; fetch x[1]
+4000bd8e:	205320        	or	a5, a3, a2	; OR on our bit
+4000bd91:	5904      	s32i.n	a5, a4, 0	; store back to x[0]
+4000bd93:	605510        	and	a5, a5, a6	; allow only these
 4000bd96:	50e413        	wsr.intenable	a5
 4000bd99:	70e613        	wsr.ps	a7
 4000bd9c:	102000        	rsync
 4000bd9f:	2d03      	mov.n	a2, a3
 4000bda1:	0df0      	ret.n
-4000bda3:	00417f        	excw
+4000bda3:	00
+
+; alias for ets_isr_mask ( mask )
 
 4000bda4 <_xtos_ints_off>:
 4000bda4:	417fd1		l32r	a4, 400003a0	; ( 3fffc200 )
 4000bda7:	706200        	rsil	a7, 2
-4000bdaa:	3804      	l32i.n	a3, a4, 0
-4000bdac:	6814      	l32i.n	a6, a4, 4
-4000bdae:	205320        	or	a5, a3, a2
-4000bdb1:	205530        	xor	a5, a5, a2
-4000bdb4:	5904      	s32i.n	a5, a4, 0
-4000bdb6:	605510        	and	a5, a5, a6
+4000bdaa:	3804      	l32i.n	a3, a4, 0	; fetch x[0]
+4000bdac:	6814      	l32i.n	a6, a4, 4	; fetch x[1]
+4000bdae:	205320        	or	a5, a3, a2	; OR our bit onto x[0]
+4000bdb1:	205530        	xor	a5, a5, a2	; flip it to zero
+4000bdb4:	5904      	s32i.n	a5, a4, 0	; store back to x[0]
+4000bdb6:	605510        	and	a5, a5, a6	; only allow these
 4000bdb9:	50e413        	wsr.intenable	a5
 4000bdbc:	70e613        	wsr.ps	a7
 4000bdbf:	102000        	rsync
-4000bdc2:	2d03      	mov.n	a2, a3
+4000bdc2:	2d03      	mov.n	a2, a3		; return prior x[0]
 4000bdc4:	0df0      	ret.n
-4000bdc6:	000082        	mull	a0, a0, a0
+4000bdc6:	0000
 
 4000bdc8 <strcmp>:
 4000bdc8:	820200        	l8ui	a8, a2, 0
@@ -20077,7 +20119,7 @@
 4000c360:	46f3ff        	j	4000c331 <__subsf3+0xc9>
 4000c363:	00f022        	excw
 4000c366:	112021		l32r	a1, 3ffd47e8
-4000c369:	41ace2		l32r	a4, 40004e1c	; ( 0831e821 )
+4000c369:	41ace2		l32r	a4, 40004e1c	; ( 0831e821 )  *** Weird
 4000c36c:	a0f240        	nsau	a10, a2
 4000c36f:	a2caf8        	addi	a10, a10, -8
 4000c372:	001a40        	ssl	a10

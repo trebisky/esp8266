@@ -35,13 +35,19 @@ local function write_reg(reg_addr, reg_val)
 end
 
 -- call with index 1-11
-local function read_cal ( x )
+local function show_cal ( x )
   local data = read_reg(REG_CALIBRATION + (x-1)*2, 2)
   local rv = string.byte(data, 1) * 256 + string.byte(data, 2)
   if rv > 32767 then
     rv = -(65536 - rv)
   end
-  return rv
+  print ( "cal " .. x .. " = " .. rv )
+end
+
+local function show_cal_u ( x )
+  local data = read_reg(REG_CALIBRATION + (x-1)*2, 2)
+  local rv = string.byte(data, 1) * 256 + string.byte(data, 2)
+  print ( "cal " .. x .. " = " .. rv )
 end
 
 -- read temperature from BMP180
@@ -75,7 +81,14 @@ print ( t )
 t = read_pressure()
 print ( t )
 
-for i=1,11,1 do
-      t = read_cal ( i )
-      print ( "cal " .. i .. " = " .. t )
-end
+show_cal ( 1 )
+show_cal ( 2 )
+show_cal ( 3 )
+show_cal_u ( 4 )
+show_cal_u ( 5 )
+show_cal_u ( 6 )
+show_cal ( 7 )
+show_cal ( 8 )
+show_cal ( 9 )
+show_cal ( 10 )
+show_cal ( 11 )
