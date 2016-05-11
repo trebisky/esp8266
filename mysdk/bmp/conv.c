@@ -80,6 +80,7 @@ main ( int argc, char **argv )
 	tc = t / 10.0;
 	tf = 32.0 + tc * 1.8;
 
+	printf ( "Temp (raw) = %d\n", rawt );
 	printf ( "Temp = %d\n", t );
 	printf ( "Temp (C) = %.3f\n", tc );
 	printf ( "Temp (F) = %.3f\n", tf );
@@ -88,6 +89,7 @@ main ( int argc, char **argv )
 	pmb = p / 100.0;
 	pmb_sea = pmb + MB_TUCSON;
 
+	printf ( "Pressure (raw) = %d\n", rawp );
 	printf ( "Pressure (Pa) = %d\n", p );
 	printf ( "Pressure (mb) = %.2f\n", pmb );
 	printf ( "Pressure (mb, sea level) = %.2f\n", pmb_sea );

@@ -14,6 +14,47 @@
 
 #include "i2c_master.h"
 
+/* tjt - my setup uses these pins.
+ * 5-10-2016
+ */
+#define TJT
+
+#ifdef TJT
+#define I2C_MASTER_SDA_MUX PERIPHS_IO_MUX_GPIO4_U
+#define I2C_MASTER_SCL_MUX PERIPHS_IO_MUX_GPIO5_U
+
+#define I2C_MASTER_SDA_GPIO 4
+#define I2C_MASTER_SCL_GPIO 5
+
+#define I2C_MASTER_SDA_FUNC FUNC_GPIO4
+#define I2C_MASTER_SCL_FUNC FUNC_GPIO5
+#endif
+
+#ifndef TJT
+#define I2C_MASTER_SDA_MUX PERIPHS_IO_MUX_GPIO2_U
+#define I2C_MASTER_SCL_MUX PERIPHS_IO_MUX_GPIO0_U
+
+#define I2C_MASTER_SDA_GPIO 2
+#define I2C_MASTER_SCL_GPIO 0
+
+#define I2C_MASTER_SDA_FUNC FUNC_GPIO2
+#define I2C_MASTER_SCL_FUNC FUNC_GPIO0
+#endif
+
+#define I2C_MASTER_SDA_HIGH_SCL_HIGH()  \
+    gpio_output_set(1<<I2C_MASTER_SDA_GPIO | 1<<I2C_MASTER_SCL_GPIO, 0, 1<<I2C_MASTER_SDA_GPIO | 1<<I2C_MASTER_SCL_GPIO, 0)
+
+#define I2C_MASTER_SDA_HIGH_SCL_LOW()  \
+    gpio_output_set(1<<I2C_MASTER_SDA_GPIO, 1<<I2C_MASTER_SCL_GPIO, 1<<I2C_MASTER_SDA_GPIO | 1<<I2C_MASTER_SCL_GPIO, 0)
+
+#define I2C_MASTER_SDA_LOW_SCL_HIGH()  \
+    gpio_output_set(1<<I2C_MASTER_SCL_GPIO, 1<<I2C_MASTER_SDA_GPIO, 1<<I2C_MASTER_SDA_GPIO | 1<<I2C_MASTER_SCL_GPIO, 0)
+
+#define I2C_MASTER_SDA_LOW_SCL_LOW()  \
+    gpio_output_set(0, 1<<I2C_MASTER_SDA_GPIO | 1<<I2C_MASTER_SCL_GPIO, 1<<I2C_MASTER_SDA_GPIO | 1<<I2C_MASTER_SCL_GPIO, 0)
+
+#define i2c_master_wait    os_delay_us
+
 LOCAL uint8 m_nLastSDA;
 LOCAL uint8 m_nLastSCL;
 
@@ -102,6 +143,9 @@ i2c_master_init(void)
 void ICACHE_FLASH_ATTR
 i2c_master_gpio_init(void)
 {
+
+    // os_printf ( "SDA/SCL = %d/%d\n", I2C_MASTER_SDA_GPIO, I2C_MASTER_SCL_GPIO );
+
     ETS_GPIO_INTR_DISABLE() ;
 //    ETS_INTR_LOCK();
 
