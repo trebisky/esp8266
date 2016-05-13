@@ -62,9 +62,12 @@ LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
 TARGET	= bmp
 
-OBJS = bmp.o gpio.o
+OBJS = bmp.o iic.o
 
 all: $(TARGET)
+
+bmp.o:	bmp.c iic.h
+iic.o:	iic.c iic.h
 
 .c.o:
 	$(vecho) "CC $<"
