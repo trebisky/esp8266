@@ -6,9 +6,9 @@ void i2c_master_init(void);
 
 void i2c_master_stop(void);
 void i2c_master_start(void);
-void i2c_master_setAck(uint8 level);
-uint8 i2c_master_getAck(void);
-uint8 i2c_master_readByte(void);
-void i2c_master_writeByte(uint8 wrdata);
+void i2c_master_setAck(int level);
+int i2c_master_getAck(void);
+int i2c_master_readByte(void);
+void i2c_master_writeByte(int wrdata);
 
 #endif

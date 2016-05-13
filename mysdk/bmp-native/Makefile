@@ -60,14 +60,14 @@ LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
 .PHONY: all flash clean info term
 
-TARGET	= bmp-native
+TARGET	= bmp
 
-OBJS = bmp-native.o i2c_master.o
+OBJS = bmp.o iic.o
 
 all: $(TARGET)
 
-bmp-native.o:	bmp-native.c i2c_master.h
-i2c_master.o:	i2c_master.c i2c_master.h
+bmp.o:	bmp.c iic.h
+iic.o:	iic.c iic.h
 
 .c.o:
 	$(vecho) "CC $<"

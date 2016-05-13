@@ -27,8 +27,7 @@ THE SOFTWARE.
 #include <os_type.h>
 #include <gpio.h>
 
-// #include "driver/uart.h"
-#include "i2c_master.h"
+#include "iic.h"
 
 extern void wdt_feed(void);
 
@@ -105,46 +104,21 @@ struct bmp_cals {
 #define	MC	bmp_cal.mc
 #define	MD	bmp_cal.md
 
-LOCAL int ICACHE_FLASH_ATTR
-send_byte ( int byte, char *msg )
-{
-	int ack;
-
-	i2c_master_writeByte ( byte );
-	ack = i2c_master_getAck();
-	if ( ack ) {
-		os_printf("I2C: No ack after sending %s\n", msg);
-		i2c_master_stop();
-		return 1;
-	}
-	return 0;
-}
-
-LOCAL int ICACHE_FLASH_ATTR
-recv_byte ( int ack )
-{
-	int rv;
-
-	rv = i2c_master_readByte();
-	i2c_master_setAck ( ack );
-	return rv;
-}
-
 /* ID register should always yield 0x55 */
 LOCAL int ICACHE_FLASH_ATTR
 read_id ( void )
 {
 	int id;
 
-	i2c_master_start();
-	if ( send_byte ( BMP_ADDR_W, "W address" ) ) return;
-	if ( send_byte ( REG_ID, "reg" ) ) return;
-	i2c_master_stop();
+	iic_start();
+	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
+	if ( iic_send_byte_m ( REG_ID, "reg" ) ) return;
+	iic_stop();
 
-	i2c_master_start();
-	if ( send_byte ( BMP_ADDR_R, "R address" ) ) return;
-	id = recv_byte ( 1 );
-	i2c_master_stop();
+	iic_start();
+	if ( iic_send_byte_m ( BMP_ADDR_R, "R address" ) ) return;
+	id = iic_recv_byte ( 1 );
+	iic_stop();
 
 	// os_printf("I2C: ID = 0x%02x\n", id );
 	return id;
@@ -155,24 +129,24 @@ read_temp ( void )
 {
 	int rv;
 
-	i2c_master_start();
-	if ( send_byte ( BMP_ADDR_W, "W address" ) ) return;
-	if ( send_byte ( REG_CONTROL, "reg" ) ) return;
-	if ( send_byte ( CMD_TEMP, "cmd" ) ) return;
-	i2c_master_stop();
+	iic_start();
+	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
+	if ( iic_send_byte_m ( REG_CONTROL, "reg" ) ) return;
+	if ( iic_send_byte_m ( CMD_TEMP, "cmd" ) ) return;
+	iic_stop();
 
     os_delay_us ( TDELAY );
 
-	i2c_master_start();
-	if ( send_byte ( BMP_ADDR_W, "W address" ) ) return;
-	if ( send_byte ( REG_RESULT, "reg" ) ) return;
-	i2c_master_stop();
+	iic_start();
+	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
+	if ( iic_send_byte_m ( REG_RESULT, "reg" ) ) return;
+	iic_stop();
 
-	i2c_master_start();
-	if ( send_byte ( BMP_ADDR_R, "R address" ) ) return;
-	rv =  recv_byte ( 0 ) << 8;
-	rv |= recv_byte ( 1 );
-	i2c_master_stop();
+	iic_start();
+	if ( iic_send_byte_m ( BMP_ADDR_R, "R address" ) ) return;
+	rv =  iic_recv_byte ( 0 ) << 8;
+	rv |= iic_recv_byte ( 1 );
+	iic_stop();
 
 	// os_printf("I2C: read(MSB/LSB)=(0x%02x/0x%02x)\n", msb, lsb);
 	return rv;
@@ -188,25 +162,25 @@ read_pressure ( void )
 {
 	int rv;
 
-	i2c_master_start();
-	if ( send_byte ( BMP_ADDR_W, "W address" ) ) return;
-	if ( send_byte ( REG_CONTROL, "reg" ) ) return;
-	if ( send_byte ( CMD_PRESS, "cmd" ) ) return;
-	i2c_master_stop();
+	iic_start();
+	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
+	if ( iic_send_byte_m ( REG_CONTROL, "reg" ) ) return;
+	if ( iic_send_byte_m ( CMD_PRESS, "cmd" ) ) return;
+	iic_stop();
 
     os_delay_us ( PDELAY );
 
-	i2c_master_start();
-	if ( send_byte ( BMP_ADDR_W, "W address" ) ) return;
-	if ( send_byte ( REG_RESULT, "reg" ) ) return;
-	i2c_master_stop();
+	iic_start();
+	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
+	if ( iic_send_byte_m ( REG_RESULT, "reg" ) ) return;
+	iic_stop();
 
-	i2c_master_start();
-	if ( send_byte ( BMP_ADDR_R, "R address" ) ) return;
-	rv =  recv_byte ( 0 ) << 16;
-	rv |=  recv_byte ( 0 ) << 8;
-	rv |=  recv_byte ( 1 );
-	i2c_master_stop();
+	iic_start();
+	if ( iic_send_byte_m ( BMP_ADDR_R, "R address" ) ) return;
+	rv =  iic_recv_byte ( 0 ) << 16;
+	rv |=  iic_recv_byte ( 0 ) << 8;
+	rv |=  iic_recv_byte ( 1 );
+	iic_stop();
 
 	rv >>= PSHIFT;
 
@@ -220,19 +194,19 @@ read_cals ( unsigned short *buf )
 	int val;
 	int i;
 
-	i2c_master_start();
-	if ( send_byte ( BMP_ADDR_W, "W address" ) ) return;
-	if ( send_byte ( REG_CALS, "reg" ) ) return;
-	i2c_master_stop();
+	iic_start();
+	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
+	if ( iic_send_byte_m ( REG_CALS, "reg" ) ) return;
+	iic_stop();
 
-	i2c_master_start();
-	if ( send_byte ( BMP_ADDR_R, "R address" ) ) return;
+	iic_start();
+	if ( iic_send_byte_m ( BMP_ADDR_R, "R address" ) ) return;
 	for ( i=0; i < NCALS; i++ ) {
-		val = recv_byte ( 0 ) << 8;
-		val |= recv_byte ( i == NCALS - 1 ? 1 : 0 );
+		val = iic_recv_byte ( 0 ) << 8;
+		val |= iic_recv_byte ( i == NCALS - 1 ? 1 : 0 );
 		*buf++ = val;
 	}
-	i2c_master_stop();
+	iic_stop();
 }
 
 /* ---------------------------------------------- */
@@ -447,6 +421,9 @@ read_cb ( void )
 	*/
 }
 
+#define IIC_SDA		4
+#define IIC_SCL		5
+
 /* Reading the sensor takes 4.5 + 7.5 milliseconds */
 #define DELAY 1000 /* milliseconds */
 
@@ -457,7 +434,8 @@ void user_init(void)
 	uart_div_modify(0, UART_CLK_FREQ / 115200);
 	os_printf ( "\n" );
 
-	i2c_master_gpio_init();
+	iic_init ( IIC_SDA, IIC_SCL );
+
 	os_printf ( "BMP180 address: %02x\n", BMP_ADDR );
 
 	// Set up a timer to tick continually
