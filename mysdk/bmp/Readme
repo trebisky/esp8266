@@ -2,9 +2,6 @@ Tom Trebisky
 
 5-8-2016
 
-I have been struggling to code up my own i2c driver and decided that
-it would be nice to start with working code and learn by adapting it.
-
 I found some nice work by Matt Callow, and he has put it all up
 on Github.  So I downloaded the zip file and found that his
 05i2cdemo looked like a nice tidy big of code without extra nonsense.
