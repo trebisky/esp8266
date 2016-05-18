@@ -1,7 +1,7 @@
 /*
 The MIT License (MIT)
 
-Copyright (c) 2014 Matt Callow
+Copyright (c) 2016 Tom Trebisky  tom@mmto.org
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,13 +27,9 @@ THE SOFTWARE.
 #include <os_type.h>
 #include <gpio.h>
 
-#include "iic.h"
-
-extern void wdt_feed(void);
+// #include "iic.h"
 
 #define  BMP_ADDR 0x77
-#define  BMP_ADDR_R ((BMP_ADDR << 1) | 1)
-#define  BMP_ADDR_W (BMP_ADDR << 1)
 
 #define  REG_CALS		0xAA
 #define  REG_CONTROL	0xF4
@@ -104,109 +100,287 @@ struct bmp_cals {
 #define	MC	bmp_cal.mc
 #define	MD	bmp_cal.md
 
-/* ID register should always yield 0x55 */
-LOCAL int ICACHE_FLASH_ATTR
-read_id ( void )
+/* These will move to iic library */
+
+#define IIC_WADDR(a)	(a << 1)
+#define IIC_RADDR(a)	((a << 1) | 1)
+
+/* raw write an array of bytes (8 bit objects)
+ * for a device without registers (like the MCP4725)
+ */
+static int ICACHE_FLASH_ATTR
+iic_write_raw ( int addr, unsigned char *buf, int n )
 {
-	int id;
+	int i;
 
 	iic_start();
-	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
-	if ( iic_send_byte_m ( REG_ID, "reg" ) ) return;
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) return 1;
+	for ( i = 0; i < n; i++ ) {
+		if ( iic_send_byte_m ( buf[i], "reg" ) ) return 1;
+	}
 	iic_stop();
 
-	iic_start();
-	if ( iic_send_byte_m ( BMP_ADDR_R, "R address" ) ) return;
-	id = iic_recv_byte ( 1 );
-	iic_stop();
-
-	// os_printf("I2C: ID = 0x%02x\n", id );
-	return id;
+	return 0;
 }
 
-LOCAL int ICACHE_FLASH_ATTR
-read_temp ( void )
+/* raw read an array of bytes (8 bit objects)
+ * for a device without registers (like the MCP4725)
+ */
+static int ICACHE_FLASH_ATTR
+iic_read_raw ( int addr, unsigned char *buf, int n )
+{
+	int i;
+
+	iic_start();
+	if ( iic_send_byte_m ( IIC_RADDR(addr), "R address" ) ) return 1;
+
+	for ( i=0; i < n; i++ ) {
+		*buf++ = iic_recv_byte ( i == n - 1 ? 1 : 0 );
+	}
+
+	iic_stop();
+
+	return 0;
+}
+
+/* raw read an array of shorts (16 bit objects)
+ */
+static int ICACHE_FLASH_ATTR
+iic_read_16raw ( int addr, unsigned short *buf, int n )
+{
+	unsigned int val;
+	int i;
+
+	iic_start();
+	if ( iic_send_byte_m ( IIC_RADDR(addr), "R address" ) ) return 1;
+
+	for ( i=0; i < n; i++ ) {
+		val =  iic_recv_byte ( 0 ) << 8;
+		val |= iic_recv_byte ( i == n - 1 ? 1 : 0 );
+		*buf++ = val;
+	}
+
+	iic_stop();
+
+	return 0;
+}
+
+/* 8 bit read */
+static int ICACHE_FLASH_ATTR
+iic_read ( int addr, int reg )
 {
 	int rv;
 
 	iic_start();
-	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
-	if ( iic_send_byte_m ( REG_CONTROL, "reg" ) ) return;
-	if ( iic_send_byte_m ( CMD_TEMP, "cmd" ) ) return;
-	iic_stop();
-
-    os_delay_us ( TDELAY );
-
-	iic_start();
-	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
-	if ( iic_send_byte_m ( REG_RESULT, "reg" ) ) return;
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) return;
+	if ( iic_send_byte_m ( reg, "reg" ) ) return;
 	iic_stop();
 
 	iic_start();
-	if ( iic_send_byte_m ( BMP_ADDR_R, "R address" ) ) return;
+	if ( iic_send_byte_m ( IIC_RADDR(addr), "R address" ) ) return;
+	rv = iic_recv_byte ( 1 );
+	iic_stop();
+
+	return rv;
+}
+
+/* read a 2 byte (short) object from
+ * two consecutive i2c registers.
+ * (or in some devices, a single 16 bit register)
+ */
+static int ICACHE_FLASH_ATTR
+iic_read_16 ( int addr, int reg )
+{
+	int rv;
+
+	iic_start();
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) return;
+	if ( iic_send_byte_m ( reg, "reg" ) ) return;
+	iic_stop();
+
+	iic_start();
+	if ( iic_send_byte_m ( IIC_RADDR(addr), "R address" ) ) return;
 	rv =  iic_recv_byte ( 0 ) << 8;
 	rv |= iic_recv_byte ( 1 );
 	iic_stop();
 
-	// os_printf("I2C: read(MSB/LSB)=(0x%02x/0x%02x)\n", msb, lsb);
 	return rv;
 }
 
-/* Pressure reads 3 bytes
+
+/* read an array of bytes (8 bit objects) from
+ * consecutive i2c registers.
+ */
+static int ICACHE_FLASH_ATTR
+iic_read_n ( int addr, int reg, unsigned char *buf, int n )
+{
+	unsigned int val;
+	int i;
+
+	iic_start();
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) return 1;
+	if ( iic_send_byte_m ( reg, "reg" ) ) return 1;
+	iic_stop();
+
+	iic_start();
+	if ( iic_send_byte_m ( IIC_RADDR(addr), "R address" ) ) return 1;
+	for ( i=0; i < n; i++ ) {
+		*buf++ = iic_recv_byte ( i == n - 1 ? 1 : 0 );
+	}
+	iic_stop();
+
+	return 0;
+}
+
+/* read an array of 2 byte (short) objects from
+ * consecutive i2c registers.
  *  - note that i2c devices just read out consecutive registers
  *  until you send a nack
  */
-
-LOCAL int ICACHE_FLASH_ATTR
-read_pressure ( void )
-{
-	int rv;
-
-	iic_start();
-	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
-	if ( iic_send_byte_m ( REG_CONTROL, "reg" ) ) return;
-	if ( iic_send_byte_m ( CMD_PRESS, "cmd" ) ) return;
-	iic_stop();
-
-    os_delay_us ( PDELAY );
-
-	iic_start();
-	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
-	if ( iic_send_byte_m ( REG_RESULT, "reg" ) ) return;
-	iic_stop();
-
-	iic_start();
-	if ( iic_send_byte_m ( BMP_ADDR_R, "R address" ) ) return;
-	rv =  iic_recv_byte ( 0 ) << 16;
-	rv |=  iic_recv_byte ( 0 ) << 8;
-	rv |=  iic_recv_byte ( 1 );
-	iic_stop();
-
-	rv >>= PSHIFT;
-
-	// os_printf("I2C: pressure = %08x\n", rv );
-	return rv;
-}
-
-LOCAL void ICACHE_FLASH_ATTR
-read_cals ( unsigned short *buf )
+static int ICACHE_FLASH_ATTR
+iic_read_16n ( int addr, int reg, unsigned short *buf, int n )
 {
 	int val;
 	int i;
 
 	iic_start();
-	if ( iic_send_byte_m ( BMP_ADDR_W, "W address" ) ) return;
-	if ( iic_send_byte_m ( REG_CALS, "reg" ) ) return;
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) return 1;
+	if ( iic_send_byte_m ( reg, "reg" ) ) return 1;
 	iic_stop();
 
 	iic_start();
-	if ( iic_send_byte_m ( BMP_ADDR_R, "R address" ) ) return;
-	for ( i=0; i < NCALS; i++ ) {
-		val = iic_recv_byte ( 0 ) << 8;
-		val |= iic_recv_byte ( i == NCALS - 1 ? 1 : 0 );
+	if ( iic_send_byte_m ( IIC_RADDR(addr), "R address" ) ) return 1;
+	for ( i=0; i < n; i++ ) {
+		val =  iic_recv_byte ( 0 ) << 8;
+		val |= iic_recv_byte ( i == n - 1 ? 1 : 0 );
 		*buf++ = val;
 	}
 	iic_stop();
+
+	return 0;
+}
+
+/* read a 2 byte (short) object from
+ * two consecutive i2c registers.
+ */
+static int ICACHE_FLASH_ATTR
+iic_read_24 ( int addr, int reg )
+{
+	int rv;
+
+	iic_start();
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) return;
+	if ( iic_send_byte_m ( reg, "reg" ) ) return;
+	iic_stop();
+
+	iic_start();
+	if ( iic_send_byte_m ( IIC_RADDR(addr), "R address" ) ) return;
+	rv =  iic_recv_byte ( 0 ) << 16;
+	rv |=  iic_recv_byte ( 0 ) << 8;
+	rv |= iic_recv_byte ( 1 );
+	iic_stop();
+
+	return rv;
+}
+
+static int ICACHE_FLASH_ATTR
+iic_write ( int addr, int reg, int val )
+{
+	iic_start();
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) return 1;
+	if ( iic_send_byte_m ( reg, "reg" ) ) return 1;
+	if ( iic_send_byte_m ( val, "val" ) ) return 1;
+	iic_stop();
+
+	return 0;
+}
+
+static int ICACHE_FLASH_ATTR
+iic_write16 ( int addr, int reg, int val )
+{
+	iic_start();
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) return 1;
+	if ( iic_send_byte_m ( reg, "reg" ) ) return 1;
+	if ( iic_send_byte_m ( val >> 8, "val_h" ) ) return 1;
+	if ( iic_send_byte_m ( val & 0xff, "val_l" ) ) return 1;
+	iic_stop();
+
+	return 0;
+}
+
+/* write a register address with no data
+ * (this could be a call to write_raw with a
+ *   count of zero)
+ */
+static int ICACHE_FLASH_ATTR
+iic_write_nada ( int addr, int reg )
+{
+	iic_start();
+	if ( iic_send_byte_m ( IIC_WADDR(addr), "W address" ) ) return 1;
+	if ( iic_send_byte_m ( reg, "reg" ) ) return 1;
+	iic_stop();
+
+	return 0;
+}
+
+/* ---------------------------------------------- */
+/* ---------------------------------------------- */
+/* BMP180 specific routines --- */
+
+/* ID register -- should always yield 0x55
+ */
+static int ICACHE_FLASH_ATTR
+read_id ( void )
+{
+	int id;
+
+	id = iic_read ( BMP_ADDR, REG_ID );
+
+	return id;
+}
+
+static int ICACHE_FLASH_ATTR
+read_temp ( void )
+{
+	int rv;
+
+	(void) iic_write ( BMP_ADDR, REG_CONTROL, CMD_TEMP );
+
+    os_delay_us ( TDELAY );
+
+	rv = iic_read_16 ( BMP_ADDR, REG_RESULT );
+
+	return rv;
+}
+
+/* Pressure reads 3 bytes
+ */
+
+static int ICACHE_FLASH_ATTR
+read_pressure ( void )
+{
+	int rv;
+
+	(void) iic_write ( BMP_ADDR, REG_CONTROL, CMD_PRESS );
+
+    os_delay_us ( PDELAY );
+
+	rv = iic_read_24 ( BMP_ADDR, REG_RESULT );
+
+	return rv >> PSHIFT;
+}
+
+static void ICACHE_FLASH_ATTR
+read_cals ( unsigned short *buf )
+{
+	/* Note that on the ESP8266 just placing the bytes into
+	 * memory in the order read out does not yield an array of shorts.
+	 * This is because the BMP180 gives the MSB first, but the
+	 * ESP8266 is little endian.  So we use our routine that gives
+	 * us an array of shorts and we are happy.
+	 */
+	// iic_read_n ( BMP_ADDR, REG_CALS, (unsigned char *) buf, 2*NCALS );
+	iic_read_16n ( BMP_ADDR, REG_CALS, buf, NCALS );
 }
 
 /* ---------------------------------------------- */
@@ -360,7 +534,6 @@ convert ( int rawt, int rawp )
 	os_printf ( "Temp = %d -- Pressure (mb*100, sea level) = %d\n", tf, pmb_sea );
 }
 
-#ifdef notdef
 void
 show_cals ( void *cals )
 {
@@ -379,31 +552,164 @@ show_cals ( void *cals )
 		os_printf ( "cal 10 = %d\n", calbuf[9] );
 		os_printf ( "cal 11 = %d\n", calbuf[10] );
 }
-#endif
 
 /* ---------------------------------------------- */
 /* ---------------------------------------------- */
+/* MCP23008 driver follows
+ * The MCP23017 expands from 8 to 16 bits
+ * each register has the "extension" at addr + 0x10
+ * (so MCP_DIR is at 0x00 and 0x10)
+ */
 
-LOCAL os_timer_t read_timer;
+#define MCP_ADDR	0x20
 
-LOCAL void ICACHE_FLASH_ATTR
-read_cb ( void )
+#define MCP_DIR		0x00
+#define MCP_GPIO	0x09
+#define MCP_OLAT	0x0a
+
+static int ICACHE_FLASH_ATTR
+read_gpio ( void )
 {
-	static int first = 1;
-	static int count = 0;
-	int t, p;
+	int val;
 
-	wdt_feed();
-	// os_printf("Time=%ld\n", system_get_time());
+	val = iic_read ( MCP_ADDR, MCP_GPIO );
 
-	if ( first ) {
-		int val = read_id ();
-		os_printf ( "id = %02x\n", val );
-		os_printf ( "OSS = %d\n", OSS );
-		read_cals ( (unsigned short *) &bmp_cal );
-		// show_cals ( (void *) &bmp_cal );
-		first = 0;
+	return val;
+}
+
+/* ---------------------------------------------- */
+/* ---------------------------------------------- */
+/* MCP4725 driver follows
+ * This device is peculiar in that it does not have registers
+ * You either read or write.
+ * read always returns 3 bytes.
+ * write has 4 flavors.
+ */
+#define DAC_ADDR	0x60
+
+static void ICACHE_FLASH_ATTR
+dac_write ( unsigned int val )
+{
+	unsigned char iobuf[2];
+
+	iobuf[0] = (val >> 8) & 0xf;
+	iobuf[1] = val & 0xff;
+	iic_write_raw ( DAC_ADDR, iobuf, 2 );
+}
+
+static void ICACHE_FLASH_ATTR
+dac_write_ee ( unsigned int val )
+{
+	unsigned char iobuf[3];
+
+	iobuf[0] = 0x60;
+	iobuf[1] = val >> 4;
+	// iobuf[2] = (val & 0xf) << 4;
+	iobuf[2] = val << 4;
+	iic_write_raw ( DAC_ADDR, iobuf, 3 );
+}
+
+/* returns up to 5 bytes.
+ * "status" byte
+ * DAC value (2 bytes)
+ * EEPROM value (2 bytes)
+ */
+static void ICACHE_FLASH_ATTR
+dac_read ( unsigned char *buf, int n )
+{
+	iic_read_raw ( DAC_ADDR, buf, n );
+}
+
+static unsigned int ICACHE_FLASH_ATTR
+dac_read_val ( void )
+{
+	unsigned char iobuf[3];
+
+	iic_read_raw ( DAC_ADDR, iobuf, 3 );
+	return (iobuf[1] << 4) | (iobuf[2] >> 4);
+}
+/* ---------------------------------------------- */
+/* ---------------------------------------------- */
+/* HDC1008 driver
+ */
+#define HDC_ADDR	0x40
+
+#define HDC_TEMP	0x00
+#define HDC_HUM		0x01
+#define HDC_CON		0x02
+#define HDC_SN1		0xFB
+#define HDC_SN2		0xFC
+#define HDC_SN3		0xFD
+
+/* bits/fields in config register */
+#define HDC_RESET	0x8000
+#define HDC_HEAT	0x2000
+#define HDC_BOTH	0x1000
+#define HDC_BSTAT	0x0800
+
+#define HDC_TRES14	0x0000
+#define HDC_TRES11	0x0400
+
+#define HDC_HRES14	0x0000
+#define HDC_HRES11	0x0100
+#define HDC_HRES8	0x0200
+
+/* Delays in microseconds */
+#define CONV_8		2500
+#define CONV_11		3650
+#define CONV_14		6350
+
+#define CONV_BOTH	12700
+
+/* Read gets both T then H */
+static void ICACHE_FLASH_ATTR
+hdc_con_both ( void )
+{
+	(void) iic_write16 ( HDC_ADDR, HDC_CON, HDC_BOTH );
+}
+
+/* Read gets either T or H */
+static void ICACHE_FLASH_ATTR
+hdc_con_single ( void )
+{
+	(void) iic_write16 ( HDC_ADDR, HDC_CON, 0 );
+}
+
+static void ICACHE_FLASH_ATTR
+hdc_read_both ( unsigned short *buf )
+{
+	iic_write_nada ( HDC_ADDR, HDC_TEMP );
+	os_delay_us ( CONV_BOTH );
+
+	iic_read_16raw ( HDC_ADDR, buf, 2 );
+}
+
+/* ---------------------------------------------- */
+/* ---------------------------------------------- */
+
+static void ICACHE_FLASH_ATTR
+upd_mcp ( void )
+{
+	int val;
+	static int phase = 0;
+
+	// val = read_gpio ();
+	// os_printf ( "MCP gpio = %02x\n", val );
+
+	if ( phase ) {
+		iic_write ( MCP_ADDR, MCP_OLAT, 0 );
+		phase = 0;
+	} else {
+		iic_write ( MCP_ADDR, MCP_OLAT, 0xff );
+		phase = 1;
 	}
+
+}
+
+static void ICACHE_FLASH_ATTR
+read_bmp ( void )
+{
+	int t, p;
 
 	t = read_temp ();
 	p = read_pressure ();
@@ -412,11 +718,117 @@ read_cb ( void )
 	//os_printf ( "raw T, P = %d  %d\n", t, p );
 
 	convert ( t, p );
+}
+
+static void ICACHE_FLASH_ATTR
+dac_show ( void )
+{
+	unsigned char io[5];
+
+	dac_read ( io, 5 );
+
+	os_printf ( "DAC status = %02x\n", io[0] );
+	os_printf ( "DAC val = %02x %02x\n", io[1], io[2] );
+	os_printf ( "DAC ee = %02x %02x\n", io[3], io[4] );
+}
+
+static unsigned int dac_val = 0;
+
+static void ICACHE_FLASH_ATTR
+dac_doodle ( void )
+{
+	dac_val += 16;
+	if ( dac_val > 4096 ) dac_val = 0;
+	dac_write ( dac_val);
+}
+
+static void ICACHE_FLASH_ATTR
+hdc_test ( void )
+{
+	int val;
+
+	/* This does not work.
+	 * device does not autoincrement address
+	 */
+	// unsigned short iobuf[3];
+	// (void) iic_read_16n ( HDC_ADDR, HDC_SN1, iobuf, 3 );
+
+	val = iic_read_16 ( HDC_ADDR, HDC_SN1 );
+	os_printf ( "HDC sn = %04x\n", val );
+	val = iic_read_16 ( HDC_ADDR, HDC_SN2 );
+	os_printf ( "HDC sn = %04x\n", val );
+	val = iic_read_16 ( HDC_ADDR, HDC_SN3 );
+	os_printf ( "HDC sn = %04x\n", val );
+
+	val = iic_read_16 ( HDC_ADDR, HDC_CON );
+	os_printf ( "HDC con = %04x\n", val );
+
+	hdc_con_both ();
+}
+
+static void ICACHE_FLASH_ATTR
+hdc_read ( void )
+{
+	unsigned short iobuf[2];
+	int t, h;
+	int tf;
+
+	hdc_read_both ( iobuf );
+
+	/*
+	t = 99;
+	h = 23;
+	tf = 0;
+	os_printf ( " Bogus t, tf, h = %d  %d %d\n", t, tf, h );
+	*/
+	// os_printf ( " HDC raw t,h = %04x  %04x\n", iobuf[0], iobuf[1] );
+
+	t = ((iobuf[0] * 165) / 65536)- 40;
+	tf = t * 18 / 10 + 32;
+	os_printf ( " -- traw, t, tf = %04x %d   %d %d\n", iobuf[0], iobuf[0], t, tf );
+
+	//h = ((iobuf[1] * 100) / 65536);
+	//os_printf ( "HDC t, tf, h = %d  %d %d\n", t, tf, h );
+
+	h = ((iobuf[1] * 100) / 65536);
+	os_printf ( " -- hraw, h = %04x %d    %d\n", iobuf[1], iobuf[1], h );
+}
+
+/* ---------------------------------------- */
+
+static os_timer_t timer;
+
+static void ICACHE_FLASH_ATTR
+ticker ( void *arg )
+{
+	static int first = 1;
+	static int count = 0;
+
+	if ( first ) {
+		int val = read_id ();
+		os_printf ( "BMP180 id = %02x\n", val );
+
+		read_cals ( (unsigned short *) &bmp_cal );
+		// show_cals ( (void *) &bmp_cal );
+
+		// iic_write ( MCP_ADDR, MCP_DIR, 0 );		/* outputs */
+
+		// dac_show ();
+
+		hdc_test ();
+
+		first = 0;
+	}
+
+	// read_bmp ();
+	// upd_mcp ();
+	// dac_doodle ();
+	hdc_read ();
 
 	/*
 	if ( ++count > 10 ) {
 		os_printf ( "Finished\n" );
-		os_timer_disarm(&read_timer);
+		os_timer_disarm(&timer);
 	}
 	*/
 }
@@ -424,8 +836,9 @@ read_cb ( void )
 #define IIC_SDA		4
 #define IIC_SCL		5
 
-/* Reading the sensor takes 4.5 + 7.5 milliseconds */
+/* Reading the BMP180 sensor takes 4.5 + 7.5 milliseconds */
 #define DELAY 1000 /* milliseconds */
+// #define DELAY 2 /* 2 milliseconds - for DAC test */
 
 void user_init(void)
 {
@@ -436,14 +849,13 @@ void user_init(void)
 
 	iic_init ( IIC_SDA, IIC_SCL );
 
-	os_printf ( "BMP180 address: %02x\n", BMP_ADDR );
+	// os_printf ( "BMP180 address: %02x\n", BMP_ADDR );
+	// os_printf ( "OSS = %d\n", OSS );
 
 	// Set up a timer to tick continually
-    os_timer_disarm(&read_timer);
-	// os_timer_setfn(ETSTimer *ptimer, ETSTimerFunc *pfunction, void *parg)
-	os_timer_setfn(&read_timer, read_cb, (void *)0);
-	// void os_timer_arm(ETSTimer *ptimer,uint32_t milliseconds, bool repeat_flag)
-	os_timer_arm(&read_timer, DELAY, 1);
+    os_timer_disarm(&timer);
+	os_timer_setfn(&timer, ticker, (void *)0);
+	os_timer_arm(&timer, DELAY, 1);
 }
 
 // vim: ts=4 sw=4 
