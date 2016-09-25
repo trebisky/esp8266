@@ -2,6 +2,7 @@
 *.bin
 bootrom.bin
 kongo_iram0.bin
+kongo_iram0_ORIG.txt
 bootrom.elf
 bootsym.elf
 *.o
