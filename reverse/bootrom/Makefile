@@ -25,7 +25,8 @@ bootrom.bin:
 naive.dis:
 	xtensa-lx106-elf-objdump -D -b binary -mxtensa bootrom.bin >naive.dis
 
-REMOTE = /www/cholla/esp8266/bootrom/boot.txt
+#REMOTE = /www/cholla/esp8266/bootrom/boot.txt
+REMOTE = /u1/www/esp8266/bootrom/boot.txt
 
 cinstall:
 	ssh cholla rm $(REMOTE)

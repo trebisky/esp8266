@@ -66,8 +66,8 @@ OBJS = bmp.o iic.o
 
 all: $(TARGET)
 
-bmp.o:	bmp.c iic.h
-iic.o:	iic.c iic.h
+#bmp.o:	bmp.c
+#iic.o:	iic.c
 
 .c.o:
 	$(vecho) "CC $<"

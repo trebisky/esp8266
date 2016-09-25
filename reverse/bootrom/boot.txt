@@ -95,7 +95,7 @@
 ;    addi ar, as, N   adds as + N and places the result in ar  N is [-127,128]
 ;  bltu is a typical branch instruction:
 ;    bltu as, at, addr  branches to addr if as < at
-;    beqz as, addr      branches to addr if as < 0
+;    beqz as, addr      branches to addr if as == 0
 
 ; -----------------------------------------------------------------------
 
