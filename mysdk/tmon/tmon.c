@@ -1,7 +1,14 @@
 /* ESP8266 sdk experiments
+ *
+ * Tmon project.
  * 
- * Sets up a TCP server on port 1013
- * Echos stuff received on port 88
+ * This is in regular use around my house.
+ * It is a RHT03 temp/humidity sensor hooked to a
+ * NodeMCU type board with an ESP8266
+ *
+ * It sends data once a minute via TCP to a server
+ * (The server is trivial Ruby code).
+ * The server runs on port 2001.
  *
  * Tom Trebisky  12-28-2015
  */
@@ -17,6 +24,14 @@
 #define TEST_PORT 13	/* daytime */
 #define DATA_PORT 2001	/* on trona */
 
+#ifdef notdef
+static char *ssid = "polecat";
+static char *pass = "Your ad here";
+#endif
+
+/* My ssid and password are in here */
+#include "secret.h"
+
 /* Usually we finish in 0.2 seconds,
  * so allowing 0.5 seconds should be adequate
  * When we first power up, connecting to the
@@ -25,17 +40,6 @@
  */
 #define WATCHDOG_INIT	10000
 #define WATCHDOG_TCP	500
-
-#ifdef notdef
-static char *ssid = "polecat";
-static char *pass = "Slow and steady.";
-
-static char *ssid = "Hoot_Owl";
-static char *pass = "The gift of God is eternal life!";
-#endif
-
-static char *ssid = "Hoot_Owl";
-static char *pass = "The gift of God is eternal life!";
 
 void show_ip ( void );
 void next_time ( void );
@@ -128,6 +132,10 @@ dns_lookup ( char *name )
 #endif
 
 #ifdef SERVER
+
+/*
+ * Sets up a TCP server on port 1013
+ */
 
 #define SERVER_PORT	1013
 

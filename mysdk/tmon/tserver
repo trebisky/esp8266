@@ -3,6 +3,19 @@
 # Ruby server to absorb temperature data
 # Tom Trebisky  4-13-2016
 
+# Data this logs will look like this:
+# 12-03-2016 10:24:01 18 0 347 109 516
+# 12-03-2016 10:25:00 18 0 338 112 521
+# 12-03-2016 10:25:59 17 0 331 112 521
+# 12-03-2016 10:26:59 18 0 326 112 521
+# 12-03-2016 10:27:58 18 0 325 111 519
+
+# The first two columns are date and time
+# Then we have a "delay" since the last reading.
+# Then an always zero that used to mean something.
+# Then: humidity, temp-C, temp-F
+#  these values are all *10 so 519 is really 51.9 degrees
+
 require 'socket'
 require 'timeout'
 

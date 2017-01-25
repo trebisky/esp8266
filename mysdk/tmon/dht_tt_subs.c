@@ -197,6 +197,7 @@ dht_sensor ( int pin, int *temp_p, int *hum_p )
     int count;
     unsigned long cc1, cc2;
     int data_count, bit_count, data;
+    int temp;
     //int sum;
     //int i;
 
@@ -306,7 +307,12 @@ dht_sensor ( int pin, int *temp_p, int *hum_p )
     }
 
     *hum_p = dht_data[0] << 8 | dht_data[1];
-    *temp_p = dht_data[2] << 8 | dht_data[3];
+
+    // *temp_p = dht_data[2] << 8 | dht_data[3];
+    temp = dht_data[2] << 8 | dht_data[3];
+    if ( temp & 0x8000 )
+	temp = -(temp - 0x8000);
+    *temp_p = temp;
 
     return 1;
 }
