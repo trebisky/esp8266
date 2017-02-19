@@ -61,10 +61,7 @@ LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
 .PHONY: all flash clean info term
 
-TARGET = blink2
-#TARGET = prod
-#TARGET = hello_loop
-#TARGET = hello
+TARGET = blink3
 
 all: $(TARGET)
 

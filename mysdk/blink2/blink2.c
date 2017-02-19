@@ -36,7 +36,8 @@ void user_init()
 {
     os_timer_disarm ( &timer1 );
     os_timer_setfn ( &timer1, timer_func1, NULL );
-    os_timer_arm ( &timer1, 1000, 1 );
+    // os_timer_arm ( &timer1, 1000, 1 );
+    os_timer_arm ( &timer1, 500, 1 );
 
     uart_div_modify(0, UART_CLK_FREQ / 115200);
 
