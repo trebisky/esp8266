@@ -76,6 +76,7 @@ hw_timer_setup_sdk ( void )
 #define FRC1_ENABLE_TIMER  BIT7
 #define FRC1_AUTO_LOAD  BIT6
 
+/* Argument is interval in microseconds !! */
 static void
 hw_timer_setup ( unsigned int val )
 {
