@@ -1,5 +1,8 @@
-At one point I was charmed with the idea of using Lua on the ESP8266,
-but got entirely disgusted and abandoned it when I discovered that
-just trying to load a DHT22 driver and demo ran it out of memory.
+Here are the results of my quick foray into Lua and NodeMCU.
 
-So, if you find anything useful here, more power to you.
+When I tried to load the bmp180 demo and ran out of memory I
+declared NodeMCU a disaster and train wreck and never looked
+back.  Apparently the project has used up almost all of
+memory on the ESP8266 leaving nothing for the end user.
+
+I didn't want to learn yet another language anyway ...
