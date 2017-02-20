@@ -1,16 +1,21 @@
-/* Use a hardware timer on the ESP8266
- * to get an LED blinking
+/* 
+ * The idea here is to learn how to use
+ *  a hardware timer on the ESP8266
+ *
+ * Here we do 2 things with it.
+ *  - we blink the onboard LED on GPIO2 at 1 Hz
+ *  - we generate a 100 Khz waveform on GPIO5
+ *
+ * Works great, os timer has 1 ms resolution.
  *
  * Tom Trebisky  2-18-2017
  */
+
 #include "ets_sys.h"
 #include "osapi.h"
 #include "os_type.h"
 #include "gpio.h"
-
 #include "user_interface.h"
-
-// static os_timer_t timer1;
 
 /* BIT2 blinks the little LED on my NodeMCU board
  * (which is labelled "D4" on the silkscreen)
@@ -18,31 +23,51 @@
  * This code also works with the plain ESP-12 board I have.
  */
 #define LED_BIT		BIT2
-#define FUNC_MUX	PERIPHS_IO_MUX_GPIO2_U
-#define FUNC_F		FUNC_GPIO2
+#define PULSE_BIT	BIT5
 
-//TIMER PREDIVED MODE
-typedef enum {
-    DIVDED_BY_1 = 0,            //timer clock
-    DIVDED_BY_16 = 4,   //divided by 16
-    DIVDED_BY_256 = 8,  //divided by 256
-} TIMER_PREDIVED_MODE;
+/* Timer clock */
+#define DIV_BY_1     0
+#define DIV_BY_16    4
+#define DIV_BY_256   8
 
-typedef enum {                  //timer interrupt mode
-    TM_LEVEL_INT = 1,   // level interrupt
-    TM_EDGE_INT   = 0,  //edge interrupt
-} TIMER_INT_MODE;
+#define TM_LEVEL_INT  1   // level interrupt
+#define TM_EDGE_INT   0   // edge interrupt
+
+static void
+flip_led ( void )
+{
+    if (GPIO_REG_READ(GPIO_OUT_ADDRESS) & LED_BIT) {
+	gpio_output_set(0, LED_BIT, LED_BIT, 0);
+	// os_printf("set high\n");
+    } else {
+	gpio_output_set(LED_BIT, 0, LED_BIT, 0);
+	// os_printf("set low\n");
+    }
+}
+
+static void
+pulse ( void )
+{
+    if (GPIO_REG_READ(GPIO_OUT_ADDRESS) & PULSE_BIT) {
+	gpio_output_set(0, PULSE_BIT, PULSE_BIT, 0);
+    } else {
+	gpio_output_set(PULSE_BIT, 0, PULSE_BIT, 0);
+    }
+}
+
+#define LED_RATE	100*1000
+
+static long count = 0;
 
 void
 hw_timer_isr ( void )
 {
-    if (GPIO_REG_READ(GPIO_OUT_ADDRESS) & LED_BIT) {
-	gpio_output_set(0, LED_BIT, LED_BIT, 0);
-	os_printf("set high\n");
-    } else {
-	gpio_output_set(LED_BIT, 0, LED_BIT, 0);
-	os_printf("set low\n");
+    if ( ++count >= LED_RATE ) {
+	flip_led ();
+	count = 0;
     }
+
+    pulse ();
 }
 
 /* After reading in the API guide for the SDK,
@@ -81,8 +106,8 @@ static void
 hw_timer_setup ( unsigned int val )
 {
     /* hw_timer_init */
-    RTC_REG_WRITE(FRC1_CTRL_ADDRESS, FRC1_AUTO_LOAD | DIVDED_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
-    // RTC_REG_WRITE(FRC1_CTRL_ADDRESS, DIVDED_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
+    RTC_REG_WRITE(FRC1_CTRL_ADDRESS, FRC1_AUTO_LOAD | DIV_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
+    // RTC_REG_WRITE(FRC1_CTRL_ADDRESS, DIV_BY_16 | FRC1_ENABLE_TIMER | TM_EDGE_INT);
 
     // ETS_FRC_TIMER1_NMI_INTR_ATTACH(hw_timer_isr);
     ETS_FRC_TIMER1_INTR_ATTACH(hw_timer_isr, NULL);
@@ -97,7 +122,8 @@ hw_timer_setup ( unsigned int val )
 void user_init()
 {
 
-    hw_timer_setup ( 500 * 1000 );
+    // hw_timer_setup ( 500 * 1000 );
+    hw_timer_setup ( 5 );
     uart_div_modify(0, UART_CLK_FREQ / 115200);
 
     wifi_set_opmode(NULL_MODE);
@@ -105,9 +131,19 @@ void user_init()
     os_printf("\n");
     os_printf("SDK version:%s\n", system_get_sdk_version());
 
-    PIN_FUNC_SELECT ( FUNC_MUX, FUNC_F );
+    /* remember GPIO 1 and 3 are uart */
+
+/* Setup "bit 2" for output (this is the LED) */
+#define FUNC_MUX	PERIPHS_IO_MUX_GPIO2_U
+#define FUNC_F		FUNC_GPIO2
+    // PIN_FUNC_SELECT ( FUNC_MUX, FUNC_F );
+    PIN_FUNC_SELECT ( PERIPHS_IO_MUX_GPIO2_U, 0 );
+
+/* Setup GPIO-5 for output (for fast pulses) */
+    PIN_FUNC_SELECT ( PERIPHS_IO_MUX_GPIO5_U, 0 );
 
     gpio_output_set(0, LED_BIT, LED_BIT, 0);
+    gpio_output_set(0, PULSE_BIT, PULSE_BIT, 0);
 }
 
 /* THE END */
