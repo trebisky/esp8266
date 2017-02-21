@@ -14,5 +14,7 @@ These are not well named, but this list may help.
 7. easy - first cut at a DHT-22 and RHT03 driver
 8. dht_tt - a DHT-22 driver with a lot of cleanup
 9. espdht - first cut at a DHT-22 driver with Wifi access
+
 10. tmon - my outdoor temperature monitor with an RHT03 (DH22 clone)
+10. coolstat - my coolstat motor status hack
 
