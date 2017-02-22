@@ -37,6 +37,21 @@
 #define bit_low(x)	gpio_output_set(0, x, x, 0)
 #define bit_high(x)	gpio_output_set(x, 0, x, 0)
 
+/*
+#define PERIPHS_IO_MUX_PULLUP           BIT7
+#define PIN_PULLUP_DIS(PIN_NAME)                 CLEAR_PERI_REG_MASK(PIN_NAME, PERIPHS_IO_MUX_PULLUP)
+#define PIN_PULLUP_EN(PIN_NAME)                  SET_PERI_REG_MASK(PIN_NAME, PERIPHS_IO_MUX_PULLUP)
+*/
+
+/* Certain eagle_soc.h files have this */
+#define PERIPHS_IO_MUX_PULLDWN          BIT6
+#define PIN_PULLDWN_DIS(PIN_NAME)             CLEAR_PERI_REG_MASK(PIN_NAME, PERIPHS_IO_MUX_PULLDWN)
+#define PIN_PULLDWN_EN(PIN_NAME)              SET_PERI_REG_MASK(PIN_NAME, PERIPHS_IO_MUX_PULLDWN)
+
+#define bit_input(x)	gpio_output_set(0, 0, 0, x)
+
+#define bit_test(x)	(gpio_input_get() & x)
+
 #ifdef notdef
 static void
 flip_led ( void )
@@ -48,9 +63,15 @@ flip_led ( void )
     }
 }
 #endif
+
 static void
 flip_led ( void )
 {
+    if (GPIO_REG_READ(GPIO_OUT_ADDRESS) & LED_BIT) {
+	bit_low ( LED_BIT );
+    } else {
+	bit_high ( LED_BIT );
+    }
 }
 
 #define LED_RATE	5*1000
@@ -207,7 +228,7 @@ new_data ( void )
 
 /* Everything is driven by this interrupt ticking */
 void
-hw_timer_isr ( void )
+hw_timer_isrX ( void )
 {
     ++led_clock;
     if ( led_clock >= LED_RATE ) {
@@ -217,6 +238,26 @@ hw_timer_isr ( void )
 
     process_input ();
     process_output ();
+}
+
+static int last = 0xabcdfeed;
+
+void
+hw_timer_isr ( void )
+{
+    int x;
+
+    // x = gpio_input_get ();
+    x = bit_test ( IN_BIT );
+    if ( x != last ) {
+	os_printf ( "%08x\n", x );
+	last = x;
+    }
+
+    if ( bit_test ( IN_BIT ) )
+	bit_low ( LED_BIT );
+    else
+	bit_high ( LED_BIT );
 }
 
 #define US_TO_RTC_TIMER_TICKS(t)          \
@@ -253,7 +294,8 @@ void user_init ( void )
     wifi_set_opmode(NULL_MODE);
 
     // We want to sample 10 times per millisecond
-    hw_timer_setup ( 100 );
+    // hw_timer_setup ( 100 );
+    hw_timer_setup ( 100 * 1000 );
 
     os_printf("\n");
     os_printf("SDK version:%s\n", system_get_sdk_version());
@@ -270,8 +312,11 @@ void user_init ( void )
 
 /* Setup GPIO-4 for input */
     PIN_FUNC_SELECT ( PERIPHS_IO_MUX_GPIO4_U, 0 );
-    /* XXX */
-    bit_high ( IN_BIT );
+    // PIN_PULLDWN_DIS ( PERIPHS_IO_MUX_GPIO4_U );
+    // PIN_PULLDWN_EN ( PERIPHS_IO_MUX_GPIO4_U );
+    // PIN_PULLUP_DIS ( PERIPHS_IO_MUX_GPIO4_U );
+    PIN_PULLUP_EN ( PERIPHS_IO_MUX_GPIO4_U );
+    bit_input ( IN_BIT );
 
 /* Setup GPIO-5 for output  */
     PIN_FUNC_SELECT ( PERIPHS_IO_MUX_GPIO5_U, 0 );
