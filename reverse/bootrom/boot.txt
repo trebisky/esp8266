@@ -98,6 +98,8 @@
 ;    beqz as, addr      branches to addr if as == 0
 
 ; -----------------------------------------------------------------------
+;
+; -----------------------------------------------------------------------
 
 ; How do things get started?  The reset vector goes to 40000080h.
 
@@ -139,7 +141,7 @@
 ; spin with break exception
 
 40000030 <_KernelExceptionVector>:
-40000030:	004100        	break	1, 0
+40000030:	004100        	break	1, 0		; breakpoint exception
 40000033:	46feff        	j	40000030 <_KernelExceptionVector>
 
 40000036:	000000        	ill
@@ -170,7 +172,7 @@
 ; spin with break exception
 
 40000070 <_DoubleExceptionVector>:
-40000070:	404100        	break	1, 4
+40000070:	404100        	break	1, 4		; breakpoint exception
 40000073:	46feff        	j	40000070 <_DoubleExceptionVector>
 40000076:	000000        	ill
 40000079:	000000        	ill
@@ -560,8 +562,16 @@
 40000424:	ffff1f00	.long 0x001fffff
 40000428:	00000038	.long 0x38000000
 
+; Some notes:
+; There are two 32 bit values at 3fffc200 that I call idata
+
 ; sets the stack pointer to 0x40000000 so it will drop into
 ; ram at 0x3fffffff and so forth.
+;
+; On reset  PS = 0x2F
+; This sets PS = 0x20
+;  This sets the interrupt level to 0 (enables all interrupts)
+;  And it sets the EXCM bit to 1 (exception mode).
 
 4000042c <_start>:
 4000042c:	0c00      	movi.n	a0, 0
@@ -580,7 +590,9 @@
 40000446:	7736f8        	bltu	a6, a7, 40000442
 
 40000449:	05ba00        	call0	40000fec <main>		; call to main <<<<<<<<<<
-4000044c:	f04100        	break	1, 15
+
+; should never return
+4000044c:	f04100        	break	1, 15			; breakpoint exception
 4000044f:	46feff        	j	4000044c		; spin if main returns
 40000452:	0000f6        	excw
 
@@ -617,8 +629,9 @@
 
 40000486:	0c02      	movi.n	a2, 0		; return 0 (out of range)
 40000488:	0df0      	ret.n
-4000048a:	000059        	excw
+4000048a:	0000
 
+; in rom_store table
 4000048c <_xtos_l1int_handler>:
 4000048c:	5981      	s32i.n	a5, a1, 32
 4000048e:	2c12      	movi.n	a2, 33
@@ -641,7 +654,7 @@
 400004b6:	e1baff		l32r	a14, 400003a0	; ( 3fffc200 )
 400004b9:	f0e203        	rsr.interrupt	a15
 400004bc:	c0e403        	rsr.intenable	a12
-400004bf:	d81e      	l32i.n	a13, a14, 4
+400004bf:	d81e      	l32i.n	a13, a14, 4	; read idata[1]
 400004c1:	c0ff10        	and	a15, a15, a12
 400004c4:	c00303        	rsr.sar	a12
 400004c7:	d931      	s32i.n	a13, a1, 12
@@ -659,8 +672,8 @@
 400004e9:	d0ccb0        	addx8	a12, a12, a13
 400004ec:	d22c1e        	l32i	a13, a12, 120
 400004ef:	f06200        	rsil	a15, 2		; set interrupt level to 2
-400004f2:	f80e      	l32i.n	a15, a14, 0
-400004f4:	d91e      	s32i.n	a13, a14, 4
+400004f2:	f80e      	l32i.n	a15, a14, 0	; read idata[0]
+400004f4:	d91e      	s32i.n	a13, a14, 4	; write idata[1]
 400004f6:	d0ff10        	and	a15, a15, a13
 400004f9:	f0e413        	wsr.intenable	a15
 400004fc:	102000        	rsync
@@ -672,13 +685,13 @@
 4000050c:	e1a5ff		l32r	a14, 400003a0	; ( 3fffc200 )
 4000050f:	f0e203        	rsr.interrupt	a15
 40000512:	d06200        	rsil	a13, 2
-40000515:	d80e      	l32i.n	a13, a14, 0
+40000515:	d80e      	l32i.n	a13, a14, 0	; read idata[0]
 40000517:	c831      	l32i.n	a12, a1, 12
 40000519:	c0dd10        	and	a13, a13, a12
 4000051c:	d0ff10        	and	a15, a15, a13
 4000051f:	566f01        	bnez	a15, 40000539
 40000522:	222113        	l32i	a2, a1, 76
-40000525:	c91e      	s32i.n	a12, a14, 4
+40000525:	c91e      	s32i.n	a12, a14, 4	; write idata[1]
 40000527:	c22102        	l32i	a12, a1, 8
 4000052a:	d0e413        	wsr.intenable	a13
 4000052d:	d06100        	rsil	a13, 1
@@ -691,7 +704,7 @@
 40000542:	e22c1f        	l32i	a14, a12, 124
 40000545:	20ff10        	and	a15, a15, a2
 40000548:	e0ff10        	and	a15, a15, a14
-4000054b:	e195ff		l32r	a14, 400003a0	; ( 3fffc200 )
+4000054b:	e195ff		l32r	a14, 400003a0	; ( 3fffc200 -- never used )
 4000054e:	562ff8        	bnez	a15, 400004d4
 40000551:	f194ff		l32r	a15, 400003a4	; ( 80000000 )
 40000554:	000d40        	ssr	a13
@@ -708,13 +721,18 @@
 4000056f:	102000        	rsync
 40000572:	0df0      	ret.n
 
+; xtos_set_vpri ( mask )
+;  idata[1] = mask
+;  intenable = idata[0] & mask
+; never called
+
 40000574 <_xtos_set_vpri>:
 40000574:	3d02      	mov.n	a3, a2
 40000576:	418aff		l32r	a4, 400003a0	; ( 3fffc200 )
 40000579:	706200        	rsil	a7, 2
-4000057c:	2814      	l32i.n	a2, a4, 4
-4000057e:	5804      	l32i.n	a5, a4, 0
-40000580:	3914      	s32i.n	a3, a4, 4
+4000057c:	2814      	l32i.n	a2, a4, 4	; idata[1]
+4000057e:	5804      	l32i.n	a5, a4, 0	; idata[0]
+40000580:	3914      	s32i.n	a3, a4, 4	; idata[1]
 40000582:	305510        	and	a5, a5, a3
 40000585:	50e413        	wsr.intenable	a5
 40000588:	70e613        	wsr.ps	a7
@@ -1878,7 +1896,7 @@
 40000fc1:	0df0      	ret.n
 40000fc3:	00
 
-40000fc4:	00020060	.long 0x60000200	; GPIO base address
+40000fc4:	00020060	.long 0x60000200	; IO base address
 40000fc8:	a0d6ff3f	.long 0x3fffd6a0
 40000fcc:	74d6ff3f	.long 0x3fffd674
 40000fd0:	b8d6ff3f	.long 0x3fffd6b8
@@ -1890,10 +1908,10 @@
 40000fe8:	ccd6ff3f	.long 0x3fffd6cc
 
 ; Aha ... here is main()
+; *** MAIN ***
 
-; a note on memory wait, if is basically a pipeline sync to support
-; the C language volatile construct.  It waits until all loads and
-; stores and such finish.
+; a note on memory wait: it is basically a pipeline sync.
+; It waits until all loads and stores finish.
 
 40000fec <main>:
 40000fec:	12c1f0        	addi	a1, a1, -16
@@ -1904,32 +1922,46 @@
 40000ff9:	0c02      	movi.n	a2, 0
 40000ffb:	85a102        	call0	40003a14 <Uart_Init>
 40000ffe:	854301        	call0	40002438 <ets_install_uart_printf>
+
+; Read the GPIO pins to determine the boot mode.
+; The claims are that to get the boot loader to run you must:
+;   Pull GPIO 0 low (this is the usual pin a jumper manipulates)
+;   Pull GPIO 2 high
+;   Pull GPIO 15 low (do we see this below ???)
+
 40001001:	c1f0ff		l32r	a12, 40000fc4	; ( 60000200 )
 40001004:	c02000        	memw
-40001007:	022c46        	l32i	a0, a12, 0x118
+40001007:	022c46        	l32i	a0, a12, 0x118	; read GPIO inputs
 4000100a:	000025        	extui	a0, a0, 16, 3
-4000100d:	266033        	beqi	a0, 6, 40001044
+4000100d:	266033        	beqi	a0, 6, 40001044	; 110
+
 40001010:	c02000        	memw
-40001013:	322c46        	l32i	a3, a12, 0x118
+40001013:	322c46        	l32i	a3, a12, 0x118	; read GPIO inputs
 40001016:	303025        	extui	a3, a3, 16, 3
 40001019:	32c3f9        	addi	a3, a3, -7
-4000101c:	168312        	beqz	a3, 40001148
+4000101c:	168312        	beqz	a3, 40001148	; 111
+
 4000101f:	c02000        	memw
-40001022:	422c46        	l32i	a4, a12, 0x118
+40001022:	422c46        	l32i	a4, a12, 0x118	; read GPIO inputs
 40001025:	404025        	extui	a4, a4, 16, 3
 40001028:	42c4fc        	addi	a4, a4, -4
-4000102b:	161412        	beqz	a4, 40001150
+4000102b:	161412        	beqz	a4, 40001150	; 100
+
 4000102e:	c02000        	memw
-40001031:	522c46        	l32i	a5, a12, 0x118
+40001031:	522c46        	l32i	a5, a12, 0x118	; read GPIO inputs
 40001034:	505025        	extui	a5, a5, 16, 3
-40001037:	66550f        	bnei	a5, 5, 4000104a
-4000103a:	22a003        	movi	a2, 3
+40001037:	66550f        	bnei	a5, 5, 4000104a	; not 101
+
+4000103a:	22a003        	movi	a2, 3		; is 101
 4000103d:	c56304        	call0	4000567c <sip_init_attach>
 40001040:	860100        	j	4000104a
 40001043:	00
 
+; Here if boot bits match 110
+
 40001044:	22a000        	movi	a2, 0
 40001047:	456304        	call0	4000567c <sip_init_attach>
+
 4000104a:	455901        	call0	400025e0 <rtc_get_reset_reason>
 4000104d:	4d02      	mov.n	a4, a2
 4000104f:	dd02      	mov.n	a13, a2
@@ -2030,9 +2062,13 @@
 40001142:	06ffff        	j	40001142 <main+0x156>
 40001145:	000000        	ill
 
+; Here if boot bits match 111
+
 40001148:	0c12      	movi.n	a2, 1
 4000114a:	055304        	call0	4000567c <sip_init_attach>
 4000114d:	46beff        	j	4000104a <main+0x5e>
+
+; Here if boot bits match 100
 
 40001150:	0c22      	movi.n	a2, 2
 40001152:	855204        	call0	4000567c <sip_init_attach>
@@ -8304,16 +8340,28 @@
 40004c48:	d0dfff3f	.long 0x3fffdfd0
 40004c4c:	fc4e0040	.long 0x40004efc
 
+; Some notes on GPIO --
+;
+; Registers are like this:
+;
+; 60000304 - set
+; 60000308 - clear
+; 6000030c -  ??
+; 60000310 - enable
+; 60000314 - disable
+; 60000318 - disable
+
 40004c50 <gpio_init>:
-40004c50:	22a004        	movi	a2, 4
+40004c50:	22a004        	movi	a2, 4		; a2 = 4
 40004c53:	31fcff		l32r	a3, 40004c44	; ( 40004e34 )
-40004c56:	0c04      	movi.n	a4, 0
-40004c58:	12c1e0        	addi	a1, a1, -32
-40004c5b:	c911      	s32i.n	a12, a1, 4
+40004c56:	0c04      	movi.n	a4, 0		; a4 = 0
+40004c58:	12c1e0        	addi	a1, a1, -32	; space on stack
+40004c5b:	c911      	s32i.n	a12, a1, 4	; save 4 regs ...
 40004c5d:	d921      	s32i.n	a13, a1, 8
 40004c5f:	e931      	s32i.n	a14, a1, 12
 40004c61:	f941      	s32i.n	a15, a1, 16
-40004c63:	0901      	s32i.n	a0, a1, 0
+40004c63:	0901      	s32i.n	a0, a1, 0	; save return
+
 40004c65:	0532fc        	call0	40000f88 <ets_isr_attach>
 40004c68:	1c02      	movi.n	a2, 16
 40004c6a:	c532fc        	call0	40000f98 <ets_isr_mask>
@@ -8331,6 +8379,7 @@
 40004c81:	e1f1ff		l32r	a14, 40004c48	; ( 3fffdfd0 )
 40004c84:	02a000        	movi	a0, 0
 40004c87:	026e00        	s32i	a0, a14, 0
+
 40004c8a:	c02c20        	or	a2, a12, a12
 40004c8d:	0c03      	movi.n	a3, 0
 40004c8f:	450700        	call0	40004d04 <gpio_register_set>
@@ -8341,23 +8390,27 @@
 40004c9c:	4bdd      	addi.n	a13, a13, 4
 40004c9e:	202724        	extui	a2, a2, 7, 3
 40004ca1:	224e0f        	s8i	a2, a14, 15
-40004ca4:	f79ce2        	bne	a12, a15, 40004c8a <gpio_init+0x3a>
+40004ca4:	f79ce2        	bne	a12, a15, 40004c8a
+
 40004ca7:	31fefa		l32r	a3, 400038a0	; ( 0000ffff )
 40004caa:	41c6f0		l32r	a4, 40000fc4	; ( 60000200 )
 40004cad:	c02000        	memw
-40004cb0:	326449        	s32i	a3, a4, 0x124
+40004cb0:	326449        	s32i	a3, a4, 0x124	; ffff --> 60000324
+
 40004cb3:	21e6ff		l32r	a2, 40004c4c	; ( 40004efc )
 40004cb6:	0c03      	movi.n	a3, 0
 40004cb8:	c51600        	call0	40004e28 <gpio_intr_handler_register>
 40004cbb:	1c02      	movi.n	a2, 16
 40004cbd:	852efc        	call0	40000fa8 <ets_isr_unmask>
-40004cc0:	c811      	l32i.n	a12, a1, 4
+
+40004cc0:	c811      	l32i.n	a12, a1, 4	; restore 4 regs
 40004cc2:	d821      	l32i.n	a13, a1, 8
 40004cc4:	e831      	l32i.n	a14, a1, 12
 40004cc6:	f841      	l32i.n	a15, a1, 16
-40004cc8:	0801      	l32i.n	a0, a1, 0
-40004cca:	12c120        	addi	a1, a1, 32
+40004cc8:	0801      	l32i.n	a0, a1, 0	; restore return
+40004cca:	12c120        	addi	a1, a1, 32	; restore stack
 40004ccd:	0df0      	ret.n
+
 40004ccf:	0061bd        	excw
 
 ; This is advertised in the SDK document --
@@ -8842,6 +8895,7 @@
 40005128:	12c110        	addi	a1, a1, 16
 4000512b:	0df0      	ret.n
 4000512d:	000000        	ill
+
 40005130:	f0dfff3f	.long 0x3fffdff0
 40005134:	90e0ff3f	.long 0x3fffe090
 
@@ -8874,7 +8928,7 @@
 40005177:	8939      	s32i.n	a8, a9, 12
 40005179:	12c120        	addi	a1, a1, 32
 4000517c:	0df0      	ret.n
-4000517e:	000012        	excw
+4000517e:	0000
 
 40005180 <sip_alloc_to_host_evt>:
 40005180:	12c1e0        	addi	a1, a1, -32
@@ -9161,6 +9215,7 @@
 40005465:	326415        	s32i	a3, a4, 84
 40005468:	0df0      	ret.n
 4000546a:	000012        	excw
+
 4000546d:	c1f02d		l32r	a12, 3ffd0c30
 40005470:	014b31		l32r	a0, 3ffd199c
 40005473:	0921      	s32i.n	a0, a1, 8
@@ -9199,8 +9254,10 @@
 400054c2:	12c110        	addi	a1, a1, 16
 400054c5:	0df0      	ret.n
 400054c7:	00
+
 400054c8:	9cd8ff3f	.long 0x3fffd89c
 400054cc:	84d8ff3f	.long 0x3fffd884
+
 400054d0:	12c1e0        	addi	a1, a1, -32
 400054d3:	c951      	s32i.n	a12, a1, 20
 400054d5:	cd02      	mov.n	a12, a2
@@ -9354,18 +9411,21 @@
 4000566b:	28b2      	l32i.n	a2, a2, 44
 4000566d:	0df0      	ret.n
 4000566f:	00
+
 40005670:	c4530040	.long 0x400053c4
 40005674:	6c540040	.long 0x4000546c
 40005678:	d0540040	.long 0x400054d0
 4000567c:	31fe
 
+; Called by main() with a2 set to 0, 1, 2, or 3
+
 4000567c <sip_init_attach>:
 4000567c:	31feff		l32r	a3, 40005674	; ( 4000546c )
 4000567f:	5d02      	mov.n	a5, a2
-40005681:	12c1f0        	addi	a1, a1, -16
+40005681:	12c1f0        	addi	a1, a1, -16	; stack space
 40005684:	21fbff		l32r	a2, 40005670	; ( 400053c4 )
-40005687:	c911      	s32i.n	a12, a1, 4
-40005689:	0901      	s32i.n	a0, a1, 0
+40005687:	c911      	s32i.n	a12, a1, 4	; save a12
+40005689:	0901      	s32i.n	a0, a1, 0	; save return
 4000568b:	c1a9fe		l32r	a12, 40005130	; ( 3fffdff0 )
 4000568e:	0c00      	movi.n	a0, 0
 40005690:	4d0c      	mov.n	a4, a12
@@ -9380,12 +9440,14 @@
 400056a7:	225c01        	s16i	a2, a12, 2
 400056aa:	456e00        	call0	40005d90 <slc_enable>
 400056ad:	0c14      	movi.n	a4, 1
-400056af:	0801      	l32i.n	a0, a1, 0
+400056af:	0801      	l32i.n	a0, a1, 0	; restore return
 400056b1:	49bc      	s32i.n	a4, a12, 44
-400056b3:	c811      	l32i.n	a12, a1, 4
-400056b5:	12c110        	addi	a1, a1, 16
+400056b3:	c811      	l32i.n	a12, a1, 4	; restore a12
+400056b5:	12c110        	addi	a1, a1, 16	; restore stack
 400056b8:	0df0      	ret.n
+
 400056ba:	0000
+
 400056bc:	bc5b0040	.long 0x40005bbc
 400056c0:	90e1ff3f	.long 0x3fffe190
 
@@ -9930,6 +9992,7 @@
 40005c23:	4985      	s32i.n	a4, a5, 32
 40005c25:	0df0      	ret.n
 40005c27:	00
+
 40005c28:	e4e1ff3f	.long 0x3fffe1e4
 40005c2c:	0000ffff	.long 0xffff0000
 40005c30:	66661111	.long 0x11116666
@@ -9937,6 +10000,7 @@
 40005c38:	20080000	.long 0x00000820
 40005c3c:	00000010	.long 0x10000000
 40005c40:	00000400	.long 0x00040000
+
 40005c44:	071032        	beq	a0, a0, 40005c7a <slc_init_attach+0x2a>
 40005c47:	020700        	l8ui	a0, a7, 0
 40005c4a:	3202
@@ -10031,6 +10095,7 @@
 40005d3b:	0861      	l32i.n	a0, a1, 24
 40005d3d:	12c120        	addi	a1, a1, 32
 40005d40:	0df0      	ret.n
+
 40005d42:	0000b1        	sra	a0, a0
 40005d45:	c0ffc0        	sub	a15, a15, a12
 40005d48:	2000b9        	excw
@@ -10056,7 +10121,9 @@
 40005d7e:	c02000        	memw
 40005d81:	491c      	s32i.n	a4, a12, 4
 40005d83:	46bdff        	j	40005c7c <slc_init_attach+0x2c>
+
 40005d86:	0000
+
 40005d88:	505f0040	.long 0x40005f50
 40005d8c:	00842a00	.long 0x002a8400
 
@@ -10064,8 +10131,8 @@
 40005d90:	0c12      	movi.n	a2, 1
 40005d92:	31fdff		l32r	a3, 40005d88	; ( 40005f50 )
 40005d95:	0c04      	movi.n	a4, 0
-40005d97:	12c1f0        	addi	a1, a1, -16
-40005d9a:	0901      	s32i.n	a0, a1, 0
+40005d97:	12c1f0        	addi	a1, a1, -16	; stack space
+40005d9a:	0901      	s32i.n	a0, a1, 0	; save return
 40005d9c:	851efb        	call0	40000f88 <ets_isr_attach>
 40005d9f:	01fbff		l32r	a0, 40005d8c	; ( 002a8400 )
 40005da2:	216cf8		l32r	a2, 40003f54	; ( 60000a00 )
@@ -10073,16 +10140,17 @@
 40005da8:	026243        	s32i	a0, a2, 0x10c
 40005dab:	0c22      	movi.n	a2, 2
 40005dad:	851ffb        	call0	40000fa8 <ets_isr_unmask>
-40005db0:	0801      	l32i.n	a0, a1, 0
-40005db2:	12c110        	addi	a1, a1, 16
+40005db0:	0801      	l32i.n	a0, a1, 0	; restore return
+40005db2:	12c110        	addi	a1, a1, 16	; restore stack
 40005db5:	0df0      	ret.n
-40005db7:	003198        	excw
+40005db7:	00
 
 40005db8 <slc_select_tohost_gpio_mode>:
 40005db8:	3198ff		l32r	a3, 40005c18	; ( 3fffe1d0 )
 40005dbb:	29a3      	s32i.n	a2, a3, 40
 40005dbd:	0df0      	ret.n
-40005dbf:	00f6b2        	excw
+
+40005dbf:	00
 
 40005dc0 <slc_select_tohost_gpio>:
 40005dc0:	f6b210        	bgeui	a2, 16, 40005dd4 <slc_select_tohost_gpio+0x14>
@@ -19535,14 +19603,15 @@
 4000bd81:	000000        	ill
 
 ; alias for ets_isr_unmask ( mask )
+; mask is in a2
 
 4000bd84 <_xtos_ints_on>:
 4000bd84:	4187d1		l32r	a4, 400003a0	; ( 3fffc200 )
 4000bd87:	706200        	rsil	a7, 2		; read and set interrupt level
-4000bd8a:	3804      	l32i.n	a3, a4, 0	; fetch x[0]
-4000bd8c:	6814      	l32i.n	a6, a4, 4	; fetch x[1]
-4000bd8e:	205320        	or	a5, a3, a2	; OR on our bit
-4000bd91:	5904      	s32i.n	a5, a4, 0	; store back to x[0]
+4000bd8a:	3804      	l32i.n	a3, a4, 0	; fetch idata[0]
+4000bd8c:	6814      	l32i.n	a6, a4, 4	; fetch idata[1]
+4000bd8e:	205320        	or	a5, a3, a2
+4000bd91:	5904      	s32i.n	a5, a4, 0	; idata[0] |= mask
 4000bd93:	605510        	and	a5, a5, a6	; allow only these
 4000bd96:	50e413        	wsr.intenable	a5
 4000bd99:	70e613        	wsr.ps	a7
@@ -19552,15 +19621,16 @@
 4000bda3:	00
 
 ; alias for ets_isr_mask ( mask )
+; mask is in a2
 
 4000bda4 <_xtos_ints_off>:
 4000bda4:	417fd1		l32r	a4, 400003a0	; ( 3fffc200 )
 4000bda7:	706200        	rsil	a7, 2
-4000bdaa:	3804      	l32i.n	a3, a4, 0	; fetch x[0]
-4000bdac:	6814      	l32i.n	a6, a4, 4	; fetch x[1]
-4000bdae:	205320        	or	a5, a3, a2	; OR our bit onto x[0]
+4000bdaa:	3804      	l32i.n	a3, a4, 0	; fetch idata[0]
+4000bdac:	6814      	l32i.n	a6, a4, 4	; fetch idata[1]
+4000bdae:	205320        	or	a5, a3, a2	; OR our bit
 4000bdb1:	205530        	xor	a5, a5, a2	; flip it to zero
-4000bdb4:	5904      	s32i.n	a5, a4, 0	; store back to x[0]
+4000bdb4:	5904      	s32i.n	a5, a4, 0	; store back to idata[0]
 4000bdb6:	605510        	and	a5, a5, a6	; only allow these
 4000bdb9:	50e413        	wsr.intenable	a5
 4000bdbc:	70e613        	wsr.ps	a7
@@ -22478,7 +22548,7 @@
 4000dc3a:	0000f0        	subx8	a0, a0, a0
 
 4000dc3c <_xtos_unhandled_interrupt>:
-4000dc3c:	f04100        	break	1, 15
+4000dc3c:	f04100        	break	1, 15		; breakpoint exception
 4000dc3f:	0df0      	ret.n
 4000dc41:	000000        	ill
 
@@ -22486,7 +22556,7 @@
 4000dc44:	2851      	l32i.n	a2, a1, 20
 4000dc46:	3861      	l32i.n	a3, a1, 24
 4000dc48:	12d101        	addmi	a1, a1, 0x100
-4000dc4b:	104100        	break	1, 1
+4000dc4b:	104100        	break	1, 1		; breakpoint exception
 4000dc4e:	003000        	rfe
 4000dc51:	000000
 
@@ -22839,6 +22909,7 @@
 4000df8b:	17e415        	bbsi	a4, 1, 4000dfa4 <memcpy+0x5c>
 4000df8e:	07e422        	bbsi	a4, 0, 4000dfb4 <memcpy+0x6c>
 4000df91:	0df0      	ret.n
+
 4000df93:	006803        	rsr.ddr	a0
 4000df96:	4b33      	addi.n	a3, a3, 4
 4000df98:	6905      	s32i.n	a6, a5, 0
