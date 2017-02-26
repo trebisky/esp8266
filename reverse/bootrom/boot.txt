@@ -1966,8 +1966,8 @@
 4000104d:	4d02      	mov.n	a4, a2
 4000104f:	dd02      	mov.n	a13, a2
 
-40001051:	31ddff		l32r	a3, 40000fc8	; ( 3fffd6a0 )
-40001054:	21deff		l32r	a2, 40000fcc	; ( 3fffd674 )
+40001051:	31ddff		l32r	a3, 40000fc8	; ( 3fffd6a0 ) printf arg1
+40001054:	21deff		l32r	a2, 40000fcc	; ( 3fffd674 ) printf format
 40001057:	c02000        	memw
 
 4000105a:	522c46        	l32i	a5, a12, 0x118	; read GPIO inputs
@@ -1975,6 +1975,16 @@
 40001060:	c02000        	memw
 40001063:	622c46        	l32i	a6, a12, 0x118	; read GPIO inputs
 40001066:	606d25        	extui	a6, a6, 29, 3	; top 3
+
+; Whenever my unit starts up, I see:
+;  " ets Jan  8 2013,rst cause:2, boot mode:(1,6)"
+; This string is at 4000f9fe in this boot rom as
+;  " ets %s,rst cause:%d, boot mode:(%d,%d)\n\n"
+;	(note the leading blank)
+; The  date  is  at 4000fa28 as "Jan  8 2013"
+; All this at the weird 74880 or 76800 baud rate
+;
+; ??? How does this stuff get from bootrom addresses into the 3fff range?
 
 40001069:	054601        	call0	400024cc <ets_printf>
 
@@ -2003,9 +2013,10 @@
 400010a5:	565901        	bnez	a9, 400010be <main+0xd2>
 400010a8:	c52500        	call0	40001308 <sub_1308>
 400010ab:	16f200        	beqz	a2, 400010be <main+0xd2>
-400010ae:	21c8ff		l32r	a2, 40000fd0	; ( 3fffd6b8 )
-400010b1:	31c8ff		l32r	a3, 40000fd4	; ( 3fffd6c0 )
-400010b4:	42a0b5        	movi	a4, 181
+
+400010ae:	21c8ff		l32r	a2, 40000fd0	; ( 3fffd6b8 )	printf format
+400010b1:	31c8ff		l32r	a3, 40000fd4	; ( 3fffd6c0 )  printf arg1
+400010b4:	42a0b5        	movi	a4, 181		; printf arg2
 400010b7:	454101        	call0	400024cc <ets_printf>
 400010ba:	06ffff        	j	400010ba <main+0xce>
 400010bd:	00
