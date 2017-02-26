@@ -1,5 +1,5 @@
 # Makefile for ESP8266 development
-# Tom Trebisky  2-20-2017
+# Tom Trebisky  12-26-2015
 
 # tjt - be verbose
 V = 1
@@ -16,27 +16,21 @@ endif
 # The new python job
 ESPTOOL		= esptool
 PORT		= /dev/ttyUSB0
-#PORT		= /dev/ttyUSB1
 
 # base directory of the ESP8266 SDK package, absolute
 ##SDK_BASE	?= /opt/Espressif/sdk/
 SDK_BASE	= /opt/esp-open-sdk
 
 # Base directory for the compiler
-# SDK_BIN = $(SDK_BASE)/xtensa-lx106-elf/bin
+SDK_BIN = $(SDK_BASE)/xtensa-lx106-elf/bin
 
 # select which tools to use as compiler, librarian and linker
 #CC		:= $(SDK_BIN)/xtensa-lx106-elf-gcc
 #AR		:= $(SDK_BIN)/xtensa-lx106-elf-ar
 #LD		:= $(SDK_BIN)/xtensa-lx106-elf-gcc
-
 CC		= xtensa-lx106-elf-gcc
 AR		= xtensa-lx106-elf-ar
 LD		= xtensa-lx106-elf-gcc
-
-#CC		= xtensa-linux-gnu-gcc
-#AR		= xtensa-linux-gnu-ar
-#LD		= xtensa-linux-gnu-gcc
 
 # various paths from the SDK used in this project
 SDK_LIBDIR	= $(SDK_BASE)/sdk/lib
@@ -66,7 +60,7 @@ LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
 .PHONY: all flash clean info term
 
-TARGET = coolstat
+TARGET	= first
 
 all: $(TARGET)
 
@@ -74,20 +68,32 @@ all: $(TARGET)
 	$(vecho) "CC $<"
 	$(Q) $(CC) $(INCLUDES) $(CFLAGS)  -c $<
 
-$(TARGET): $(TARGET).o
-	$(vecho) "LD $@"
-	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) $< -Wl,--end-group -o $@
+#first: first.o
+#	$(vecho) "LD $@"
+#	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) first.o -Wl,--end-group -o $@
+
+# linker flags
+#XLDFLAGS		= -nostdlib -Wl,--no-check-sections -u user_init -Wl,-static
+
+#XLD_SCRIPT	= $(SDK_BASE)/sdk/ld/eagle.first.v6.ld
+
+#XLIBS		= c gcc hal pp phy net80211 lwip wpa main crypto
+#XLIBS		= c gcc
+XLIBS		= gcc
+XLIBS		:= $(addprefix -l,$(XLIBS))
+
+first: first.o
+	$(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(XLIBS) first.o -Wl,--end-group -o $@
 
 # This is important -- without the right options it works sometimes,
 # but other times screws up.
 # Flash options - anything with a 12E module will be dio
 # dio/8m works for my unit #1
 #FLOPS = -fm dio -fs 4m
-# works for nodemcu board ...
-#FLOPS = -fm dio -fs 8m
+FLOPS = -fm dio -fs 8m
 
 # This loads our code into the flash on the device itself
-flash:	$(TARGET)
+flash:  $(TARGET)
 	$(ESPTOOL) elf2image $(TARGET)
 	-$(ESPTOOL) --port $(PORT) write_flash $(FLOPS) 0x00000 $(TARGET)-0x00000.bin 0x40000 $(TARGET)-0x40000.bin
 
@@ -101,14 +107,17 @@ bootrom.bin:
 	#esptool -p $(PORT) dump_mem 0x40000000 65536 esp8266_rom.bin
 	esptool -p $(PORT) dump_mem 0x40000000 65536 bootrom.bin
 
+#bootrom.dis:
+#	xtensa-lx106-elf-objdump -D -b binary -mxtensa bootrom.bin >bootrom.dis
+
 dis:
-	xtensa-lx106-elf-objdump -D -mxtensa $(TARGET) >$(TARGET).dis
+	xtensa-lx106-elf-objdump -D -mxtensa first.o >first.dis
+
+syms:
+	xtensa-lx106-elf-nm first | sort >first.syms
 
 term:
 	picocom -b 115200 $(PORT)
-
-version:
-	$(CC) --version
 
 clean:
 	$(Q) rm -f $(TARGET)

@@ -100,11 +100,18 @@ static int lcount;
 #define	BIT_LONG	0
 #define	BIT_SHORT	1
 
-static int inbits[8];
+static int inbits[MAX_BITS];
 
 void new_data ( void );
 
-int read_input ( void ) { return INACTIVE; }
+// int read_input ( void ) { return INACTIVE; }
+
+int read_input ( void ) {
+    if ( gpio_input_get() & IN_BIT )
+	return ACTIVE;
+    else
+	return INACTIVE;
+}
 
 /* Input state machine */
 int
@@ -126,12 +133,16 @@ process_input ( void )
 
     if ( ++clock_count > MAX_CLOCK ) {
 	state = IDLE;
+	os_printf ( "Oops\n" );
 	return;
     }
 
     if ( state == LEAD ) {
-	if ( pin == INACTIVE )
+	if ( pin == INACTIVE ) {
 	    state = LCOUNT;
+	    hcount = 0;
+	    lcount = 0;
+	}
 	return;
     }
 
@@ -158,12 +169,19 @@ process_input ( void )
 	state = IDLE;
 	/* Finish -- full byte received */
 	new_data ();
-    } else
+    } else {
 	state = LCOUNT;
+	hcount = 0;
+	lcount = 0;
+    }
 }
 
+#define LEAD_TIME	10
+#define LONG_TIME	7
+#define SHORT_TIME	3
+
 static int out_state = IDLE;
-static int outbits[8];
+static int outbits[MAX_BITS];
 static int outbit_count;
 static int out_count;
 
@@ -175,7 +193,7 @@ process_output ( void )
 	return;
 
     if ( out_state == START ) {
-	out_count = 9;
+	out_count = LEAD_TIME - 1;
 	outbit_count = 0;
 	out_state = HCOUNT;
 	bit_high ( OUT_BIT );
@@ -187,9 +205,9 @@ process_output ( void )
 	    return;
 
 	if ( outbits[outbit_count] == BIT_LONG )
-	    out_count = 6;
+	    out_count = LONG_TIME - 1;
 	else
-	    out_count = 2;
+	    out_count = SHORT_TIME - 1;
 	outbit_count++;
 	bit_high ( OUT_BIT );
 	out_state == HCOUNT;
@@ -207,12 +225,14 @@ process_output ( void )
     }
 
     if ( outbits[outbit_count] == BIT_LONG )
-	out_count = 2;
+	out_count = SHORT_TIME - 1;
     else
-	out_count = 6;
+	out_count = LONG_TIME - 1;
     bit_low ( OUT_BIT );
     out_state == LCOUNT;
 }
+
+static int howmany = 0;
 
 /* called whenever new data is received */
 void
@@ -220,15 +240,28 @@ new_data ( void )
 {
     int i;
 
+    ++howmany;
+
+    if ( (howmany % 8) == 0 )
+	os_printf ( "Got %d -- %d %d %d %d - %d %d %d %d\n", howmany,
+	    inbits[0],
+	    inbits[1],
+	    inbits[2],
+	    inbits[3],
+	    inbits[4],
+	    inbits[5],
+	    inbits[6],
+	    inbits[7] );
+
     for ( i=0; i<MAX_BITS; i++ )
 	outbits[i] = inbits[i];
 
-    out_state = START;
+    // out_state = START;
 }
 
 /* Everything is driven by this interrupt ticking */
 void
-hw_timer_isrX ( void )
+hw_timer_isr ( void )
 {
     ++led_clock;
     if ( led_clock >= LED_RATE ) {
@@ -243,14 +276,14 @@ hw_timer_isrX ( void )
 static int last = 0xabcdfeed;
 
 void
-hw_timer_isr ( void )
+hw_timer_isrX ( void )
 {
     int x;
 
     // x = gpio_input_get ();
     x = bit_test ( IN_BIT );
     if ( x != last ) {
-	os_printf ( "%08x\n", x );
+	os_printf ( "%04x\n", x & 0xffff );
 	last = x;
     }
 
@@ -294,8 +327,7 @@ void user_init ( void )
     wifi_set_opmode(NULL_MODE);
 
     // We want to sample 10 times per millisecond
-    // hw_timer_setup ( 100 );
-    hw_timer_setup ( 100 * 1000 );
+    hw_timer_setup ( 100 );
 
     os_printf("\n");
     os_printf("SDK version:%s\n", system_get_sdk_version());

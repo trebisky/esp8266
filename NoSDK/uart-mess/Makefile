@@ -1,5 +1,5 @@
 # Makefile for ESP8266 development
-# Tom Trebisky  2-20-2017
+# Tom Trebisky  12-26-2015
 
 # tjt - be verbose
 V = 1
@@ -15,28 +15,22 @@ endif
 
 # The new python job
 ESPTOOL		= esptool
-PORT		= /dev/ttyUSB0
-#PORT		= /dev/ttyUSB1
+PORT		= /dev/ttyUSB1
 
 # base directory of the ESP8266 SDK package, absolute
 ##SDK_BASE	?= /opt/Espressif/sdk/
 SDK_BASE	= /opt/esp-open-sdk
 
 # Base directory for the compiler
-# SDK_BIN = $(SDK_BASE)/xtensa-lx106-elf/bin
+SDK_BIN = $(SDK_BASE)/xtensa-lx106-elf/bin
 
 # select which tools to use as compiler, librarian and linker
 #CC		:= $(SDK_BIN)/xtensa-lx106-elf-gcc
 #AR		:= $(SDK_BIN)/xtensa-lx106-elf-ar
 #LD		:= $(SDK_BIN)/xtensa-lx106-elf-gcc
-
 CC		= xtensa-lx106-elf-gcc
 AR		= xtensa-lx106-elf-ar
 LD		= xtensa-lx106-elf-gcc
-
-#CC		= xtensa-linux-gnu-gcc
-#AR		= xtensa-linux-gnu-ar
-#LD		= xtensa-linux-gnu-gcc
 
 # various paths from the SDK used in this project
 SDK_LIBDIR	= $(SDK_BASE)/sdk/lib
@@ -61,12 +55,17 @@ INCLUDES = -I. -I$(SDK_INCDIR)
 # compiler flags
 CFLAGS		= -Os -g -O2 -Wpointer-arith -Wundef -Werror -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH
 
-# linker flags
+# linker flags for true "tiny"
 LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
+
+# Add this to give us a new name
+# LDFLAGS		= -nostdlib -Wl,--no-check-sections -u tiny_start -Wl,-static
 
 .PHONY: all flash clean info term
 
-TARGET = coolstat
+TARGET	= uart
+
+OBJS = uart.o esp_uart.o
 
 all: $(TARGET)
 
@@ -74,20 +73,30 @@ all: $(TARGET)
 	$(vecho) "CC $<"
 	$(Q) $(CC) $(INCLUDES) $(CFLAGS)  -c $<
 
-$(TARGET): $(TARGET).o
-	$(vecho) "LD $@"
-	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) $< -Wl,--end-group -o $@
+#XLIBS		= c gcc hal pp phy net80211 lwip wpa main crypto
+#XLIBS		= c gcc
+
+# This is all that is needed for true "tiny"
+#XLIBS		= gcc
+
+# We add this for os_printf_plus() in user_interface.o in libmain.a
+# Note that call_user_start() is in vector.o in libmain.a
+#XLIBS		= c gcc hal pp phy net80211 lwip wpa main crypto
+XLIBS		= c gcc pp phy net80211 lwip wpa main crypto
+XLIBS		:= $(addprefix -l,$(XLIBS))
+
+$(TARGET): $(OBJS)
+	$(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(XLIBS) $(OBJS) -Wl,--end-group -o $@
 
 # This is important -- without the right options it works sometimes,
 # but other times screws up.
 # Flash options - anything with a 12E module will be dio
 # dio/8m works for my unit #1
 #FLOPS = -fm dio -fs 4m
-# works for nodemcu board ...
-#FLOPS = -fm dio -fs 8m
+FLOPS = -fm dio -fs 8m
 
 # This loads our code into the flash on the device itself
-flash:	$(TARGET)
+flash:  $(TARGET)
 	$(ESPTOOL) elf2image $(TARGET)
 	-$(ESPTOOL) --port $(PORT) write_flash $(FLOPS) 0x00000 $(TARGET)-0x00000.bin 0x40000 $(TARGET)-0x40000.bin
 
@@ -101,14 +110,17 @@ bootrom.bin:
 	#esptool -p $(PORT) dump_mem 0x40000000 65536 esp8266_rom.bin
 	esptool -p $(PORT) dump_mem 0x40000000 65536 bootrom.bin
 
+bootrom.dis:
+	xtensa-lx106-elf-objdump -D -b binary -mxtensa bootrom.bin >bootrom.dis
+
 dis:
-	xtensa-lx106-elf-objdump -D -mxtensa $(TARGET) >$(TARGET).dis
+	xtensa-lx106-elf-objdump -D -mxtensa $(TARGET)
+
+syms:
+	xtensa-lx106-elf-nm $(TARGET) | sort >$(TARGET).syms
 
 term:
 	picocom -b 115200 $(PORT)
-
-version:
-	$(CC) --version
 
 clean:
 	$(Q) rm -f $(TARGET)

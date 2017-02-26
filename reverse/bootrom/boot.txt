@@ -1965,18 +1965,23 @@
 4000104a:	455901        	call0	400025e0 <rtc_get_reset_reason>
 4000104d:	4d02      	mov.n	a4, a2
 4000104f:	dd02      	mov.n	a13, a2
+
 40001051:	31ddff		l32r	a3, 40000fc8	; ( 3fffd6a0 )
 40001054:	21deff		l32r	a2, 40000fcc	; ( 3fffd674 )
 40001057:	c02000        	memw
-4000105a:	522c46        	l32i	a5, a12, 0x118
-4000105d:	505025        	extui	a5, a5, 16, 3
+
+4000105a:	522c46        	l32i	a5, a12, 0x118	; read GPIO inputs
+4000105d:	505025        	extui	a5, a5, 16, 3	; low 3
 40001060:	c02000        	memw
-40001063:	622c46        	l32i	a6, a12, 0x118
-40001066:	606d25        	extui	a6, a6, 29, 3
+40001063:	622c46        	l32i	a6, a12, 0x118	; read GPIO inputs
+40001066:	606d25        	extui	a6, a6, 29, 3	; top 3
+
 40001069:	054601        	call0	400024cc <ets_printf>
+
 4000106c:	01d3ff		l32r	a0, 40000fb8	; ( 3fffdcd0 )
 4000106f:	f63d02        	bgeui	a13, 3, 40001075
 40001072:	56bd0a        	bnez	a13, 40001121
+
 40001075:	263d11        	beqi	a13, 3, 4000108a
 40001078:	62cdfc        	addi	a6, a13, -4
 4000107b:	169609        	beqz	a6, 40001118
@@ -4159,45 +4164,52 @@
 400025d9:	000000        	ill
 400025dc:	ffffdfff	.long 0xffdfffff
 
+; Called once during startup.
+; 60000700 are RTC registers 
+
 400025e0 <rtc_get_reset_reason>:
 400025e0:	41dffa		l32r	a4, 4000115c	; ( 60000600 )
 400025e3:	c02000        	memw
-400025e6:	222445        	l32i	a2, a4, 0x114
+400025e6:	222445        	l32i	a2, a4, 0x114	; RTC
 400025e9:	a1fcff		l32r	a10, 400025dc	; ( ffdfffff )
 400025ec:	202034        	extui	a2, a2, 0, 4
-400025ef:	665231        	bnei	a2, 5, 40002624 <rtc_get_reset_reason+0x44>
+400025ef:	665231        	bnei	a2, 5, 40002624
+
 400025f2:	c02000        	memw
-400025f5:	322446        	l32i	a3, a4, 0x118
+400025f5:	322446        	l32i	a3, a4, 0x118	; RTC
 400025f8:	303854        	extui	a3, a3, 8, 6
-400025fb:	261336        	beqi	a3, 1, 40002635 <rtc_get_reset_reason+0x55>
+400025fb:	261336        	beqi	a3, 1, 40002635
 400025fe:	c02000        	memw
 40002601:	61f6ff		l32r	a6, 400025dc	; ( ffdfffff )
-40002604:	822446        	l32i	a8, a4, 0x118
+40002604:	822446        	l32i	a8, a4, 0x118	; RTC
 40002607:	0c07      	movi.n	a7, 0
 40002609:	808854        	extui	a8, a8, 8, 6
 4000260c:	82c8f8        	addi	a8, a8, -8
 4000260f:	802793        	movnez	a2, a7, a8
 40002612:	c02000        	memw
-40002615:	522442        	l32i	a5, a4, 0x108
+40002615:	522442        	l32i	a5, a4, 0x108	; RTC
 40002618:	605510        	and	a5, a5, a6
 4000261b:	c02000        	memw
-4000261e:	526442        	s32i	a5, a4, 0x108
+4000261e:	526442        	s32i	a5, a4, 0x108	; RTC
 40002621:	0df0      	ret.n
-40002623:	00c020        	or	a12, a0, a0
-40002626:	009224        	extui	a9, a0, 2, 3
-40002629:	42a099        	movi	a4, 153
-4000262c:	10c020        	or	a12, a0, a1
-4000262f:	009264        	extui	a9, a0, 2, 7
-40002632:	420df0        	l8ui	a4, a13, 240
+40002623:	00
+
+40002624:	c02000        	memw
+40002627:	922442        	l32i	a9, a4, 0x108	; RTC
+4000262a:	a09910        	and	a9, a9, a10
+4000262d:	c02000        	memw
+40002630:	926442        	s32i	a9, a4, 0x108	; RTC
+40002633:	0df0      	ret.n
+
 40002635:	31e9ff		l32r	a3, 400025dc	; ( ffdfffff )
 40002638:	0c62      	movi.n	a2, 6
 4000263a:	c02000        	memw
-4000263d:	b22442        	l32i	a11, a4, 0x108
+4000263d:	b22442        	l32i	a11, a4, 0x108	; RTC
 40002640:	30bb10        	and	a11, a11, a3
 40002643:	c02000        	memw
-40002646:	b26442        	s32i	a11, a4, 0x108
+40002646:	b26442        	s32i	a11, a4, 0x108	; RTC
 40002649:	0df0      	ret.n
-4000264b:	004156        	excw
+4000264b:	00
 
 4000264c <software_reset>:
 4000264c:	4156f7		l32r	a4, 400003a4	; ( 80000000 )
@@ -10001,9 +10013,8 @@
 40005c3c:	00000010	.long 0x10000000
 40005c40:	00000400	.long 0x00040000
 
-40005c44:	071032        	beq	a0, a0, 40005c7a <slc_init_attach+0x2a>
-40005c47:	020700        	l8ui	a0, a7, 0
-40005c4a:	3202
+40005c44:	07103202	.long 0x02321007
+40005c48:	07003202	.long 0x02320007
 40005c4c:	03200000	.long 0x00002003
 
 40005c50 <slc_init_attach>:
@@ -10016,14 +10027,18 @@
 40005c5f:	2906      	s32i.n	a2, a6, 0
 40005c61:	3916      	s32i.n	a3, a6, 4
 40005c63:	4936      	s32i.n	a4, a6, 12
-40005c65:	16b50d        	beqz	a5, 40005d44 <slc_init_attach+0xf4>
+40005c65:	16b50d        	beqz	a5, 40005d44
+
 40005c68:	0b75      	addi.n	a7, a5, -1
-40005c6a:	16270e        	beqz	a7, 40005d50 <slc_init_attach+0x100>
+40005c6a:	16270e        	beqz	a7, 40005d50
+
 40005c6d:	21efff		l32r	a2, 40005c2c	; ( ffff0000 )
 40005c70:	82c5fe        	addi	a8, a5, -2
-40005c73:	16580e        	beqz	a8, 40005d5c <slc_init_attach+0x10c>
+40005c73:	16580e        	beqz	a8, 40005d5c
+
 40005c76:	92c5fd        	addi	a9, a5, -3
-40005c79:	16390f        	beqz	a9, 40005d70 <slc_init_attach+0x120>
+40005c79:	16390f        	beqz	a9, 40005d70
+
 40005c7c:	a1edff		l32r	a10, 40005c30	; ( 11116666 )
 40005c7f:	c02000        	memw
 40005c82:	a90c      	s32i.n	a10, a12, 0
@@ -10074,8 +10089,8 @@
 40005cfd:	b11bf9		l32r	a11, 4000416c	; ( 20000000 )
 40005d00:	a0a310        	and	a10, a3, a10
 40005d03:	b0aa20        	or	a10, a10, a11
-40005d06:	c020
-40005d08:	00a26c4a	.long 0x4a6ca200
+40005d06:	c02000        	memw
+40005d09:	a26c4a        	s32i	a10, a12, 0x128
 40005d0c:	c02000        	memw
 40005d0f:	81ccff		l32r	a8, 40005c40	; ( 00040000 )
 40005d12:	922c4a        	l32i	a9, a12, 0x128
@@ -10095,33 +10110,37 @@
 40005d3b:	0861      	l32i.n	a0, a1, 24
 40005d3d:	12c120        	addi	a1, a1, 32
 40005d40:	0df0      	ret.n
+40005d42:	0000
 
-40005d42:	0000b1        	sra	a0, a0
-40005d45:	c0ffc0        	sub	a15, a15, a12
-40005d48:	2000b9        	excw
-40005d4b:	1c06      	movi.n	a6, 16
-40005d4d:	cbff      	addi.n	a15, a15, 12
-40005d4f:	0021be        	excw
-40005d52:	ff          	.byte 0xff
+40005d44:	b1c0ff        	l32r	a11, 40005c44 	; ( 02321007 )
+40005d47:	c02000        	memw
+40005d4a:	b91c      	s32i.n	a11, a12, 4
+40005d4c:	06cbff        	j	40005c7c
+40005d4f:	00
+
+40005d50:	21beff        	l32r	a2, 40005c48	; ( 02320007 )
 40005d53:	c02000        	memw
 40005d56:	291c      	s32i.n	a2, a12, 4
-40005d58:	06c8ff        	j	40005c7c <slc_init_attach+0x2c>
-40005d5b:	00c020        	or	a12, a0, a0
-40005d5e:	00381c        	excw
+40005d58:	06c8ff        	j	40005c7c
+40005d5b:	00
+
+40005d5c:	c02000        	memw
+40005d5f:	381c      	l32i.n	a3, a12, 4
 40005d61:	203310        	and	a3, a3, a2
 40005d64:	003320        	or	a3, a3, a0
 40005d67:	c02000        	memw
 40005d6a:	391c      	s32i.n	a3, a12, 4
-40005d6c:	06c3ff        	j	40005c7c <slc_init_attach+0x2c>
-40005d6f:	00c020        	or	a12, a0, a0
-40005d72:	00481c        	excw
+40005d6c:	06c3ff        	j	40005c7c
+40005d6f:	00
+
+40005d70:	c02000        	memw
+40005d73:	481c      	l32i.n	a4, a12, 4
 40005d75:	51b5ff		l32r	a5, 40005c4c	; ( 00002003 )
 40005d78:	204410        	and	a4, a4, a2
 40005d7b:	504420        	or	a4, a4, a5
 40005d7e:	c02000        	memw
 40005d81:	491c      	s32i.n	a4, a12, 4
-40005d83:	46bdff        	j	40005c7c <slc_init_attach+0x2c>
-
+40005d83:	46bdff        	j	40005c7c
 40005d86:	0000
 
 40005d88:	505f0040	.long 0x40005f50

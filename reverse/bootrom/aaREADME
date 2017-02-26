@@ -4,4 +4,21 @@ My notes on maintaining this project.
 
 2) make cinstall publishes this to my website on cholla.
 
-3)
+3) I also have this on github, to publish it there:
+    git add .
+    git commit
+    git push github master
+
+4) Sometimes I find patches of the disassembly that need rework.
+    Let's say I decide I have a block at 40005d03
+    I do this:
+	./short_dump 5d03 >zzz
+    Then I edit it in by hand
+
+5) Other times I find a patch of memory that should be displayed
+    as a 32 bit value to be referenced by a l32r
+    then I user:
+	./dumper 5c44 
+    And again, I edit it in by hand
+    The source for dumper is in reverse/tools
+
