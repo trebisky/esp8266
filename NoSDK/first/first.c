@@ -15,6 +15,24 @@ unsigned long xthal_get_ccount ( void );
 
 #define TENSEC (UART_CLK_FREQ * 10)
 
+void one_sec ( void ) {
+    unsigned long cycles;
+
+    cycles = 0;
+    asm volatile("wsr.ccount %0" : : "r" (cycles) );
+    asm volatile("memw");
+
+    // asm volatile("rsr.ccount %0" : "=r" (cycles) );
+    // ets_printf ( "cycles = %d\n", cycles );
+
+    for ( ;; ) {
+	asm volatile("rsr.ccount %0" : "=r" (cycles) );
+	if ( cycles >= 52 * 1000 * 1000 )
+	    break;
+    }
+    // ets_printf ( "cycles = %d\n", cycles );
+}
+
 // void user_init()
 void call_user_start()
 {
@@ -22,12 +40,40 @@ void call_user_start()
     int x;
     unsigned long cc1, cc2;
     unsigned long *cp;
+    unsigned long cycles;
 
     uart_div_modify(0, UART_CLK_FREQ / 115200);
     ets_delay_us ( 1000 * 500 );
 
     ets_printf("\n");
     ets_printf("Hello World\n");
+
+    for ( i=0; i < 52; i++ ) {
+	one_sec ();
+    }
+
+    ets_printf ( "Spinning\n" );
+    for ( ;; ) ;
+
+    asm volatile("wsr.ccount %0" : : "r" (0) );
+
+    cycles = 0;
+    asm volatile("wsr.ccount %0" : : "r" (cycles) );
+
+    asm volatile("memw");
+
+    asm volatile("rsr.ccount %0" : "=r" (cycles) );
+    ets_printf ( "cycles = %d\n", cycles );
+
+    for ( ;; ) {
+	asm volatile("rsr.ccount %0" : "=r" (cycles) );
+	if ( cycles >= 52 * 1000 * 1000 )
+	    break;
+    }
+    ets_printf ( "cycles = %d\n", cycles );
+
+    ets_printf ( "Spinning\n" );
+    for ( ;; ) ;
 
     x = ets_get_cpu_frequency ();
     ets_printf ( "CPU %d\n", x );

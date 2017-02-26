@@ -22690,17 +22690,22 @@
 4000dd3d:	000000        	ill
 
 4000dd40 <xthal_set_ccompare>:
-4000dd40:	cc42      	bnez.n	a2, 4000dd48 <xthal_set_ccompare+0x8>
+4000dd40:	cc42      	bnez.n	a2, 4000dd48
 4000dd42:	30f013        	wsr.ccompare0	a3
 4000dd45:	002000        	isync
 4000dd48:	0df0      	ret.n
-4000dd4a:	0000cc        	excw
+4000dd4a:	0000
+
+; XXX - testing a2 up front seems odd and broken
+; so this only works when called with a zero argument
+; as if it allows multiple compare regs, but handles only one.
 
 4000dd4c <xthal_get_ccompare>:
-4000dd4c:	cc42      	bnez.n	a2, 4000dd54 <xthal_get_ccompare+0x8>
+4000dd4c:	cc42      	bnez.n	a2, 4000dd54
 4000dd4e:	20f003        	rsr.ccompare0	a2
 4000dd51:	0df0      	ret.n
-4000dd53:	000c02        	excw
+4000dd53:	00
+4000dd54:	0c02      	movi.n	a2, 0
 4000dd56:	0df0      	ret.n
 
 4000dd58 <xthal_get_interrupt>:
