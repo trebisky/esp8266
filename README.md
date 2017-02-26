@@ -1,7 +1,7 @@
 Here are a variety of ESP8266 related things.
 
-1. NoSDK - some experiments in C programming right on the bootrom
-2. mysdk - my most interesting things are here.
+1. NoSDK - some experiments in C programming directly on the bootrom
+2. mysdk - my experiments and projects are here.
 3. reverse - reverse engineering, especially the bootrom
 4. zzlua - dead end work with NodeMCU and Lua.
 
