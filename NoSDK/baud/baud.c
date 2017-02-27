@@ -9,7 +9,8 @@
 #include <stdlib.h>
 
 char *device = "/dev/ttyUSB0";
-int speed = 76800;
+// int speed = 76800;
+int speed = 74880;
 
 int ioctl ( int, int, struct termios2 *);
 
