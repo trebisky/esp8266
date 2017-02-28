@@ -60,9 +60,9 @@
 ; This is a 32 bit RISC processor with 16 registers.
 ; Register use as I understand them so far is:
 ;
-;	a0 - used for subroutine return
+;	a0 - used for subroutine return address
 ;	a1 - stack pointer
-;	a2 - first subroutine argument and function value return
+;	a2 - first subroutine argument and possible return value
 ;
 ; There is a 662 page "instruction set architecture" manual available,
 ;  which is almost indispensible for sorting this stuff out.
@@ -202,9 +202,10 @@
 40000090:	000000e0	.long 0xe0000000
 40000094:	f3000040	.long 0x400000f3
 40000098:	28e30040	.long 0x4000e328
+
 4000009c:	000000        	ill
 4000009f:	000000        	ill
-400000a2:	00000c        	excw
+400000a2:	0000
 
 ; We seem to be done with vectors and it is code from here on out.
 ; Reset jumps immediately to here.
@@ -251,23 +252,31 @@
 
 400000af:	21f5ff		l32r	a2, 40000084	; ( 00000000 )
 400000b2:	30eb03        	rsr.prid	a3	; read processor ID
-400000b5:	303074        	extui	a3, a3, 0, 8	; extract low bits
+400000b5:	303074        	extui	a3, a3, 0, 8	; extract low 8 bits
 400000b8:	8c42      	beqz.n	a2, 400000c0	; branch if a2==0 (and it is!)
+
 400000ba:	562300        	bnez	a3, 400000c0
 400000bd:	026200        	s32i	a0, a2, 0
 
 400000c0:	21f2ff		l32r	a2, 40000088	; ( 40000000 )
 400000c3:	20e713        	wsr.vecbase	a2	; store to vector base
-400000c6:	206100        	rsil	a2, 1
+
+400000c6:	206100        	rsil	a2, 1		; set interrupt level to 1
 400000c9:	21f0ff		l32r	a2, 4000008c	; ( 2222211f )
 400000cc:	51f1ff		l32r	a5, 40000090	; ( e0000000 )
 400000cf:	61f1ff		l32r	a6, 40000094	; ( 400000f3 )
-400000d2:	0c03      	movi.n	a3, 0
-400000d4:	7d02      	mov.n	a7, a2
+400000d2:	0c03      	movi.n	a3, 0		; a3 = 0
+400000d4:	7d02      	mov.n	a7, a2		; old interrut level
 400000d6:	506610        	and	a6, a6, a5
 400000d9:	860500        	j	400000f3	; jump !!
 
 400000dc:	00000000
+
+; The "witlb" instruction writes an instruction TLB entry
+; The "wdtlb" instruction writes an data TLB entry
+;  (this is clearly a harvard architecture processor)
+; The first register is the value to be written
+; The second register is the TLB to write to
 
 400000e0:	406350        	witlb	a4, a3
 400000e3:	002000        	isync
@@ -279,13 +288,12 @@
 
 ; code above jumps in here.
 
-400000f3:	704034        	extui	a4, a7, 0, 4
+400000f3:	704034        	extui	a4, a7, 0, 4	; extract low 4 bits
 400000f6:	6713e6        	beq	a3, a6, 400000e0
 
 400000f9:	406350        	witlb	a4, a3
 400000fc:	5033c0        	sub	a3, a3, a5
 400000ff:	f6b3ed        	bgeui	a3, 16, 400000f0
-
 40000102:	002000        	isync
 
 40000105:	51e2ff		l32r	a5, 40000090 ; ( e0000000 )
@@ -297,20 +305,45 @@
 40000113:	5033c0        	sub	a3, a3, a5
 40000116:	707441        	srli	a7, a7, 4
 40000119:	f6b3f0        	bgeui	a3, 16, 4000010d
-
 4000011c:	302000        	dsync
+
+; ----------------------
+; The following table control the copy of blocks of stuff
+;   stored in the bootrom into the data RAM for use.
+;
+; Each block is specified by 3 words.
+;  -- target start
+;  -- target end
+;  -- source start
+
+; 4000e328 <_rom_store_table>:
+; 4000e328:	3fffc000 3fffc857 4000e388
+; 4000e334:	3fffc860 3fffdaac 4000ebe8
+; 4000e340:	3fffdaac 3fffdab0 4000fe34
+; 4000e34c:	3fffdab0 3fffdab0 4000fe38	; null
+; 4000e358:	3fffdab0 3fffdab0 4000fe38	; null
+; 4000e364:	3fffdab0 3fffdab0 4000fe38	; null
+; 4000e370:	3fffdab0 3fffdab0 4000fe38	; null
+; 4000e37c:	00000000 00000000 00000000	; END
+;
+; 4000e388 <_rom_store>:
+; 4000e388:	4000dc44 .....
+
+; For some reason, the table has 8 "slots",
+; but only the first 3 actually do anything.
+
 4000011f:	21deff		l32r	a2, 40000098 ; ( 4000e328 )
 40000122:	ac02      	beqz.n	a2, 40000146
-40000124:	3802      	l32i.n	a3, a2, 0
-40000126:	4812      	l32i.n	a4, a2, 4
-40000128:	5822      	l32i.n	a5, a2, 8
+40000124:	3802      	l32i.n	a3, a2, 0	; target
+40000126:	4812      	l32i.n	a4, a2, 4	; target end
+40000128:	5822      	l32i.n	a5, a2, 8	; source
 4000012a:	22c20c        	addi	a2, a2, 12
 4000012d:	47b30f        	bgeu	a3, a4, 40000140
 
-40000130:	6805      	l32i.n	a6, a5, 0
-40000132:	4b55      	addi.n	a5, a5, 4
-40000134:	6903      	s32i.n	a6, a3, 0
-40000136:	4b33      	addi.n	a3, a3, 4
+40000130:	6805      	l32i.n	a6, a5, 0	; from table
+40000132:	4b55      	addi.n	a5, a5, 4	; ++
+40000134:	6903      	s32i.n	a6, a3, 0	; to dRAM
+40000136:	4b33      	addi.n	a3, a3, 4	; ++
 40000138:	4733f4        	bltu	a3, a4, 40000130
 4000013b:	46f9ff        	j	40000124
 
@@ -319,9 +352,10 @@
 40000140:	5603fe        	bnez	a3, 40000124
 40000143:	56d5fd        	bnez	a5, 40000124
 40000146:	002000        	isync
+
 40000149:	052e00        	call0	4000042c <_start>
 
-; probably the above was coded in assembly language
+; probably everything above this was coded in assembly language
 ; and the call to _start is the transition to C code.
 
 ; a lot of zero padding for some reason ...
@@ -1963,28 +1997,50 @@
 40001047:	456304        	call0	4000567c <sip_init_attach>
 
 4000104a:	455901        	call0	400025e0 <rtc_get_reset_reason>
-4000104d:	4d02      	mov.n	a4, a2
+4000104d:	4d02      	mov.n	a4, a2		; arg2 for printf (cause)
 4000104f:	dd02      	mov.n	a13, a2
 
-40001051:	31ddff		l32r	a3, 40000fc8	; ( 3fffd6a0 ) printf arg1
+40001051:	31ddff		l32r	a3, 40000fc8	; ( 3fffd6a0 ) printf arg1 (build date)
 40001054:	21deff		l32r	a2, 40000fcc	; ( 3fffd674 ) printf format
 40001057:	c02000        	memw
 
+; This will be arg3 for printf - for "mode:(a5,a6)"
 4000105a:	522c46        	l32i	a5, a12, 0x118	; read GPIO inputs
 4000105d:	505025        	extui	a5, a5, 16, 3	; low 3
 40001060:	c02000        	memw
+
+; This will be arg4 for printf - for "mode:(a5,a6)"
 40001063:	622c46        	l32i	a6, a12, 0x118	; read GPIO inputs
 40001066:	606d25        	extui	a6, a6, 29, 3	; top 3
 
-; Whenever my unit starts up, I see:
-;  " ets Jan  8 2013,rst cause:2, boot mode:(1,6)"
-; This string is at 4000f9fe in this boot rom as
-;  " ets %s,rst cause:%d, boot mode:(%d,%d)\n\n"
-;	(note the leading blank)
-; The  date  is  at 4000fa28 as "Jan  8 2013"
-; All this at the weird 74880 or 76800 baud rate
+; When I hold down the boot button (grounding GPIO 0) and hit reset,
+; I see one line of output:
+;  ets Jan  8 2013,rst cause:2, boot mode:(1,6)
 ;
-; ??? How does this stuff get from bootrom addresses into the 3fff range?
+; When I don't hold the button and let it start my application, I see:
+;
+; ets Jan  8 2013,rst cause:2, boot mode:(3,7)
+;
+; load 0x40100000, len 27188, room 16 
+; tail 4
+; chksum 0xc0
+; load 0x3ffe8000, len 884, room 4 
+; tail 0
+; chksum 0x30
+; load 0x3ffe8378, len 280, room 8 
+; tail 0
+; chksum 0x12
+; csum 0x12
+;
+; This all comes out at 74880 baud (since the processor is running at 52 Mhz),
+; so you only see garbled characters unless you take special pains to listen
+; at 74880 baud.
+;
+; This particular call uses the format:
+;
+; 3fffd674:	"\n ets %s,rst cause:%d, boot mode:(%d,%d)\n\n"
+; 3fffd6a0:	"Jan  8 2013"
+; 
 
 40001069:	054601        	call0	400024cc <ets_printf>
 
@@ -2013,6 +2069,10 @@
 400010a5:	565901        	bnez	a9, 400010be <main+0xd2>
 400010a8:	c52500        	call0	40001308 <sub_1308>
 400010ab:	16f200        	beqz	a2, 400010be <main+0xd2>
+
+; Format is "%s %s \n"
+;  a3 points to "ets_main.c"
+;  a4 seems fishy for something to pass to a %s
 
 400010ae:	21c8ff		l32r	a2, 40000fd0	; ( 3fffd6b8 )	printf format
 400010b1:	31c8ff		l32r	a3, 40000fd4	; ( 3fffd6c0 )  printf arg1
@@ -2049,6 +2109,7 @@
 400010f8:	2802      	l32i.n	a2, a2, 0
 400010fa:	162200        	beqz	a2, 40001100
 400010fd:	c00200        	callx0	a2
+; Format follows: "user code done"
 40001100:	21b8ff		l32r	a2, 40000fe0	; ( 3fffd6dc )
 40001103:	853c01        	call0	400024cc <ets_printf>
 40001106:	c5cfff        	call0	40000e04 <ets_run>
@@ -2059,6 +2120,7 @@
 40001113:	12c110        	addi	a1, a1, 16
 40001116:	0df0      	ret.n
 
+; Format: "wdt reset"
 40001118:	21b3ff		l32r	a2, 40000fe4	; ( 3fffd6ac )
 4000111b:	101120        	or	a1, a1, a1
 4000111e:	c53a01        	call0	400024cc <ets_printf>
@@ -2069,8 +2131,11 @@
 4000112a:	06d7ff        	j	4000108a <main+0x9e>
 4000112d:	000000        	ill
 
+; Format: "unknown reset"
 40001130:	21aeff		l32r	a2, 40000fe8	; ( 3fffd6cc )
 40001133:	853901        	call0	400024cc <ets_printf>
+
+; Format: "%s %s "
 40001136:	21a6ff		l32r	a2, 40000fd0	; ( 3fffd6b8 )
 40001139:	31a6ff		l32r	a3, 40000fd4	; ( 3fffd6c0 )
 4000113c:	42a0bb        	movi	a4, 187
@@ -2164,6 +2229,7 @@
 40001211:	f02000        	nop
 40001214:	808d25        	extui	a8, a8, 29, 3
 40001217:	262808        	beqi	a8, 2, 40001223 <sub_11ac+0x77>
+; Format: "waiting for host"
 4000121a:	21e0ff		l32r	a2, 4000119c	; ( 3fffd6ec )
 4000121d:	c52a01        	call0	400024cc <ets_printf>
 40001220:	02a001        	movi	a0, 1
@@ -2320,6 +2386,8 @@
 400013b5:	79c1      	s32i.n	a7, a1, 48
 400013b7:	e22115        	l32i	a14, a1, 84
 400013ba:	30f320        	or	a15, a3, a3
+
+; Format: "load 0x%08x, len %d, room %d "
 400013bd:	21caff		l32r	a2, 400012e8	; ( 3fffd700 )
 400013c0:	62210c        	l32i	a6, a1, 48
 400013c3:	52a010        	movi	a5, 16
@@ -2421,12 +2489,14 @@
 400014c1:	3d01      	mov.n	a3, a1
 400014c3:	1c04      	movi.n	a4, 16
 400014c5:	456503        	call0	40004b1c <SPIRead>
-400014c8:	56422d        	bnez	a2, 400017a0 <sub_1308+0x498>
+400014c8:	56422d        	bnez	a2, 400017a0
 400014cb:	722113        	l32i	a7, a1, 76
 400014ce:	1961      	s32i.n	a1, a1, 24
 400014d0:	72c710        	addi	a7, a7, 16
 400014d3:	726113        	s32i	a7, a1, 76
 400014d6:	3891      	l32i.n	a3, a1, 36
+
+; Format: "tail %d"
 400014d8:	2185ff		l32r	a2, 400012ec	; ( 3fffd734 )
 400014db:	303074        	extui	a3, a3, 0, 8
 400014de:	3971      	s32i.n	a3, a1, 28
@@ -2435,6 +2505,7 @@
 400014e5:	0c34      	movi.n	a4, 3
 400014e7:	078402        	bany	a4, a0, 400014ed <sub_1308+0x1e5>
 400014ea:	866500        	j	40001684 <sub_1308+0x37c>
+
 400014ed:	a6104b        	blti	a0, 1, 4000153c <sub_1308+0x234>
 400014f0:	3d00      	mov.n	a3, a0
 400014f2:	0c0e      	movi.n	a14, 0
@@ -2465,6 +2536,8 @@
 40001533:	30cc30        	xor	a12, a12, a3
 40001536:	c0c074        	extui	a12, a12, 0, 8
 40001539:	079ed9        	bne	a14, a0, 40001516 <sub_1308+0x20e>
+
+; Format: "chksum 0x%02x"
 4000153c:	216dff		l32r	a2, 400012f0	; ( 3fffd740 )
 4000153f:	3d0c      	mov.n	a3, a12
 40001541:	85f800        	call0	400024cc <ets_printf>
@@ -2479,6 +2552,7 @@
 40001556:	f0f074        	extui	a15, a15, 0, 8
 40001559:	f68f02        	bgeui	a15, 8, 4000155f <sub_1308+0x257>
 4000155c:	467000        	j	40001721 <sub_1308+0x419>
+
 4000155f:	7861      	l32i.n	a7, a1, 24
 40001561:	8b8e      	addi.n	a8, a14, 8
 40001563:	808074        	extui	a8, a8, 0, 8
@@ -2576,9 +2650,11 @@
 4000165a:	979eb8        	bne	a14, a9, 40001616 <sub_1308+0x30e>
 4000165d:	e22115        	l32i	a14, a1, 84
 40001660:	0677ff        	j	40001440 <sub_1308+0x138>
-40001663:	002124        	extui	a2, a0, 1, 3
-40001666:	ff          	.byte 0xff
-40001667:	3124ff		l32r	a3, 400012f8	; ( 3fffc870 )
+40001663:	00
+
+; Format: "flash read err, %s"
+40001664:	2124ff        	l32r	a2, 400012f4	; ( 3fffd720 )
+40001667:	3124ff        	l32r	a3, 400012f8
 4000166a:	05e600        	call0	400024cc <ets_printf>
 4000166d:	22a001        	movi	a2, 1
 40001670:	c2210f        	l32i	a12, a1, 60
@@ -2588,7 +2664,8 @@
 4000167c:	02210e        	l32i	a0, a1, 56
 4000167f:	12c160        	addi	a1, a1, 96
 40001682:	0df0      	ret.n
-40001684:	1640eb        	beqz	a0, 4000153c <sub_1308+0x234>
+
+40001684:	1640eb        	beqz	a0, 4000153c
 40001687:	008241        	srli	a8, a0, 2
 4000168a:	e61802        	bgei	a8, 1, 40001690 <sub_1308+0x388>
 4000168d:	c6aaff        	j	4000153c <sub_1308+0x234>
@@ -2648,6 +2725,7 @@
 4000171b:	8665ff        	j	400014b5 <sub_1308+0x1ad>
 4000171e:	000000        	ill
 
+; Format:  "ho %d tail %d room %d"
 40001721:	21f6fe		l32r	a2, 400012fc	; ( 3fffd76c )
 40001724:	38c1      	l32i.n	a3, a1, 48
 40001726:	5d0f      	mov.n	a5, a15
@@ -2676,14 +2754,20 @@
 40001764:	3841      	l32i.n	a3, a1, 16
 40001766:	e851      	l32i.n	a14, a1, 20
 40001768:	068eff        	j	400015a4 <sub_1308+0x29c>
-4000176b:	00e991        	excw
+4000176b:	00
+
+4000176c:	e991      	s32i.n	a14, a1, 36
 4000176e:	c638ff        	j	40001455 <sub_1308+0x14d>
+
+; Format: "csum 0x%02x"
 40001771:	21e3fe		l32r	a2, 40001300	; ( 3fffd750 )
 40001774:	c03c20        	or	a3, a12, a12
 40001777:	45d500        	call0	400024cc <ets_printf>
 4000177a:	62010f        	l8ui	a6, a1, 15
 4000177d:	c066c0        	sub	a6, a6, a12
 40001780:	1656e3        	beqz	a6, 400015b9 <sub_1308+0x2b1>
+
+; Format: "csum err....ho %"
 40001783:	21e0fe		l32r	a2, 40001304	; ( 3fffd760 )
 40001786:	45d400        	call0	400024cc <ets_printf>
 40001789:	22a001        	movi	a2, 1
@@ -2694,28 +2778,36 @@
 40001797:	08e1      	l32i.n	a0, a1, 56
 40001799:	12c160        	addi	a1, a1, 96
 4000179c:	0df0      	ret.n
-4000179e:	000021        	srai	a0, a0, 0
-400017a1:	d5fe32        	excw
-400017a4:	a1d045		l32r	a10, 3ffd2ee4
-400017a7:	d20022        	l8ui	a13, a0, 34
-400017aa:	a001c2        	excw
-400017ad:	210fd2		l32r	a2, 3fff5fec
-400017b0:	2110e2		l32r	a2, 3fff9ff0
-400017b3:	2111f2		l32r	a2, 3fffdff8
-400017b6:	211202		l32r	a2, 3ffc2000
-400017b9:	210e12		l32r	a2, 3ffc5ff4
-400017bc:	c1600d		l32r	a12, 3ffc4d3c
-400017bf:	f021cd        	excw
-400017c2:	fe          	.byte 0xfe
+4000179e:	0000
+
+; Format: "flash read err, %s"
+400017a0:	21d5fe        	l32r	a2, 400012f4	; ( 3fffd720 )
+400017a3:	32a1d0        	movi	a3, 0x1d0
+400017a6:	45d200        	call0	400024cc <ets_printf>
+400017a9:	22a001        	movi	a2, 1
+400017ac:	c2210f        	l32i	a12, a1, 60
+400017af:	d22110        	l32i	a13, a1, 64
+400017b2:	e22111        	l32i	a14, a1, 68
+400017b5:	f22112        	l32i	a15, a1, 72
+400017b8:	02210e        	l32i	a0, a1, 56
+400017bb:	12c160        	addi	a1, a1, 96
+400017be:	0df0      	ret.n
+
+; Format: "flash read err, %s"
+400017c0:	21cdfe        	l32r	a2, 400012f4	; ( 3fffd720 )
 400017c3:	32a20d        	movi	a3, 0x20d
 400017c6:	45d000        	call0	400024cc <ets_printf>
 400017c9:	067bff        	j	400015b9 <sub_1308+0x2b1>
-400017cc:	000000        	ill
-400017cf:	00
+
+400017cc:	00000000
+
 400017d0:	e0dcff3f	.long 0x3fffdce0
 400017d4:	84d7ff3f	.long 0x3fffd784
 400017d8:	8cd7ff3f	.long 0x3fffd78c
 400017dc:	ccd7ff3f	.long 0x3fffd7cc
+
+; Subroutine, no calls visible.
+
 400017e0:	12c1f0        	addi	a1, a1, -16
 400017e3:	d921      	s32i.n	a13, a1, 8
 400017e5:	e931      	s32i.n	a14, a1, 12
@@ -2743,11 +2835,15 @@
 4000181b:	02c010        	addi	a0, a0, 16
 4000181e:	5790dc        	bne	a0, a5, 400017fe <sub_1308+0x4f6>
 40001821:	3d0c      	mov.n	a3, a12
+
+; Format: "sp %p "
 40001823:	21ecff		l32r	a2, 400017d4	; ( 3fffd784 )
 40001826:	101120        	or	a1, a1, a1
 40001829:	05ca00        	call0	400024cc <ets_printf>
 4000182c:	0c0c      	movi.n	a12, 0
 4000182e:	a61e1a        	blti	a14, 1, 4000184c <sub_1308+0x544>
+
+; Format: "sf_dump[%d] a0: 0x%08x  a1: 0x%08x  a2: 0x%08x  a3: 0x%08x "
 40001831:	21e9ff		l32r	a2, 400017d8	; ( 3fffd78c )
 40001834:	c03c20        	or	a3, a12, a12
 40001837:	422d00        	l32i	a4, a13, 0
@@ -2758,6 +2854,8 @@
 40001844:	d2cd10        	addi	a13, a13, 16
 40001847:	1bcc      	addi.n	a12, a12, 1
 40001849:	e79ce4        	bne	a12, a14, 40001831 <sub_1308+0x529>
+
+; Format: "epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x"
 4000184c:	21e4ff		l32r	a2, 400017dc	; ( 3fffd7cc )
 4000184f:	30b103        	rsr.epc1	a3
 40001852:	40b203        	rsr.epc2	a4
@@ -2778,10 +2876,14 @@
 ; gets installed as exception handler
 
 40001878:	30e803        	rsr.exccause	a3
+
+; Format: "Fatal exception (%d): "
 4000187b:	21feff		l32r	a2, 40001874	; ( 3fffd814 )
 4000187e:	12c1f0        	addi	a1, a1, -16
 40001881:	026100        	s32i	a0, a1, 0
 40001884:	45c400        	call0	400024cc <ets_printf>
+
+; Format: "epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x"
 40001887:	21d5ff		l32r	a2, 400017dc	; ( 3fffd7cc )
 4000188a:	30b103        	rsr.epc1	a3
 4000188d:	40b203        	rsr.epc2	a4
@@ -3147,7 +3249,7 @@
 40001c24:	8b29      	addi.n	a2, a9, 8
 40001c26:	12c110        	addi	a1, a1, 16
 40001c29:	0df0      	ret.n
-40001c2b:	0012c1        	mul16u	a1, a2, a0
+40001c2b:	00
 
 40001c2c <mem_calloc>:
 40001c2c:	12c1f0        	addi	a1, a1, -16
@@ -3167,7 +3269,7 @@
 40001c50:	c821      	l32i.n	a12, a1, 8
 40001c52:	12c110        	addi	a1, a1, 16
 40001c55:	0df0      	ret.n
-40001c57:	003d02        	excw
+40001c57:	00
 
 40001c58 <mem_zalloc>:
 40001c58:	3d02      	mov.n	a3, a2
@@ -3178,7 +3280,7 @@
 40001c64:	0801      	l32i.n	a0, a1, 0
 40001c66:	12c110        	addi	a1, a1, 16
 40001c69:	0df0      	ret.n
-40001c6b:	009d02        	excw
+40001c6b:	00
 
 40001c6c <mem_realloc>:
 40001c6c:	9d02      	mov.n	a9, a2
@@ -3209,8 +3311,8 @@
 40001ca7:	c821      	l32i.n	a12, a1, 8
 40001ca9:	12c110        	addi	a1, a1, 16
 40001cac:	0df0      	ret.n
-
 40001cae:	0000
+
 40001cb0:	3cddff3f	.long 0x3fffdd3c
 40001cb4:	f2ff0000	.long 0x0000fff2
 
@@ -3249,14 +3351,17 @@
 40001cfc:	0df0      	ret.n
 40001cfe:	0000
 
+; Format: "eprintf no buf"
 40001d00:	21f6ff        	l32r	a2, 40001cd8	; ( 0x3fffd82c )
 40001d03:	857c00        	call0	400024cc <ets_printf>
 40001d06:	0801      	l32i.n	a0, a1, 0
 40001d08:	12c110        	addi	a1, a1, 16
 40001d0b:	0df0      	ret.n
-40001d0d:	000000        	ill
+40001d0d:	000000
 
 40001d10:	dc1c0040	.long 0x40001cdc
+
+; many calls to this -- apparently to print debug only
 
 40001d14 <eprintf>:
 40001d14:	9d03      	mov.n	a9, a3		; a9 = a3 (second arg)
@@ -3283,6 +3388,8 @@
 40001d42:	12c130        	addi	a1, a1, 48	; restore stack
 40001d45:	0df0      	ret.n
 40001d47:	00
+
+; never called
 
 40001d48 <eprintf_to_host>:
 40001d48:	41daff		l32r	a4, 40001cb0	; ( 3fffdd3c )
@@ -3316,7 +3423,7 @@
 40001d98:	0801      	l32i.n	a0, a1, 0
 40001d9a:	12c110        	addi	a1, a1, 16
 40001d9d:	0df0      	ret.n
-40001d9f:	0012c1        	mul16u	a1, a2, a0
+40001d9f:	00
 
 ; On my running system,
 ;   the first pointer  at 3fffdd3c + 12 (3fffdd48) is 40100490
@@ -3387,12 +3494,14 @@
 40001e1a:	0c15      	movi.n	a5, 1
 40001e1c:	f03583        	moveqz	a3, a5, a15
 40001e1f:	200583        	moveqz	a0, a5, a2
-40001e22:	37000a        	bnone	a0, a3, 40001e30 <sub_1df8+0x38>
+40001e22:	37000a        	bnone	a0, a3, 40001e30
 40001e25:	1bc1      	addi.n	a12, a1, 1
 40001e27:	3c06      	movi.n	a6, 48
 40001e29:	624100        	s8i	a6, a1, 0
-40001e2c:	c61100        	j	40001e77 <sub_1df8+0x7f>
-40001e2f:	00cd01        	slli	a12, a13, 32
+40001e2c:	c61100        	j	40001e77
+40001e2f:	00
+
+40001e30:	cd01      	mov.n	a12, a1
 40001e32:	42611b        	s32i	a4, a1, 108
 40001e35:	626114        	s32i	a6, a1, 80
 40001e38:	407f31        	srai	a7, a4, 31
@@ -3418,12 +3527,12 @@
 40001e6b:	303093        	movnez	a3, a0, a3
 40001e6e:	202093        	movnez	a2, a0, a2
 40001e71:	30a220        	or	a10, a2, a3
-40001e74:	566afc        	bnez	a10, 40001e3e <sub_1df8+0x46>
+40001e74:	566afc        	bnez	a10, 40001e3e
 40001e77:	0d01      	mov.n	a0, a1
-40001e79:	171c47        	beq	a12, a1, 40001ec4 <sub_1df8+0xcc>
+40001e79:	171c47        	beq	a12, a1, 40001ec4
 40001e7c:	102cc0        	sub	a2, a12, a1
 40001e7f:	204141        	srli	a4, a2, 1
-40001e82:	07620a        	bbci	a2, 0, 40001e90 <sub_1df8+0x98>
+40001e82:	07620a        	bbci	a2, 0, 40001e90
 40001e85:	0bcc      	addi.n	a12, a12, -1
 40001e87:	320c00        	l8ui	a3, a12, 0
 40001e8a:	324d00        	s8i	a3, a13, 0
@@ -3431,7 +3540,7 @@
 40001e90:	e22118        	l32i	a14, a1, 96
 40001e93:	f22119        	l32i	a15, a1, 100
 40001e96:	0c07      	movi.n	a7, 0
-40001e98:	9c44      	beqz.n	a4, 40001eb0 <sub_1df8+0xb8>
+40001e98:	9c44      	beqz.n	a4, 40001eb0
 40001e9a:	0b6c      	addi.n	a6, a12, -1
 40001e9c:	620600        	l8ui	a6, a6, 0
 40001e9f:	c2ccfe        	addi	a12, a12, -2
@@ -3439,7 +3548,7 @@
 40001ea5:	624d00        	s8i	a6, a13, 0
 40001ea8:	524d01        	s8i	a5, a13, 1
 40001eab:	2bdd      	addi.n	a13, a13, 2
-40001ead:	c730e9        	bltu	a0, a12, 40001e9a <sub_1df8+0xa2>
+40001ead:	c730e9        	bltu	a0, a12, 40001e9a
 40001eb0:	022115        	l32i	a0, a1, 84
 40001eb3:	c22116        	l32i	a12, a1, 88
 40001eb6:	724d00        	s8i	a7, a13, 0
@@ -3447,7 +3556,9 @@
 40001ebc:	d22117        	l32i	a13, a1, 92
 40001ebf:	3a11      	add.n	a1, a1, a3
 40001ec1:	0df0      	ret.n
-40001ec3:	000c02        	excw
+40001ec3:	00
+
+40001ec4:	0c02      	movi.n	a2, 0
 40001ec6:	022115        	l32i	a0, a1, 84
 40001ec9:	c22116        	l32i	a12, a1, 88
 40001ecc:	e22118        	l32i	a14, a1, 96
@@ -3458,7 +3569,8 @@
 40001eda:	d22117        	l32i	a13, a1, 92
 40001edd:	3a11      	add.n	a1, a1, a3
 40001edf:	0df0      	ret.n
-40001ee1:	000000        	ill
+40001ee1:	000000
+
 40001ee4:	90c8ff3f	.long 0x3fffc890
 40001ee8:	70c9ff3f	.long 0x3fffc970
 40001eec:	c0caff3f	.long 0x3fffcac0
@@ -3480,7 +3592,7 @@
 40001f1a:	1b03      	addi.n	a0, a3, 1
 40001f1c:	f20300        	l8ui	a15, a3, 0
 40001f1f:	026113        	s32i	a0, a1, 76
-40001f22:	164f4d        	beqz	a15, 400023fa <ets_vprintf+0x4fa>
+40001f22:	164f4d        	beqz	a15, 400023fa
 40001f25:	0c0d      	movi.n	a13, 0
 40001f27:	0c0c      	movi.n	a12, 0
 40001f29:	12611f        	s32i	a1, a1, 124
@@ -3491,7 +3603,7 @@
 40001f36:	0c00      	movi.n	a0, 0
 40001f38:	02611e        	s32i	a0, a1, 120
 40001f3b:	b2611d        	s32i	a11, a1, 116
-40001f3e:	271f1a        	beq	a15, a2, 40001f5c <ets_vprintf+0x5c>
+40001f3e:	271f1a        	beq	a15, a2, 40001f5c
 40001f41:	2d0f      	mov.n	a2, a15
 40001f43:	c00e00        	callx0	a14
 40001f46:	c2cc01        	addi	a12, a12, 1
@@ -3499,35 +3611,36 @@
 40001f4c:	2c52      	movi.n	a2, 37
 40001f4e:	f20000        	l8ui	a15, a0, 0
 40001f51:	1b00      	addi.n	a0, a0, 1
-40001f53:	16af1e        	beqz	a15, 40002141 <ets_vprintf+0x241>
+40001f53:	16af1e        	beqz	a15, 40002141
 40001f56:	026113        	s32i	a0, a1, 76
-40001f59:	279fe4        	bne	a15, a2, 40001f41 <ets_vprintf+0x41>
+40001f59:	279fe4        	bne	a15, a2, 40001f41
 40001f5c:	422113        	l32i	a4, a1, 76
 40001f5f:	2cd3      	movi.n	a3, 45
 40001f61:	f20400        	l8ui	a15, a4, 0
 40001f64:	1b44      	addi.n	a4, a4, 1
 40001f66:	426113        	s32i	a4, a1, 76
-40001f69:	371f1f        	beq	a15, a3, 40001f8c <ets_vprintf+0x8c>
+40001f69:	371f1f        	beq	a15, a3, 40001f8c
 40001f6c:	3c05      	movi.n	a5, 48
 40001f6e:	0c06      	movi.n	a6, 0
 40001f70:	62611c        	s32i	a6, a1, 112
-40001f73:	571f27        	beq	a15, a5, 40001f9e <ets_vprintf+0x9e>
+40001f73:	571f27        	beq	a15, a5, 40001f9e
 40001f76:	2cf7      	movi.n	a7, 47
 40001f78:	0c08      	movi.n	a8, 0
 40001f7a:	82611b        	s32i	a8, a1, 108
-40001f7d:	f7b733        	bgeu	a7, a15, 40001fb4 <ets_vprintf+0xb4>
+40001f7d:	f7b733        	bgeu	a7, a15, 40001fb4
 40001f80:	3c99      	movi.n	a9, 57
-40001f82:	f7392e        	bltu	a9, a15, 40001fb4 <ets_vprintf+0xb4>
+40001f82:	f7392e        	bltu	a9, a15, 40001fb4
 40001f85:	0c06      	movi.n	a6, 0
 40001f87:	2cf0      	movi.n	a0, 47
-40001f89:	461a00        	j	40001ff6 <ets_vprintf+0xf6>
+40001f89:	461a00        	j	40001ff6
+
 40001f8c:	3c0a      	movi.n	a10, 48
 40001f8e:	f20400        	l8ui	a15, a4, 0
 40001f91:	0c1b      	movi.n	a11, 1
 40001f93:	1b04      	addi.n	a0, a4, 1
 40001f95:	026113        	s32i	a0, a1, 76
 40001f98:	b2611c        	s32i	a11, a1, 112
-40001f9b:	a79fd7        	bne	a15, a10, 40001f76 <ets_vprintf+0x76>
+40001f9b:	a79fd7        	bne	a15, a10, 40001f76
 40001f9e:	2cf2      	movi.n	a2, 47
 40001fa0:	422113        	l32i	a4, a1, 76
 40001fa3:	32a001        	movi	a3, 1
@@ -3535,32 +3648,34 @@
 40001fa9:	f20400        	l8ui	a15, a4, 0
 40001fac:	1b44      	addi.n	a4, a4, 1
 40001fae:	426113        	s32i	a4, a1, 76
-40001fb1:	f732cb        	bltu	a2, a15, 40001f80 <ets_vprintf+0x80>
+40001fb1:	f732cb        	bltu	a2, a15, 40001f80
 40001fb4:	0c06      	movi.n	a6, 0
 40001fb6:	52cfd2        	addi	a5, a15, -46
-40001fb9:	16b524        	beqz	a5, 40002208 <ets_vprintf+0x308>
+40001fb9:	16b524        	beqz	a5, 40002208
 40001fbc:	3c78      	movi.n	a8, 55
 40001fbe:	72cf94        	addi	a7, a15, -108
-40001fc1:	167720        	beqz	a7, 400021cc <ets_vprintf+0x2cc>
+40001fc1:	167720        	beqz	a7, 400021cc
 40001fc4:	0c09      	movi.n	a9, 0
 40001fc6:	0c0a      	movi.n	a10, 0
 40001fc8:	02cfbe        	addi	a0, a15, -66
-40001fcb:	87b00a        	bgeu	a0, a8, 40001fd9 <ets_vprintf+0xd9>
+40001fcb:	87b00a        	bgeu	a0, a8, 40001fd9
 40001fce:	b1c5ff		l32r	a11, 40001ee4	; ( 3fffc890 )
 40001fd1:	b0b0a0        	addx4	a11, a0, a11
 40001fd4:	b80b      	l32i.n	a11, a11, 0
 40001fd6:	a00b00        	jx	a11
+
 40001fd9:	0c00      	movi.n	a0, 0
 40001fdb:	026110        	s32i	a0, a1, 64
 40001fde:	5c42      	movi.n	a2, 84
 40001fe0:	02cfdb        	addi	a0, a15, -37
-40001fe3:	27b04d        	bgeu	a0, a2, 40002034 <ets_vprintf+0x134>
+40001fe3:	27b04d        	bgeu	a0, a2, 40002034
 40001fe6:	31c0ff		l32r	a3, 40001ee8	; ( 3fffc970 )
 40001fe9:	3030a0        	addx4	a3, a0, a3
 40001fec:	3803      	l32i.n	a3, a3, 0
 40001fee:	a00300        	jx	a3
+
 40001ff1:	3c94      	movi.n	a4, 57
-40001ff3:	f734bf        	bltu	a4, a15, 40001fb6 <ets_vprintf+0xb6>
+40001ff3:	f734bf        	bltu	a4, a15, 40001fb6
 40001ff6:	522113        	l32i	a5, a1, 76
 40001ff9:	6066a0        	addx4	a6, a6, a6
 40001ffc:	f06690        	addx2	a6, a6, a15
@@ -3568,10 +3683,11 @@
 40002002:	f20500        	l8ui	a15, a5, 0
 40002005:	1b55      	addi.n	a5, a5, 1
 40002007:	526113        	s32i	a5, a1, 76
-4000200a:	f730e3        	bltu	a0, a15, 40001ff1 <ets_vprintf+0xf1>
-4000200d:	46e9ff        	j	40001fb6 <ets_vprintf+0xb6>
+4000200a:	f730e3        	bltu	a0, a15, 40001ff1
+4000200d:	46e9ff        	j	40001fb6
+
 40002010:	0c1a      	movi.n	a10, 1
-40002012:	16e92f        	beqz	a9, 40002314 <ets_vprintf+0x414>
+40002012:	16e92f        	beqz	a9, 40002314
 40002015:	1c87      	movi.n	a7, 24
 40002017:	82211a        	l32i	a8, a1, 104
 4000201a:	7c82      	movi.n	a2, -8
@@ -3579,26 +3695,32 @@
 4000201e:	200010        	and	a0, a0, a2
 40002021:	8b80      	addi.n	a8, a0, 8
 40002023:	82611a        	s32i	a8, a1, 104
-40002026:	87a702        	bge	a7, a8, 4000202c <ets_vprintf+0x12c>
-40002029:	464b00        	j	4000215a <ets_vprintf+0x25a>
+40002026:	87a702        	bge	a7, a8, 4000202c
+40002029:	464b00        	j	4000215a
+
 4000202c:	022111        	l32i	a0, a1, 68
-4000202f:	064d00        	j	40002167 <ets_vprintf+0x267>
-40002032:	000062        	excw
-40002035:	61202c		l32r	a6, 3ffcd0b8
-40002038:	52c00e        	addi	a5, a0, 14
-4000203b:	002d0f        	excw
+4000202f:	064d00        	j	40002167
+40002032:	0000
+
+40002034:	626120        	s32i	a6, a1, 128
+40002037:	2c52      	movi.n	a2, 37
+40002039:	c00e00        	callx0	a14
+
+4000203c:	2d0f      	mov.n	a2, a15
 4000203e:	c00e00        	callx0	a14
+
 40002041:	622120        	l32i	a6, a1, 128
 40002044:	2bcc      	addi.n	a12, a12, 2
-40002046:	461f00        	j	400020c7 <ets_vprintf+0x1c7>
+40002046:	461f00        	j	400020c7
+
 40002049:	dd06      	mov.n	a13, a6
-4000204b:	16d635        	beqz	a6, 400023ac <ets_vprintf+0x4ac>
+4000204b:	16d635        	beqz	a6, 400023ac
 4000204e:	0bf6      	addi.n	a15, a6, -1
-40002050:	a61f70        	blti	a15, 1, 400020c4 <ets_vprintf+0x1c4>
+40002050:	a61f70        	blti	a15, 1, 400020c4
 40002053:	9d01      	mov.n	a9, a1
 40002055:	0c00      	movi.n	a0, 0
 40002057:	0c1a      	movi.n	a10, 1
-40002059:	076f1c        	bbci	a15, 0, 40002079 <ets_vprintf+0x179>
+40002059:	076f1c        	bbci	a15, 0, 40002079
 4000205c:	1b91      	addi.n	a9, a1, 1
 4000205e:	3c14      	movi.n	a4, 49
 40002060:	2ce3      	movi.n	a3, 46
@@ -3611,7 +3733,7 @@
 40002073:	503493        	movnez	a3, a4, a5
 40002076:	324100        	s8i	a3, a1, 0
 40002079:	f08121        	srai	a8, a15, 1
-4000207c:	164804        	beqz	a8, 400020c4 <ets_vprintf+0x1c4>
+4000207c:	164804        	beqz	a8, 400020c4
 4000207f:	2ce7      	movi.n	a7, 46
 40002081:	1b50      	addi.n	a5, a0, 1
 40002083:	b2c0e0        	addi	a11, a0, -32
@@ -3636,7 +3758,7 @@
 400020b9:	20ab93        	movnez	a10, a11, a2
 400020bc:	a24901        	s8i	a10, a9, 1
 400020bf:	2b99      	addi.n	a9, a9, 2
-400020c1:	079fba        	bne	a15, a0, 4000207f <ets_vprintf+0x17f>
+400020c1:	079fba        	bne	a15, a0, 4000207f
 400020c4:	12611f        	s32i	a1, a1, 124
 400020c7:	d26119        	s32i	a13, a1, 100
 400020ca:	22211b        	l32i	a2, a1, 108
@@ -3644,8 +3766,8 @@
 400020d0:	d0f6c0        	sub	a15, a6, a13
 400020d3:	0b4f      	addi.n	a4, a15, -1
 400020d5:	00f493        	movnez	a15, a4, a0
-400020d8:	168210        	beqz	a2, 400021e4 <ets_vprintf+0x2e4>
-400020db:	8c70      	beqz.n	a0, 400020e6 <ets_vprintf+0x1e6>
+400020d8:	168210        	beqz	a2, 400021e4
+400020db:	8c70      	beqz.n	a0, 400020e6
 400020dd:	2d00      	mov.n	a2, a0
 400020df:	c00e00        	callx0	a14
 400020e2:	1bcc      	addi.n	a12, a12, 1
@@ -3653,16 +3775,16 @@
 400020e6:	3c0d      	movi.n	a13, 48
 400020e8:	52211c        	l32i	a5, a1, 112
 400020eb:	026110        	s32i	a0, a1, 64
-400020ee:	16a50f        	beqz	a5, 400021ec <ets_vprintf+0x2ec>
+400020ee:	16a50f        	beqz	a5, 400021ec
 400020f1:	022110        	l32i	a0, a1, 64
 400020f4:	f02000        	nop
-400020f7:	8c50      	beqz.n	a0, 40002100 <ets_vprintf+0x200>
+400020f7:	8c50      	beqz.n	a0, 40002100
 400020f9:	2d00      	mov.n	a2, a0
 400020fb:	c00e00        	callx0	a14
 400020fe:	1bcc      	addi.n	a12, a12, 1
 40002100:	622119        	l32i	a6, a1, 100
 40002103:	0bd6      	addi.n	a13, a6, -1
-40002105:	a61617        	blti	a6, 1, 40002120 <ets_vprintf+0x220>
+40002105:	a61617        	blti	a6, 1, 40002120
 40002108:	72211f        	l32i	a7, a1, 124
 4000210b:	220700        	l8ui	a2, a7, 0
 4000210e:	1b77      	addi.n	a7, a7, 1
@@ -3671,20 +3793,22 @@
 40002116:	1bcc      	addi.n	a12, a12, 1
 40002118:	8d0d      	mov.n	a8, a13
 4000211a:	d2cdff        	addi	a13, a13, -1
-4000211d:	e618e7        	bgei	a8, 1, 40002108 <ets_vprintf+0x208>
+4000211d:	e618e7        	bgei	a8, 1, 40002108
 40002120:	92211c        	l32i	a9, a1, 112
 40002123:	0d0f      	mov.n	a0, a15
-40002125:	1609e2        	beqz	a9, 40001f49 <ets_vprintf+0x49>
+40002125:	1609e2        	beqz	a9, 40001f49
 40002128:	0bff      	addi.n	a15, a15, -1
-4000212a:	e61002        	bgei	a0, 1, 40002130 <ets_vprintf+0x230>
-4000212d:	0686ff        	j	40001f49 <ets_vprintf+0x49>
+4000212a:	e61002        	bgei	a0, 1, 40002130
+4000212d:	0686ff        	j	40001f49
+
 40002130:	2c02      	movi.n	a2, 32
 40002132:	c00e00        	callx0	a14
 40002135:	1bcc      	addi.n	a12, a12, 1
 40002137:	ad0f      	mov.n	a10, a15
 40002139:	0bff      	addi.n	a15, a15, -1
-4000213b:	e61af1        	bgei	a10, 1, 40002130 <ets_vprintf+0x230>
-4000213e:	c681ff        	j	40001f49 <ets_vprintf+0x49>
+4000213b:	e61af1        	bgei	a10, 1, 40002130
+4000213e:	c681ff        	j	40001f49
+
 40002141:	022114        	l32i	a0, a1, 80
 40002144:	d22116        	l32i	a13, a1, 88
 40002147:	e22117        	l32i	a14, a1, 92
@@ -3694,8 +3818,10 @@
 40002152:	c22115        	l32i	a12, a1, 84
 40002155:	3a11      	add.n	a1, a1, a3
 40002157:	0df0      	ret.n
-40002159:	001c8b        	excw
-4000215c:	072b04        	blt	a11, a0, 40002164 <ets_vprintf+0x264>
+40002159:	00
+
+4000215a:	1c8b      	movi.n	a11, 24
+4000215c:	072b04        	blt	a11, a0, 40002164
 4000215f:	2c80      	movi.n	a0, 40
 40002161:	02611a        	s32i	a0, a1, 104
 40002164:	022112        	l32i	a0, a1, 72
@@ -3707,59 +3833,66 @@
 40002175:	22223e        	l32i	a2, a2, 248
 40002178:	22611d        	s32i	a2, a1, 116
 4000217b:	32cf9c        	addi	a3, a15, -100
-4000217e:	162314        	beqz	a3, 400022c4 <ets_vprintf+0x3c4>
+4000217e:	162314        	beqz	a3, 400022c4
 40002181:	42cfbc        	addi	a4, a15, -68
-40002184:	16c413        	beqz	a4, 400022c4 <ets_vprintf+0x3c4>
+40002184:	16c413        	beqz	a4, 400022c4
 40002187:	0c05      	movi.n	a5, 0
 40002189:	82211d        	l32i	a8, a1, 116
 4000218c:	82611d        	s32i	a8, a1, 116
 4000218f:	52611e        	s32i	a5, a1, 120
 40002192:	0c0b      	movi.n	a11, 0
 40002194:	b26110        	s32i	a11, a1, 64
-40002197:	c690ff        	j	40001fde <ets_vprintf+0xde>
-4000219a:	000062        	excw
-4000219d:	61203c		l32r	a6, 3ffd1220
-400021a0:	02c00e        	addi	a0, a0, 14
-400021a3:	0022a0        	addx4	a2, a2, a0
-400021a6:	78c0      	l32i.n	a7, a0, 48
-400021a8:	0e          	.byte 0xe
-400021a9:	000c86        	excw
+40002197:	c690ff        	j	40001fde
+4000219a:	0000
+
+4000219c:	626120        	s32i	a6, a1, 128
+4000219f:	3c02      	movi.n	a2, 48
+400021a1:	c00e00        	callx0	a14
+400021a4:	22a078        	movi	a2, 120
+400021a7:	c00e00        	callx0	a14
+400021aa:	0c86      	movi.n	a6, 8
 400021ac:	0c10      	movi.n	a0, 1
 400021ae:	02611b        	s32i	a0, a1, 108
 400021b1:	3c52      	movi.n	a2, 53
 400021b3:	02cfbc        	addi	a0, a15, -68
-400021b6:	273002        	bltu	a0, a2, 400021bc <ets_vprintf+0x2bc>
-400021b9:	c6c1ff        	j	400020c4 <ets_vprintf+0x1c4>
+400021b6:	273002        	bltu	a0, a2, 400021bc
+400021b9:	c6c1ff        	j	400020c4
+
 400021bc:	314cff		l32r	a3, 40001eec	; ( 3fffcac0 )
 400021bf:	3030a0        	addx4	a3, a0, a3
 400021c2:	3803      	l32i.n	a3, a3, 0
 400021c4:	626120        	s32i	a6, a1, 128
 400021c7:	a00300        	jx	a3
-400021ca:	000052        	excw
-400021cd:	2113f2		l32r	a2, 3fffea1c
-400021d0:	05001b        	call0	4001d1d4 <_rom_store+0xee4c>
-400021d3:	555261        	excw
-400021d6:	1342cf        	excw
-400021d9:	9416e4        	excw
-400021dc:	1b0c      	addi.n	a0, a12, 1
-400021de:	090c      	s32i.n	a0, a12, 0
-400021e0:	1ac6      	add.n	a12, a6, a1
-400021e2:	78ff      	l32i.n	a7, a15, 60
+400021ca:	0000
+
+400021cc:	522113        	l32i	a5, a1, 76
+400021cf:	f20500        	l8ui	a15, a5, 0
+400021d2:	1b55      	addi.n	a5, a5, 1
+400021d4:	526113        	s32i	a5, a1, 76
+400021d7:	42cf94        	addi	a4, a15, -108
+400021da:	16e41b        	beqz	a4, 4000239c
+400021dd:	0c09      	movi.n	a9, 0
+400021df:	0c1a      	movi.n	a10, 1
+400021e1:	c678ff        	j	40001fc8
+
 400021e4:	62211c        	l32i	a6, a1, 112
 400021e7:	2c0d      	movi.n	a13, 32
-400021e9:	5646f0        	bnez	a6, 400020f1 <ets_vprintf+0x1f1>
+400021e9:	5646f0        	bnez	a6, 400020f1
 400021ec:	0d0f      	mov.n	a0, a15
 400021ee:	0bff      	addi.n	a15, a15, -1
-400021f0:	e61002        	bgei	a0, 1, 400021f6 <ets_vprintf+0x2f6>
-400021f3:	86beff        	j	400020f1 <ets_vprintf+0x1f1>
+400021f0:	e61002        	bgei	a0, 1, 400021f6
+400021f3:	86beff        	j	400020f1
+
 400021f6:	2d0d      	mov.n	a2, a13
 400021f8:	c00e00        	callx0	a14
 400021fb:	1bcc      	addi.n	a12, a12, 1
 400021fd:	7d0f      	mov.n	a7, a15
 400021ff:	0bff      	addi.n	a15, a15, -1
-40002201:	e617f1        	bgei	a7, 1, 400021f6 <ets_vprintf+0x2f6>
-40002204:	46baff        	j	400020f1 <ets_vprintf+0x1f1>
-40002207:	002cf8        	excw
+40002201:	e617f1        	bgei	a7, 1, 400021f6
+40002204:	46baff        	j	400020f1
+40002207:	00
+
+40002208:	2cf8      	movi.n	a8, 47
 4000220a:	922113        	l32i	a9, a1, 76
 4000220d:	a2211b        	l32i	a10, a1, 108
 40002210:	f20900        	l8ui	a15, a9, 0
@@ -3767,36 +3900,42 @@
 40002215:	a2611b        	s32i	a10, a1, 108
 40002218:	1b99      	addi.n	a9, a9, 1
 4000221a:	926113        	s32i	a9, a1, 76
-4000221d:	f73802        	bltu	a8, a15, 40002223 <ets_vprintf+0x323>
-40002220:	0666ff        	j	40001fbc <ets_vprintf+0xbc>
+4000221d:	f73802        	bltu	a8, a15, 40002223
+40002220:	0666ff        	j	40001fbc
+
 40002223:	3c9b      	movi.n	a11, 57
-40002225:	f73b02        	bltu	a11, a15, 4000222b <ets_vprintf+0x32b>
-40002228:	063500        	j	40002300 <ets_vprintf+0x400>
-4000222b:	4663ff        	j	40001fbc <ets_vprintf+0xbc>
+40002225:	f73b02        	bltu	a11, a15, 4000222b
+40002228:	063500        	j	40002300
+4000222b:	4663ff        	j	40001fbc
+
 4000222e:	f2211a        	l32i	a15, a1, 104
 40002231:	1c8d      	movi.n	a13, 24
 40002233:	0d0f      	mov.n	a0, a15
 40002235:	4bff      	addi.n	a15, a15, 4
 40002237:	f2611a        	s32i	a15, a1, 104
-4000223a:	f72d2c        	blt	a13, a15, 4000226a <ets_vprintf+0x36a>
+4000223a:	f72d2c        	blt	a13, a15, 4000226a
 4000223d:	022111        	l32i	a0, a1, 68
-40002240:	c60c00        	j	40002277 <ets_vprintf+0x377>
+40002240:	c60c00        	j	40002277
+
 40002243:	626120        	s32i	a6, a1, 128
 40002246:	32211a        	l32i	a3, a1, 104
 40002249:	1c82      	movi.n	a2, 24
 4000224b:	0d03      	mov.n	a0, a3
 4000224d:	4b33      	addi.n	a3, a3, 4
 4000224f:	32611a        	s32i	a3, a1, 104
-40002252:	372250        	blt	a2, a3, 400022a6 <ets_vprintf+0x3a6>
+40002252:	372250        	blt	a2, a3, 400022a6
 40002255:	022111        	l32i	a0, a1, 68
-40002258:	c61500        	j	400022b3 <ets_vprintf+0x3b3>
-4000225b:	006261        	excw
-4000225e:	202c52        	excw
+40002258:	c61500        	j	400022b3
+4000225b:	00
+
+4000225c:	626120        	s32i	a6, a1, 128
+4000225f:	2c52      	movi.n	a2, 37
 40002261:	c00e00        	callx0	a14
 40002264:	622120        	l32i	a6, a1, 128
-40002267:	0697ff        	j	400020c7 <ets_vprintf+0x1c7>
+40002267:	0697ff        	j	400020c7
+
 4000226a:	1c84      	movi.n	a4, 24
-4000226c:	072404        	blt	a4, a0, 40002274 <ets_vprintf+0x374>
+4000226c:	072404        	blt	a4, a0, 40002274
 4000226f:	2c45      	movi.n	a5, 36
 40002271:	52611a        	s32i	a5, a1, 104
 40002274:	022112        	l32i	a0, a1, 72
@@ -3808,17 +3947,18 @@
 40002285:	707883        	moveqz	a7, a8, a7
 40002288:	72611f        	s32i	a7, a1, 124
 4000228b:	720700        	l8ui	a7, a7, 0
-4000228e:	160718        	beqz	a7, 40002412 <ets_vprintf+0x512>
+4000228e:	160718        	beqz	a7, 40002412
 40002291:	02211f        	l32i	a0, a1, 124
 40002294:	0c0d      	movi.n	a13, 0
 40002296:	1bdd      	addi.n	a13, a13, 1
 40002298:	820001        	l8ui	a8, a0, 1
 4000229b:	1b00      	addi.n	a0, a0, 1
-4000229d:	5658ff        	bnez	a8, 40002296 <ets_vprintf+0x396>
-400022a0:	c688ff        	j	400020c7 <ets_vprintf+0x1c7>
+4000229d:	5658ff        	bnez	a8, 40002296
+400022a0:	c688ff        	j	400020c7
 400022a3:	000000        	ill
+
 400022a6:	1c89      	movi.n	a9, 24
-400022a8:	072904        	blt	a9, a0, 400022b0 <ets_vprintf+0x3b0>
+400022a8:	072904        	blt	a9, a0, 400022b0
 400022ab:	2c4a      	movi.n	a10, 36
 400022ad:	a2611a        	s32i	a10, a1, 104
 400022b0:	022112        	l32i	a0, a1, 72
@@ -3827,14 +3967,16 @@
 400022b8:	22d2ff        	addmi	a2, a2, 0xffffff00
 400022bb:	2202fc        	l8ui	a2, a2, 252
 400022be:	c00e00        	callx0	a14
-400022c1:	4620ff        	j	40001f46 <ets_vprintf+0x46>
+400022c1:	4620ff        	j	40001f46
+
 400022c4:	22211d        	l32i	a2, a1, 116
 400022c7:	0c0a      	movi.n	a10, 0
 400022c9:	32211e        	l32i	a3, a1, 120
 400022cc:	0c00      	movi.n	a0, 0
-400022ce:	e61302        	bgei	a3, 1, 400022d4 <ets_vprintf+0x3d4>
-400022d1:	c63800        	j	400023b8 <ets_vprintf+0x4b8>
-400022d4:	16a0eb        	beqz	a0, 40002192 <ets_vprintf+0x292>
+400022ce:	e61302        	bgei	a3, 1, 400022d4
+400022d1:	c63800        	j	400023b8
+
+400022d4:	16a0eb        	beqz	a0, 40002192
 400022d7:	52211d        	l32i	a5, a1, 116
 400022da:	7cfb      	movi.n	a11, -1
 400022dc:	82211e        	l32i	a8, a1, 120
@@ -3846,29 +3988,34 @@
 400022ed:	1ba8      	addi.n	a10, a8, 1
 400022ef:	508a83        	moveqz	a8, a10, a5
 400022f2:	82611e        	s32i	a8, a1, 120
-400022f5:	4639ff        	j	40001fde <ets_vprintf+0xde>
+400022f5:	4639ff        	j	40001fde
+
 400022f8:	3c90      	movi.n	a0, 57
-400022fa:	f7b002        	bgeu	a0, a15, 40002300 <ets_vprintf+0x400>
-400022fd:	c62eff        	j	40001fbc <ets_vprintf+0xbc>
+400022fa:	f7b002        	bgeu	a0, a15, 40002300
+400022fd:	c62eff        	j	40001fbc
 40002300:	322113        	l32i	a3, a1, 76
 40002303:	2cf2      	movi.n	a2, 47
 40002305:	f20300        	l8ui	a15, a3, 0
 40002308:	1b33      	addi.n	a3, a3, 1
 4000230a:	326113        	s32i	a3, a1, 76
-4000230d:	f732e7        	bltu	a2, a15, 400022f8 <ets_vprintf+0x3f8>
-40002310:	062aff        	j	40001fbc <ets_vprintf+0xbc>
-40002313:	00168a        	excw
-40002316:	0a52      	add.n	a5, a2, a0
-40002318:	211a1c		l32r	a2, 3ffc9380
-4000231b:	840d05        	excw
+4000230d:	f732e7        	bltu	a2, a15, 400022f8
+40002310:	062aff        	j	40001fbc
+40002313:	00
+
+40002314:	168a0a        	beqz	a10, 400023c0
+40002317:	52211a        	l32i	a5, a1, 104
+4000231a:	1c84      	movi.n	a4, 24
+4000231c:	0d05      	mov.n	a0, a5
 4000231e:	4b55      	addi.n	a5, a5, 4
 40002320:	52611a        	s32i	a5, a1, 104
-40002323:	572407        	blt	a4, a5, 4000232e <ets_vprintf+0x42e>
+40002323:	572407        	blt	a4, a5, 4000232e
 40002326:	022111        	l32i	a0, a1, 68
-40002329:	860300        	j	4000233b <ets_vprintf+0x43b>
-4000232c:	00001c        	excw
-4000232f:	870727        	bnone	a7, a8, 4000235a <ets_vprintf+0x45a>
-40002332:	042c48        	excw
+40002329:	860300        	j	4000233b
+4000232c:	0000
+
+4000232e:	1c87      	movi.n	a7, 24
+40002330:	072704        	blt	a7, a0, 40002338
+40002333:	2c48      	movi.n	a8, 36
 40002335:	82611a        	s32i	a8, a1, 104
 40002338:	022112        	l32i	a0, a1, 72
 4000233b:	a2211a        	l32i	a10, a1, 104
@@ -3879,15 +4026,18 @@
 40002349:	a0af31        	srai	a10, a10, 31
 4000234c:	a2611e        	s32i	a10, a1, 120
 4000234f:	068aff        	j	4000217b <ets_vprintf+0x27b>
-40002352:	000032        	excw
-40002355:	211e22		l32r	a2, 3ffcabd0
-40002358:	211d4d		l32r	a2, 3ffd57cc
-4000235b:	011c05		l32r	a0, 3ffc37cc
-4000235e:	61e5fe		l32r	a6, 40001ef4	; ( 3fffd848 )
+40002352:	0000
+
+40002354:	32211e        	l32i	a3, a1, 120
+40002357:	22211d        	l32i	a2, a1, 116
+4000235a:	4d01      	mov.n	a4, a1
+4000235c:	1c05      	movi.n	a5, 16
+4000235e:	61e5fe        	l32r	a6, 40001ef4 <sub_1df8+0xfc>
 40002361:	45a9ff        	call0	40001df8 <sub_1df8>
 40002364:	622120        	l32i	a6, a1, 128
 40002367:	dd02      	mov.n	a13, a2
-40002369:	c655ff        	j	400020c4 <ets_vprintf+0x1c4>
+40002369:	c655ff        	j	400020c4
+
 4000236c:	32211e        	l32i	a3, a1, 120
 4000236f:	22211d        	l32i	a2, a1, 116
 40002372:	4d01      	mov.n	a4, a1
@@ -3896,7 +4046,8 @@
 40002379:	c5a7ff        	call0	40001df8 <sub_1df8>
 4000237c:	622120        	l32i	a6, a1, 128
 4000237f:	dd02      	mov.n	a13, a2
-40002381:	c64fff        	j	400020c4 <ets_vprintf+0x1c4>
+40002381:	c64fff        	j	400020c4
+
 40002384:	32211e        	l32i	a3, a1, 120
 40002387:	22211d        	l32i	a2, a1, 116
 4000238a:	4d01      	mov.n	a4, a1
@@ -3905,31 +4056,37 @@
 40002391:	45a6ff        	call0	40001df8 <sub_1df8>
 40002394:	622120        	l32i	a6, a1, 128
 40002397:	dd02      	mov.n	a13, a2
-40002399:	c649ff        	j	400020c4 <ets_vprintf+0x1c4>
+40002399:	c649ff        	j	400020c4
+
 4000239c:	f20500        	l8ui	a15, a5, 0
 4000239f:	0c19      	movi.n	a9, 1
 400023a1:	1bb5      	addi.n	a11, a5, 1
 400023a3:	b26113        	s32i	a11, a1, 76
-400023a6:	468dff        	j	400021df <ets_vprintf+0x2df>
+400023a6:	468dff        	j	400021df
 400023a9:	000000        	ill
-400023ac:	168906        	beqz	a9, 40002418 <ets_vprintf+0x518>
+
+400023ac:	168906        	beqz	a9, 40002418
 400023af:	3cff      	movi.n	a15, 63
 400023b1:	4c0d      	movi.n	a13, 64
-400023b3:	0627ff        	j	40002053 <ets_vprintf+0x153>
-400023b6:	000016        	excw
-400023b9:	43060c        	excw
-400023bc:	10c6c4        	extui	a12, a1, 6, 13
-400023bf:	ff          	.byte 0xff
+400023b3:	0627ff        	j	40002053
+400023b6:	0000
+
+400023b8:	164306        	beqz	a3, 40002420
+400023bb:	0c10      	movi.n	a0, 1
+400023bd:	c6c4ff        	j	400022d4
+
 400023c0:	52211a        	l32i	a5, a1, 104
 400023c3:	1c84      	movi.n	a4, 24
 400023c5:	0d05      	mov.n	a0, a5
 400023c7:	4b55      	addi.n	a5, a5, 4
 400023c9:	52611a        	s32i	a5, a1, 104
-400023cc:	572406        	blt	a4, a5, 400023d6 <ets_vprintf+0x4d6>
+400023cc:	572406        	blt	a4, a5, 400023d6
 400023cf:	022111        	l32i	a0, a1, 68
-400023d2:	460300        	j	400023e3 <ets_vprintf+0x4e3>
-400023d5:	001c87        	excw
-400023d8:	072704        	blt	a7, a0, 400023e0 <ets_vprintf+0x4e0>
+400023d2:	460300        	j	400023e3
+400023d5:	00
+
+400023d6:	1c87      	movi.n	a7, 24
+400023d8:	072704        	blt	a7, a0, 400023e0
 400023db:	2c48      	movi.n	a8, 36
 400023dd:	82611a        	s32i	a8, a1, 104
 400023e0:	022112        	l32i	a0, a1, 72
@@ -3940,7 +4097,8 @@
 400023ee:	a2611d        	s32i	a10, a1, 116
 400023f1:	a0af31        	srai	a10, a10, 31
 400023f4:	a2611e        	s32i	a10, a1, 120
-400023f7:	0660ff        	j	4000217b <ets_vprintf+0x27b>
+400023f7:	0660ff        	j	4000217b
+
 400023fa:	0c02      	movi.n	a2, 0
 400023fc:	c22115        	l32i	a12, a1, 84
 400023ff:	d22116        	l32i	a13, a1, 88
@@ -3950,16 +4108,22 @@
 4000240b:	022114        	l32i	a0, a1, 80
 4000240e:	3a11      	add.n	a1, a1, a3
 40002410:	0df0      	ret.n
+
 40002412:	0c0d      	movi.n	a13, 0
-40002414:	c62bff        	j	400020c7 <ets_vprintf+0x1c7>
-40002417:	001cff        	excw
+40002414:	c62bff        	j	400020c7
+40002417:	00
+
+40002418:	1cff      	movi.n	a15, 31
 4000241a:	2c0d      	movi.n	a13, 32
-4000241c:	c60cff        	j	40002053 <ets_vprintf+0x153>
-4000241f:	00a732        	excw
-40002422:	0246ab        	s8i	a0, a6, 171
-40002425:	ff          	.byte 0xff
-40002426:	46e4ff        	j	400023bb <ets_vprintf+0x4bb>
+4000241c:	c60cff        	j	40002053
+4000241f:	00
+
+40002420:	a73202        	bltu	a2, a10, 40002426
+40002423:	46abff        	j	400022d4
+40002426:	46e4ff        	j	400023bb
 40002429:	000000        	ill
+
+; ** End of ets_vprintf
 
 ; ets_install_putc1 ( arg )
 ; only called from ets_install_uart_printf() below
@@ -4046,7 +4210,7 @@
 400024c4:	5cddff3f	.long 0x3fffdd5c
 400024c8:	a01d0040	.long 0x40001da0
 
-; ets_printf
+; ets_printf -- many calls to this
 
 400024cc <ets_printf>:
 400024cc:	12c1c0        	addi	a1, a1, -64	; space on stack
@@ -4131,6 +4295,8 @@
 40002575:	0df0      	ret.n
 40002577:	00a1ce        	excw
 
+; never called
+
 40002578 <ets_external_printf>:
 40002578:	a1cefd		l32r	a10, 40001cb0	; ( 3fffdd3c )
 4000257b:	12c1c0        	addi	a1, a1, -64
@@ -4143,7 +4309,7 @@
 4000258a:	3991      	s32i.n	a3, a1, 36
 4000258c:	a85a      	l32i.n	a10, a10, 20
 4000258e:	3d02      	mov.n	a3, a2
-40002590:	9c0a      	beqz.n	a10, 400025a4 <ets_external_printf+0x2c>
+40002590:	9c0a      	beqz.n	a10, 400025a4
 40002592:	41c7fd		l32r	a4, 40001cb0	; ( 3fffdd3c )
 40002595:	22c420        	addi	a2, a4, 32
 40002598:	32c41c        	addi	a3, a4, 28
@@ -4162,7 +4328,7 @@
 400025bb:	2941      	s32i.n	a2, a1, 16
 400025bd:	4863      	l32i.n	a4, a3, 24
 400025bf:	0831      	l32i.n	a0, a1, 12
-400025c1:	8cf4      	beqz.n	a4, 400025d4 <ets_external_printf+0x5c>
+400025c1:	8cf4      	beqz.n	a4, 400025d4
 400025c3:	2893      	l32i.n	a2, a3, 36
 400025c5:	c00400        	callx0	a4
 400025c8:	0841      	l32i.n	a0, a1, 16
@@ -4170,9 +4336,12 @@
 400025cc:	0831      	l32i.n	a0, a1, 12
 400025ce:	12c140        	addi	a1, a1, 64
 400025d1:	0df0      	ret.n
-400025d3:	0012c1        	mul16u	a1, a2, a0
-400025d6:	400df0        	subx8	a0, a13, a4
+400025d3:	00
+
+400025d4:	12c140        	addi	a1, a1, 64
+400025d7:	0df0      	ret.n
 400025d9:	000000        	ill
+
 400025dc:	ffffdfff	.long 0xffdfffff
 
 ; Called once during startup.
@@ -4916,22 +5085,28 @@
 40002c91:	580c      	l32i.n	a5, a12, 0
 40002c93:	0801      	l32i.n	a0, a1, 0
 40002c95:	c7950f        	bne	a5, a12, 40002ca8 <timer_insert+0x44>
+
+; Format: "%s %s "
 40002c98:	21f1ff		l32r	a2, 40002c5c	; ( 3fffd6b8 )
 40002c9b:	31f1ff		l32r	a3, 40002c60	; ( 3fffd878 )
 40002c9e:	42a0ad        	movi	a4, 173
 40002ca1:	8582ff        	call0	400024cc <ets_printf>
 40002ca4:	06ffff        	j	40002ca4 <timer_insert+0x40>
-40002ca7:	00c811        	slli	a12, a8, 16
+40002ca7:	00
+
+40002ca8:	c811      	l32i.n	a12, a1, 4
 40002caa:	12c110        	addi	a1, a1, 16
 40002cad:	0df0      	ret.n
-40002caf:	000903        	excw
+40002caf:	00
+
+40002cb0:	0903      	s32i.n	a0, a3, 0
 40002cb2:	2913      	s32i.n	a2, a3, 4
 40002cb4:	c905      	s32i.n	a12, a5, 0
 40002cb6:	c5f4ff        	call0	40002c04 <sub_2c04>
 40002cb9:	06f5ff        	j	40002c91 <timer_insert+0x2d>
+
 40002cbc:	ce300000	.long 0x000030ce
 40002cc0:	b4c40400	.long 0x0004c4b4
-40002cc4:	12c1
 
 40002cc4 <ets_timer_arm>:
 40002cc4:	12c1f0        	addi	a1, a1, -16
@@ -4942,11 +5117,14 @@
 40002cd2:	080c      	l32i.n	a0, a12, 0
 40002cd4:	3d04      	mov.n	a3, a4
 40002cd6:	26000e        	beqi	a0, -1, 40002ce8 <ets_timer_arm+0x24>
+
+; Format: "%s %s "
 40002cd9:	21e0ff		l32r	a2, 40002c5c	; ( 3fffd6b8 )
 40002cdc:	31e1ff		l32r	a3, 40002c60	; ( 3fffd878 )
 40002cdf:	42a0b9        	movi	a4, 185
 40002ce2:	857eff        	call0	400024cc <ets_printf>
 40002ce5:	06ffff        	j	40002ce5 <ets_timer_arm+0x21>
+
 40002ce8:	16c204        	beqz	a2, 40002d38 <ets_timer_arm+0x74>
 40002ceb:	41f4ff		l32r	a4, 40002cbc	; ( 000030ce )
 40002cee:	3921      	s32i.n	a3, a1, 8
@@ -5018,18 +5196,21 @@
 40002d83:	0901      	s32i.n	a0, a1, 0
 40002d85:	0802      	l32i.n	a0, a2, 0
 40002d87:	26000e        	beqi	a0, -1, 40002d99 <ets_timer_done+0x19>
+
+; Format: "%s %s "
 40002d8a:	21b4ff		l32r	a2, 40002c5c	; ( 3fffd6b8 )
 40002d8d:	31b4ff		l32r	a3, 40002c60	; ( 3fffd878 )
 40002d90:	42a0e7        	movi	a4, 231
 40002d93:	8573ff        	call0	400024cc <ets_printf>
 40002d96:	06ffff        	j	40002d96 <ets_timer_done+0x16>
+
 40002d99:	0c03      	movi.n	a3, 0
 40002d9b:	0c04      	movi.n	a4, 0
 40002d9d:	85eaff        	call0	40002c48 <ets_timer_setfn>
 40002da0:	0801      	l32i.n	a0, a1, 0
 40002da2:	12c110        	addi	a1, a1, 16
 40002da5:	0df0      	ret.n
-40002da7:	0012c1        	mul16u	a1, a2, a0
+40002da7:	00
 
 40002da8 <ets_timer_handler_isr>:
 40002da8:	12c1f0        	addi	a1, a1, -16
@@ -9316,11 +9497,15 @@
 40005524:	0cc2      	movi.n	a2, 12
 40005526:	85c5ff        	call0	40005180 <sip_alloc_to_host_evt>
 40005529:	2911      	s32i.n	a2, a1, 4
-4000552b:	56b200        	bnez	a2, 4000553a <sip_install_rx_data_cb+0xde>
+4000552b:	56b200        	bnez	a2, 4000553a
+
+; Format: "no rds"
 4000552e:	21e6ff		l32r	a2, 400054c8	; ( 3fffd89c )
 40005531:	85f9fc        	call0	400024cc <ets_printf>
 40005534:	86f4ff        	j	4000550a <sip_install_rx_data_cb+0xae>
+
 40005537:	000000        	ill
+
 4000553a:	322103        	l32i	a3, a1, 12
 4000553d:	222201        	l32i	a2, a2, 4
 40005540:	5821      	l32i.n	a5, a1, 8
@@ -9340,6 +9525,7 @@
 40005567:	2d03      	mov.n	a2, a3
 40005569:	c52900        	call0	40005808 <sip_send>
 4000556c:	86e6ff        	j	4000550a <sip_install_rx_data_cb+0xae>
+
 4000556f:	008202        	excw
 40005572:	0d72      	excw
 40005574:	020e62        	l8ui	a0, a14, 98
@@ -9383,6 +9569,8 @@
 400055e2:	8840      	l32i.n	a8, a0, 16
 400055e4:	076828        	bbci	a8, 0, 40005610 <sip_install_rx_data_cb+0x1b4>
 400055e7:	4801      	l32i.n	a4, a1, 0
+
+; Format: "bootup , addr 0x%08x"
 400055e9:	21b8ff		l32r	a2, 400054cc	; ( 3fffd884 )
 400055ec:	320403        	l8ui	a3, a4, 3
 400055ef:	520402        	l8ui	a5, a4, 2
@@ -9706,6 +9894,8 @@
 4000590f:	461e00        	j	4000598c <sub_58b8+0xd4>
 40005912:	784d      	l32i.n	a7, a13, 16
 40005914:	076705        	bbci	a7, 0, 4000591d <sub_58b8+0x65>
+
+; Format: "rx done unknown"
 40005917:	21e6ff		l32r	a2, 400058b0	; ( 3fffd8b8 )
 4000591a:	05bbfc        	call0	400024cc <ets_printf>
 4000591d:	165cfc        	beqz	a12, 400058e6 <sub_58b8+0x2e>
@@ -9780,6 +9970,8 @@
 400059d0:	0c14      	movi.n	a4, 1
 400059d2:	c00600        	callx0	a6
 400059d5:	06d1ff        	j	4000591d <sub_58b8+0x65>
+
+; Format: "sip bogus rx done"
 400059d8:	21b7ff		l32r	a2, 400058b4	; ( 3fffd8a4 )
 400059db:	05affc        	call0	400024cc <ets_printf>
 400059de:	c22103        	l32i	a12, a1, 12
@@ -9788,6 +9980,7 @@
 400059e7:	0821      	l32i.n	a0, a1, 8
 400059e9:	12c120        	addi	a1, a1, 32
 400059ec:	0df0      	ret.n
+
 400059ee:	000002        	excw
 400059f1:	4d44      	excw
 400059f3:	c558fb        	call0	40000f80 <ets_intr_unlock>
@@ -9798,10 +9991,7 @@
 
 40005a00:	f0d8ff3f	.long 0x3fffd8f0
 40005a04:	dcd8ff3f	.long 0x3fffd8dc
-
-40005a08:	ccd8      	bnez.n	a8, 40005a19 <sub_5a0c+0xd>
-40005a0a:	ff          	.byte 0xff
-40005a0b:	3f          	.byte 0x3f
+40005a08:	ccd8ff3f      	.long 0x3fffd8cc
 
 40005a0c <sub_5a0c>:
 40005a0c:	12c1e0        	addi	a1, a1, -32
@@ -9865,6 +10055,8 @@
 40005a9e:	284e      	l32i.n	a2, a14, 16
 40005aa0:	3df0      	nop.n
 40005aa2:	076205        	bbci	a2, 0, 40005aab <sub_5a0c+0x9f>
+
+; Format: "tx unknown"
 40005aa5:	21d6ff		l32r	a2, 40005a00	; ( 3fffd8f0 )
 40005aa8:	05a2fc        	call0	400024cc <ets_printf>
 40005aab:	169df7        	beqz	a13, 40005a28 <sub_5a0c+0x1c>
@@ -9888,6 +10080,8 @@
 40005adc:	800011        	slli	a0, a0, 8
 40005adf:	200020        	or	a0, a0, a2
 40005ae2:	47108e        	beq	a0, a4, 40005a74 <sub_5a0c+0x68>
+
+; Format: "seq %u, %u ds %p"
 40005ae5:	21c7ff		l32r	a2, 40005a04	; ( 3fffd8dc )
 40005ae8:	5d0d      	mov.n	a5, a13
 40005aea:	003020        	or	a3, a0, a0
@@ -9956,8 +10150,10 @@
 40005b9b:	2d0f      	mov.n	a2, a15
 40005b9d:	c00000        	callx0	a0
 40005ba0:	c6c1ff        	j	40005aab <sub_5a0c+0x9f>
-40005ba3:	002199        	excw
-40005ba6:	ff          	.byte 0xff
+40005ba3:	00
+
+; Format: "sip bogus tx"
+40005ba4:	2199ff        	l32r	a2, 40005a08	; ( 3fffd8cc )
 40005ba7:	4592fc        	call0	400024cc <ets_printf>
 40005baa:	c22102        	l32i	a12, a1, 8
 40005bad:	d22103        	l32i	a13, a1, 12
@@ -11129,6 +11325,7 @@
 40006715:	8cf5      	beqz.n	a5, 40006728 <rom_rxiq_get_mis+0x100>
 40006717:	5881      	l32i.n	a5, a1, 32
 40006719:	422109        	l32i	a4, a1, 36
+; format follows: "rxiq_get_mis: s_pwr=%lld, %d-%d, "
 4000671c:	21c2ff		l32r	a2, 40006624	; ( 3fffd8fc )
 4000671f:	806c01        	slli	a6, a12, 24
 40006722:	606831        	srai	a6, a6, 24
@@ -11140,7 +11337,7 @@
 40006730:	0801      	l32i.n	a0, a1, 0
 40006732:	12c130        	addi	a1, a1, 48
 40006735:	0df0      	ret.n
-40006737:	0012c1        	mul16u	a1, a2, a0
+40006737:	00
 
 40006738 <rom_sar_init>:
 40006738:	12c1f0        	addi	a1, a1, -16
@@ -13214,6 +13411,7 @@
 40007bd5:	0851      	l32i.n	a0, a1, 20
 40007bd7:	12c130        	addi	a1, a1, 48
 40007bda:	0df0      	ret.n
+
 40007bdc:	50c8ff3f	.long 0x3fffc850
 40007be0:	20d9ff3f	.long 0x3fffd920
 40007be4:	2cd9ff3f	.long 0x3fffd92c
@@ -13341,10 +13539,14 @@
 40007d24:	c00000        	callx0	a0
 40007d27:	222118        	l32i	a2, a1, 96
 40007d2a:	9c32      	beqz.n	a2, 40007d41 <rom_pbus_dco___SA2+0x151>
+
+; format follows --- " (%d,%d)"
 40007d2c:	21adff		l32r	a2, 40007be0	; ( 3fffd920 )
 40007d2f:	3d0c      	mov.n	a3, a12
 40007d31:	d04d20        	or	a4, a13, a13
 40007d34:	c5fdf9        	call0	40001d14 <eprintf>
+
+; format follows --- "%d,%d "
 40007d37:	21abff		l32r	a2, 40007be4	; ( 3fffd92c )
 40007d3a:	3841      	l32i.n	a3, a1, 16
 40007d3c:	4851      	l32i.n	a4, a1, 20
@@ -13441,6 +13643,7 @@
 40007e38:	00a074        	extui	a10, a0, 0, 8
 40007e3b:	a2611b        	s32i	a10, a1, 108
 40007e3e:	9ca9      	beqz.n	a9, 40007e5c <rom_pbus_dco___SA2+0x26c>
+; Format follows: "stage %d: CGAIN=%d FGAIN=%d, DC_OS=(%d,%d), DAC=(%d,%d) "
 40007e40:	216aff		l32r	a2, 40007be8	; ( 3fffd934 )
 40007e43:	322113        	l32i	a3, a1, 76
 40007e46:	4861      	l32i.n	a4, a1, 24
@@ -13455,6 +13658,7 @@
 40007e5c:	d22118        	l32i	a13, a1, 96
 40007e5f:	3df0      	nop.n
 40007e61:	8c4d      	beqz.n	a13, 40007e69 <rom_pbus_dco___SA2+0x279>
+; Format follows:  "\n"
 40007e63:	2162ff		l32r	a2, 40007bec	; ( 3fffd96c )
 40007e66:	c5eaf9        	call0	40001d14 <eprintf>
 40007e69:	d2a200        	movi	a13, 0x200
@@ -13469,6 +13673,7 @@
 40007e83:	563fe4        	bnez	a15, 40007cca <rom_pbus_dco___SA2+0xda>
 40007e86:	22210f        	l32i	a2, a1, 60
 40007e89:	8c42      	beqz.n	a2, 40007e91 <rom_pbus_dco___SA2+0x2a1>
+; Format follows:  "\n"
 40007e8b:	2158ff		l32r	a2, 40007bec	; ( 3fffd96c )
 40007e8e:	45e8f9        	call0	40001d14 <eprintf>
 40007e91:	c881      	l32i.n	a12, a1, 32
@@ -13479,11 +13684,15 @@
 40007e9c:	0871      	l32i.n	a0, a1, 28
 40007e9e:	2a11      	add.n	a1, a1, a2
 40007ea0:	0df0      	ret.n
+
 40007ea2:	0c40      	movi.n	a0, 4
 40007ea4:	06e4ff        	j	40007e38 <rom_pbus_dco___SA2+0x248>
-40007ea7:	000c0c        	excw
+40007ea7:	00
+
+40007ea8:	0c0c      	movi.n	a12, 0
 40007eaa:	8665ff        	j	40007c44 <rom_pbus_dco___SA2+0x54>
-40007ead:	000000        	ill
+40007ead:	000000
+
 40007eb0:	70d9ff3f	.long 0x3fffd970
 
 40007eb4 <rom_rfcal_pwrctrl>:
@@ -13536,6 +13745,7 @@
 40007f29:	624700        	s8i	a6, a7, 0
 40007f2c:	161501        	beqz	a5, 40007f41 <rom_rfcal_pwrctrl+0x8d>
 40007f2f:	422114        	l32i	a4, a1, 80
+; Format follows: "pwctrl: rate_i=%d, target_power=%d, detect_power=%d"
 40007f32:	21dfff		l32r	a2, 40007eb0	; ( 3fffd970 )
 40007f35:	d03d20        	or	a3, a13, a13
 40007f38:	805001        	slli	a5, a0, 24
@@ -13976,6 +14186,7 @@
 40008378:	0178f7		l32r	a0, 40006158	; ( 3fffc730 )
 4000837b:	46cdff        	j	400082b4 <rom_rfcal_rxiq_set_reg+0x50>
 4000837e:	0000
+
 40008380:	a8d9ff3f	.long 0x3fffd9a8
 40008384:	c4d9ff3f	.long 0x3fffd9c4
 
@@ -14106,6 +14317,7 @@
 400084b7:	ed02      	mov.n	a14, a2
 400084b9:	222110        	l32i	a2, a1, 64
 400084bc:	8c82      	beqz.n	a2, 400084c8 <rom_rfcal_txcap+0x140>
+; Format follows: -- "num_k=%d, power_out=%d, "
 400084be:	21b0ff		l32r	a2, 40008380	; ( 3fffd9a8 )
 400084c1:	3d0c      	mov.n	a3, a12
 400084c3:	4d0e      	mov.n	a4, a14
@@ -14120,6 +14332,7 @@
 400084d9:	c6dbff        	j	4000844c <rom_rfcal_txcap+0xc4>
 400084dc:	e22110        	l32i	a14, a1, 64
 400084df:	8c9e      	beqz.n	a14, 400084ec <rom_rfcal_txcap+0x164>
+; Format follows: -- "reg_i=%d, indata=%d"
 400084e1:	21a8ff		l32r	a2, 40008384	; ( 3fffd9c4 )
 400084e4:	3d0d      	mov.n	a3, a13
 400084e6:	42210d        	l32i	a4, a1, 52
@@ -14322,6 +14535,7 @@
 400086c4:	220150        	l8ui	a2, a1, 80
 400086c7:	22610e        	s32i	a2, a1, 56
 400086ca:	168200        	beqz	a2, 400086d6 <rom_rfcal_txiq+0xc6>
+; Format follows: -- "txiq: tone_atten=%d"
 400086cd:	21cdff		l32r	a2, 40008604	; ( 3fffd9dc )
 400086d0:	322102        	l32i	a3, a1, 8
 400086d3:	0564f9        	call0	40001d14 <eprintf>
@@ -14502,12 +14716,11 @@
 4000889b:	004020        	or	a4, a0, a0
 4000889e:	6029d1        	mul16s	a2, a9, a6
 400088a1:	06cfff        	j	400087e1 <rom_rfcal_txiq+0x1d1>
+
 400088a4:	00002c00	.long 0x002c0000
 400088a8:	fffffff0	.long 0xf0ffffff
 400088ac:	f4d9ff3f	.long 0x3fffd9f4
-400088b0:	f8d9      	l32i.n	a15, a9, 52
-400088b2:	ff          	.byte 0xff
-400088b3:	3f          	.byte 0x3f
+400088b0:	f8d9ff3f      	.long 0x3fffd9f8
 400088b4:	08daff3f	.long 0x3fffda08
 
 400088b8 <rom_rfcal_txiq_cover>:
@@ -14634,6 +14847,7 @@
 400089ee:	e0e831        	srai	a14, a14, 24
 400089f1:	08b1      	l32i.n	a0, a1, 44
 400089f3:	8c70      	beqz.n	a0, 400089fe <rom_rfcal_txiq_cover+0x146>
+; Format: "%d,"
 400089f5:	21adff		l32r	a2, 400088ac	; ( 3fffd9f4 )
 400089f8:	101120        	or	a1, a1, a1
 400089fb:	8531f9        	call0	40001d14 <eprintf>
@@ -14656,9 +14870,11 @@
 40008a29:	80ee01        	slli	a14, a14, 24
 40008a2c:	e0e831        	srai	a14, a14, 24
 40008a2f:	86efff        	j	400089f1 <rom_rfcal_txiq_cover+0x139>
-40008a32:	0016af        	excw
-40008a35:	01219e		l32r	a0, 3fff02bc
-40008a38:	ff          	.byte 0xff
+40008a32:	00
+
+40008a33:	16af01        	beqz	a15, 40008a51 <rom_rfcal_txiq_cover+0x199>
+; Format: "txiq_gain=%d"
+40008a36:	219eff        	l32r	a2, 400088b0	; ( 3fffd9f8 )
 40008a39:	e03e20        	or	a3, a14, a14
 40008a3c:	452df9        	call0	40001d14 <eprintf>
 40008a3f:	022101        	l32i	a0, a1, 4
@@ -14669,6 +14885,8 @@
 40008a4a:	e841      	l32i.n	a14, a1, 16
 40008a4c:	12c140        	addi	a1, a1, 64
 40008a4f:	0df0      	ret.n
+
+; Format follows: txiq_phase=%d
 40008a51:	2198ff		l32r	a2, 400088b4	; ( 3fffda08 )
 40008a54:	e03e20        	or	a3, a14, a14
 40008a57:	c52bf9        	call0	40001d14 <eprintf>
@@ -14895,6 +15113,7 @@
 40008c80:	dd05      	mov.n	a13, a5
 40008c82:	ed03      	mov.n	a14, a3
 40008c84:	acd6      	beqz.n	a6, 40008cb5 <rom_set_txbb_atten+0x49>
+; Format follows:  "bt: "
 40008c86:	21f7ff		l32r	a2, 40008c64	; ( 3fffda18 )
 40008c89:	8508f9        	call0	40001d14 <eprintf>
 40008c8c:	d961      	s32i.n	a13, a1, 24
@@ -14905,12 +15124,14 @@
 40008c96:	da4f      	add.n	a4, a15, a13
 40008c98:	420400        	l8ui	a4, a4, 0
 40008c9b:	320300        	l8ui	a3, a3, 0
+; Format follows:  "%d, "
 40008c9e:	21f2ff		l32r	a2, 40008c68	; ( 3fffd9bc )
 40008ca1:	4033c0        	sub	a3, a3, a4
 40008ca4:	c506f9        	call0	40001d14 <eprintf>
 40008ca7:	1bdd      	addi.n	a13, a13, 1
 40008ca9:	d0d074        	extui	a13, a13, 0, 8
 40008cac:	d79ee4        	bne	a14, a13, 40008c94 <rom_set_txbb_atten+0x28>
+; Format: "\n"
 40008caf:	21cffb		l32r	a2, 40007bec	; ( 3fffd96c )
 40008cb2:	0506f9        	call0	40001d14 <eprintf>
 40008cb5:	22a077        	movi	a2, 119
@@ -23323,444 +23544,534 @@
 
 4000e324 <xthal_window_spill>:
 4000e324:	0df0      	ret.n
-4000e326:	000000        	ill
+4000e326:	0000
+
+; ----------------------------------------------------------------
+; ----------------------------------------------------------------
+
+; Here we have an 8 entry table to move stuff
+; from the bootrom into data RAM
+; Only the first 3 entries in the table actually do anything.
+; Then there are 4 zero length entries,
+; followed by an end sentinel of all zeros.
 
 4000e328 <_rom_store_table>:
-4000e328:	3fffc000 3fffc857 4000e388 3fffc860     ...?W..?...@`..?
-4000e338:	3fffdaac 4000ebe8 3fffdaac 3fffdab0     ...?...@...?...?
-4000e348:	4000fe34 3fffdab0 3fffdab0 4000fe38     4..@...?...?8..@
-4000e358:	3fffdab0 3fffdab0 4000fe38 3fffdab0     ...?...?8..@...?
-4000e368:	3fffdab0 4000fe38 3fffdab0 3fffdab0     ...?8..@...?...?
-4000e378:	4000fe38 00000000 00000000 00000000     8..@............
+
+4000e328:	3fffc000 3fffc857 4000e388
+4000e334:	3fffc860 3fffdaac 4000ebe8
+4000e340:	3fffdaac 3fffdab0 4000fe34
+4000e34c:	3fffdab0 3fffdab0 4000fe38	; null
+4000e358:	3fffdab0 3fffdab0 4000fe38	; null
+4000e364:	3fffdab0 3fffdab0 4000fe38	; null
+4000e370:	3fffdab0 3fffdab0 4000fe38	; null
+4000e37c:	00000000 00000000 00000000	; END
+
+; The clever reader will notice that all of these blocks get moved
+;  the same amount, in other words the whole mess could be moved
+;  as one big lump.  Perhaps there is a reason to move it in three pieces.
+; The real mystery is why all this fancy business, just code
+;  up memcpy in assembly and call it.
+
+; Block 1: 4000e388 to 4000ebdf  74632
+; Block 2: 4000ebe8 to 4000fe34  74632
+; Block 3: 4000fe34 to 4000fe38  74632
+
+; I have translated these addresses to what they would be at their
+; final relocated destination in RAM, since those addresses are what
+; is referenced through the bootrom.
 
 4000e388 <_rom_store>:
-4000e388:	4000dc44 4000dbe4 4000dc44 4000dc44     D..@...@D..@D..@
-4000e398:	4000048c 4000dbe0 4000dc44 4000dc44     ...@...@D..@D..@
-4000e3a8:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e3b8:	40000590 40000590 40000590 40000590     ...@...@...@...@
-4000e3c8:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e3d8:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e3e8:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e3f8:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e408:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e418:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e428:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e438:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e448:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e458:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e468:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e478:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
-4000e488:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e498:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e4a8:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e4b8:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e4c8:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e4d8:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e4e8:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e4f8:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e508:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e518:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e528:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e538:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e548:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e558:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e568:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e578:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
-4000e588:	00000000 ffffffff 4000dc3c 0000000e     ........<..@....
-4000e598:	4000dc3c 0000000d 4000dc3c 0000000c     <..@....<..@....
-4000e5a8:	4000dc3c 0000000b 4000dc3c 0000000a     <..@....<..@....
-4000e5b8:	4000dc3c 00000009 4000dc3c 00000008     <..@....<..@....
-4000e5c8:	4000dc3c 00000007 4000dc3c 00000006     <..@....<..@....
-4000e5d8:	4000dc3c 00000005 4000dc3c 00000004     <..@....<..@....
-4000e5e8:	4000dc3c 00000003 4000dc3c 00000002     <..@....<..@....
-4000e5f8:	4000dc3c 00000001 4000dc3c 00000000     <..@....<..@....
-4000e608:	ffffc000 00004000 ffffc000 00002000     .....@....... ..
-4000e618:	ffffe000 00001000 fffff000 00000800     ................
-4000e628:	fffff800 00000400 fffffc00 00000200     ................
-4000e638:	fffffe00 00000100 ffffff00 00000080     ................
-4000e648:	ffffff80 00000040 ffffffc0 00000020     ....@....... ...
-4000e658:	ffffffe0 00000010 fffffff0 00000008     ................
-4000e668:	fffffff8 00000004 fffffffc 00000002     ................
-4000e678:	fffffffe 00000001 00000000 3fffc5e4     ...............?
-4000e688:	3fffc640 3fffc69c 00000000 00000000     @..?...?........
-4000e698:	00000000 00000000 00000000 00000000     ................
-4000e6a8:	00000000 00000000 00000000 3fffd670     ............p..?
-4000e6b8:	00000000 00000000 00000000 00000000     ................
-4000e6c8:	00000000 00000000 00000000 00000000     ................
-4000e6d8:	00000000 00000000 00000000 00000000     ................
-4000e6e8:	00000000 00000000 00000000 00000000     ................
-4000e6f8:	00000000 00000000 00000000 00000000     ................
-4000e708:	00000000 00000000 00000000 00000000     ................
-4000e718:	00000000 00000000 00000000 00000000     ................
-4000e728:	00000001 00000000 abcd330e e66d1234     .........3..4.m.
-4000e738:	0005deec 0000000b 00000000 00000000     ................
-4000e748:	00000000 00000000 00000000 00000000     ................
-4000e758:	00000000 00000000 00000000 00000000     ................
-4000e768:	00000000 00000000 00000000 00000000     ................
-4000e778:	00000000 00000000 00000000 00000000     ................
-4000e788:	00000000 00000000 00000000 00000000     ................
-4000e798:	00000000 00000000 00000000 00000000     ................
-4000e7a8:	00000000 00000000 00000000 00000000     ................
-4000e7b8:	00000000 00000000 00000000 00000000     ................
-4000e7c8:	00000000 00000000 00000000 00000000     ................
-4000e7d8:	00000000 00000000 00000000 00000000     ................
-4000e7e8:	00000000 00000000 00000000 00000000     ................
-4000e7f8:	00000000 00000000 00000000 00000000     ................
-4000e808:	00000000 00000000 00000000 00000000     ................
-4000e818:	00000000 00000000 00000000 00000000     ................
-4000e828:	00000000 00000000 00000000 00000000     ................
-4000e838:	00000000 00000000 00000000 00000000     ................
-4000e848:	00000000 00000000 00000000 00000000     ................
-4000e858:	00000000 00000000 00000000 00000000     ................
-4000e868:	00000000 00000000 00000000 00000000     ................
-4000e878:	00000000 00000000 00000000 00000000     ................
-4000e888:	00000000 00000000 00000000 00000000     ................
-4000e898:	00000000 00000000 00000000 00000000     ................
-4000e8a8:	00000000 00000000 00000000 00000000     ................
-4000e8b8:	00000000 00000000 00000000 00000000     ................
-4000e8c8:	00000000 00000000 00000000 00000000     ................
-4000e8d8:	00000000 00000000 00000000 00000000     ................
-4000e8e8:	00000000 00000000 00000000 00000000     ................
-4000e8f8:	00000000 00000000 00000000 00000000     ................
-4000e908:	00000000 00000000 00000000 00000000     ................
-4000e918:	00000000 00000000 00000000 00000000     ................
-4000e928:	00000000 00000000 00000000 00000000     ................
-4000e938:	00000000 00000000 00000000 00000000     ................
-4000e948:	00000000 00000000 00000000 00000000     ................
-4000e958:	00000000 00000000 00000000 00000000     ................
-4000e968:	00000000 00000000 00000000 00000000     ................
-4000e978:	00000000 00000000 00000000 00000000     ................
-4000e988:	00000000 00000000 00000000 00000000     ................
-4000e998:	00000000 00000000 00000000 00000000     ................
-4000e9a8:	00000000 00000000 00000000 00000000     ................
-4000e9b8:	00000000 00000000 00000000 00000000     ................
-4000e9c8:	00000000 00000000 00000000 00000000     ................
-4000e9d8:	00000000 00000000 00000000 00000000     ................
-4000e9e8:	00000000 00000000 00000000 00000000     ................
-4000e9f8:	00000000 00000000 00000000 00000000     ................
-4000ea08:	00000000 00000000 00000000 00000000     ................
-4000ea18:	00000000 00000000 00000000 00000000     ................
-4000ea28:	00000000 00000000 00000000 00000000     ................
-4000ea38:	00000000 00000000 00000000 00000000     ................
-4000ea48:	00000000 00000000 00000000 00000000     ................
-4000ea58:	00000000 00000000 00000000 00000000     ................
-4000ea68:	00000000 00000000 00000000 00000000     ................
-4000ea78:	00000000 00000000 3fffc2f8 000000ff     ...........?....
-4000ea88:	00007073 00000050 ffffffff 00000006     sp..P...........
-4000ea98:	0000000c 3fffc718 001640ef 00400000     .......?.@....@.
-4000eaa8:	00010000 00001000 00000100 0000ffff     ................
-4000eab8:	3fffc734 400060c0 400060d0 400060ec     4..?.`.@.`.@.`.@
-4000eac8:	4000610c 4000615c 00000000 400061b8     .a.@\a.@.....a.@
-4000ead8:	40006238 40006260 400062dc 40006394     8b.@`b.@.b.@.c.@
-4000eae8:	400063b0 40006400 40006430 40006484     .c.@.d.@0d.@.d.@
-4000eaf8:	4000650c 40006550 400065a4 40006628     .e.@Pe.@.e.@(f.@
-4000eb08:	40006738 4000678c 400067c8 40006830     8g.@.g.@.g.@0h.@
-4000eb18:	00000000 00000000 40006874 400068b4     ........th.@.h.@
-4000eb28:	4000698c 40006a1c 40006a98 40006ad4     .i.@.j.@.j.@.j.@
-4000eb38:	40006b10 40006c50 40006f84 4000711c     .k.@Pl.@.o.@.q.@
-4000eb48:	4000718c 40007268 4000729c 400072d8     .q.@hr.@.r.@.r.@
-4000eb58:	4000730c 4000737c 40007410 40007448     .s.@|s.@.t.@Ht.@
-4000eb68:	4000747c 400074d8 4000754c 40007610     |t.@.t.@Lu.@.v.@
-4000eb78:	40007648 40007688 400076cc 400076fc     Hv.@.v.@.v.@.v.@
-4000eb88:	40007740 400077a0 40007804 4000781c     @w.@.w.@.x.@.x.@
-4000eb98:	40007868 400078dc 40007968 40007a28     hx.@.x.@hy.@(z.@
-4000eba8:	40007bf0 40007eb4 4000804c 40008264     .{.@.~.@L..@d..@
-4000ebb8:	40008388 40008610 400088b8 40008a70     ...@...@...@p..@
-4000ebc8:	40008b6c 40008c6c 40008d34 00000000     l..@l..@4..@....
-4000ebd8:	48505669 00323740 00000000 00000000     iVPH@72.........
-4000ebe8:	3fffc2f8 00000000 00000000 00000000     ...?............
-4000ebf8:	5f737465 61706e75 665f6b63 6873616c     ets_unpack_flash
-4000ec08:	646f635f 00000065 00000000 00000000     _code...........
-4000ec18:	40002012 40001fd9 40002012 40001fd9     . .@...@. .@...@
-4000ec28:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
-4000ec38:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
-4000ec48:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
-4000ec58:	40001fd9 40001fd9 40001fd9 40002012     ...@...@...@. .@
-4000ec68:	40001fd9 40001fd9 40002012 40001fd9     ...@...@. .@...@
-4000ec78:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
-4000ec88:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
-4000ec98:	40002012 40001fd9 40002012 40001fd9     . .@...@. .@...@
-4000eca8:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
-4000ecb8:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
-4000ecc8:	40001fd9 40001fd9 40002010 40001fd9     ...@...@. .@...@
-4000ecd8:	40001fd9 40001fd9 40001fd9 40002012     ...@...@...@. .@
-4000ece8:	40001fd9 40001fd9 40002012 00000000     ...@...@. .@....
-4000ecf8:	4000225c 40002034 40002034 40002034     \".@4 .@4 .@4 .@
-4000ed08:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ed18:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ed28:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ed38:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ed48:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ed58:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ed68:	40002034 40002049 40002243 400021b1     4 .@I .@C".@.!.@
-4000ed78:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ed88:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ed98:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000eda8:	40002034 40002034 4000222e 40002034     4 .@4 .@.".@4 .@
-4000edb8:	400021b1 40002034 40002034 400021b1     .!.@4 .@4 .@.!.@
-4000edc8:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000edd8:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ede8:	40002034 40002049 40002243 400021b1     4 .@I .@C".@.!.@
-4000edf8:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ee08:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
-4000ee18:	40002034 40002034 40002034 4000219c     4 .@4 .@4 .@.!.@
-4000ee28:	40002034 40002034 4000222e 40002034     4 .@4 .@.".@4 .@
-4000ee38:	400021b1 40002034 40002034 400021b1     .!.@4 .@4 .@.!.@
-4000ee48:	40002384 400020c4 400020c4 400020c4     .#.@. .@. .@. .@
-4000ee58:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
-4000ee68:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
-4000ee78:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
-4000ee88:	400020c4 40002384 400020c4 400020c4     . .@.#.@. .@. .@
-4000ee98:	4000236c 400020c4 400020c4 400020c4     l#.@. .@. .@. .@
-4000eea8:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
-4000eeb8:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
-4000eec8:	40002384 400020c4 400020c4 400020c4     .#.@. .@. .@. .@
-4000eed8:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
-4000eee8:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
-4000eef8:	40002354 400020c4 400020c4 400020c4     T#.@. .@. .@. .@
-4000ef08:	400020c4 40002384 400020c4 400020c4     . .@.#.@. .@. .@
-4000ef18:	40002354 00000000 00000000 00000000     T#.@............
-4000ef28:	40003435 40003435 40003500 400034eb     54.@54.@.5.@.4.@
-4000ef38:	400034d0 40003440 400034b9 400034a3     .4.@@4.@.4.@.4.@
-4000ef48:	4000348d 4000347d 40003468 40003455     .4.@}4.@h4.@U4.@
-4000ef58:	0c080400 19161310 24221f1c 2e2c2927     .........."$'),.
-4000ef68:	40006ca5 40006d81 40006dc6 40006dc0     .l.@.m.@.m.@.m.@
-4000ef78:	40006dba 40006db4 40006dae 40006da8     .m.@.m.@.m.@.m.@
-4000ef88:	40006da2 40006d9c 40006d96 40006d90     .m.@.m.@.m.@.m.@
-4000ef98:	40006d8a 40006d84 00000000 00000000     .m.@.m.@........
-4000efa8:	40006d70 40006dff 40006eb4 40006ea6     pm.@.m.@.n.@.n.@
-4000efb8:	40006e98 40006e89 40006e78 40006e6a     .n.@.n.@xn.@jn.@
-4000efc8:	40006e5b 40006e4c 40006e3e 40006e2d     [n.@Ln.@>n.@-n.@
-4000efd8:	40006e1f 40006e0e 00000000 00000000     .n.@.n.@........
-4000efe8:	40006df0 40006ec5 40006f55 40006f49     .m.@.n.@Uo.@Io.@
-4000eff8:	40006f3d 40006f31 40006f25 40006f19     =o.@1o.@%o.@.o.@
-4000f008:	40006f0d 40006f01 40006ef5 40006ee9     .o.@.o.@.n.@.n.@
-4000f018:	40006edd 40006ed1 00000000 00000000     .n.@.n.@........
-4000f028:	40007005 400070cd 40007115 4000710f     .p.@.p.@.q.@.q.@
-4000f038:	40007109 40007103 400070fd 400070f7     .q.@.q.@.p.@.p.@
-4000f048:	400070f1 400070eb 400070e5 400070df     .p.@.p.@.p.@.p.@
-4000f058:	400070d9 400070d3 00000000 00000000     .p.@.p.@........
-4000f068:	05040200 0c0b0907 43800000 00000000     ...........C....
-4000f078:	c66363a5 f87c7c84 ee777799 f67b7b8d     .cc..||..ww..{{.
-4000f088:	fff2f20d d66b6bbd de6f6fb1 91c5c554     .....kk..oo.T...
-4000f098:	60303050 02010103 ce6767a9 562b2b7d     P00`.....gg.}++V
-4000f0a8:	e7fefe19 b5d7d762 4dababe6 ec76769a     ....b......M.vv.
-4000f0b8:	8fcaca45 1f82829d 89c9c940 fa7d7d87     E.......@....}}.
-4000f0c8:	effafa15 b25959eb 8e4747c9 fbf0f00b     .....YY..GG.....
-4000f0d8:	41adadec b3d4d467 5fa2a2fd 45afafea     ...Ag......_...E
-4000f0e8:	239c9cbf 53a4a4f7 e4727296 9bc0c05b     ...#...S.rr.[...
-4000f0f8:	75b7b7c2 e1fdfd1c 3d9393ae 4c26266a     ...u.......=j&&L
-4000f108:	6c36365a 7e3f3f41 f5f7f702 83cccc4f     Z66lA??~....O...
-4000f118:	6834345c 51a5a5f4 d1e5e534 f9f1f108     \44h...Q4.......
-4000f128:	e2717193 abd8d873 62313153 2a15153f     .qq.s...S11b?..*
-4000f138:	0804040c 95c7c752 46232365 9dc3c35e     ....R...e##F^...
-4000f148:	30181828 379696a1 0a05050f 2f9a9ab5     (..0...7......./
-4000f158:	0e070709 24121236 1b80809b dfe2e23d     ....6..$....=...
-4000f168:	cdebeb26 4e272769 7fb2b2cd ea75759f     &...i''N.....uu.
-4000f178:	1209091b 1d83839e 582c2c74 341a1a2e     ........t,,X...4
-4000f188:	361b1b2d dc6e6eb2 b45a5aee 5ba0a0fb     -..6.nn..ZZ....[
-4000f198:	a45252f6 763b3b4d b7d6d661 7db3b3ce     .RR.M;;va......}
-4000f1a8:	5229297b dde3e33e 5e2f2f71 13848497     {))R>...q//^....
-4000f1b8:	a65353f5 b9d1d168 00000000 c1eded2c     .SS.h.......,...
-4000f1c8:	40202060 e3fcfc1f 79b1b1c8 b65b5bed     `  @.......y.[[.
-4000f1d8:	d46a6abe 8dcbcb46 67bebed9 7239394b     .jj.F......gK99r
-4000f1e8:	944a4ade 984c4cd4 b05858e8 85cfcf4a     .JJ..LL..XX.J...
-4000f1f8:	bbd0d06b c5efef2a 4faaaae5 edfbfb16     k...*......O....
-4000f208:	864343c5 9a4d4dd7 66333355 11858594     .CC..MM.U33f....
-4000f218:	8a4545cf e9f9f910 04020206 fe7f7f81     .EE.............
-4000f228:	a05050f0 783c3c44 259f9fba 4ba8a8e3     .PP.D<<x...%...K
-4000f238:	a25151f3 5da3a3fe 804040c0 058f8f8a     .QQ....].@@.....
-4000f248:	3f9292ad 219d9dbc 70383848 f1f5f504     ...?...!H88p....
-4000f258:	63bcbcdf 77b6b6c1 afdada75 42212163     ...c...wu...c!!B
-4000f268:	20101030 e5ffff1a fdf3f30e bfd2d26d     0.. ........m...
-4000f278:	81cdcd4c 180c0c14 26131335 c3ecec2f     L.......5..&/...
-4000f288:	be5f5fe1 359797a2 884444cc 2e171739     .__....5.DD.9...
-4000f298:	93c4c457 55a7a7f2 fc7e7e82 7a3d3d47     W......U.~~.G==z
-4000f2a8:	c86464ac ba5d5de7 3219192b e6737395     .dd..]].+..2.ss.
-4000f2b8:	c06060a0 19818198 9e4f4fd1 a3dcdc7f     .``......OO.....
-4000f2c8:	44222266 542a2a7e 3b9090ab 0b888883     f""D~**T...;....
-4000f2d8:	8c4646ca c7eeee29 6bb8b8d3 2814143c     .FF.)......k<..(
-4000f2e8:	a7dede79 bc5e5ee2 160b0b1d addbdb76     y....^^.....v...
-4000f2f8:	dbe0e03b 64323256 743a3a4e 140a0a1e     ;...V22dN::t....
-4000f308:	924949db 0c06060a 4824246c b85c5ce4     .II.....l$$H.\\.
-4000f318:	9fc2c25d bdd3d36e 43acacef c46262a6     ]...n......C.bb.
-4000f328:	399191a8 319595a4 d3e4e437 f279798b     ...9...17....yy.
-4000f338:	d5e7e732 8bc8c843 6e373759 da6d6db7     2...C...Y77n.mm.
-4000f348:	018d8d8c b1d5d564 9c4e4ed2 49a9a9e0     ....d....NN....I
-4000f358:	d86c6cb4 ac5656fa f3f4f407 cfeaea25     .ll..VV.....%...
-4000f368:	ca6565af f47a7a8e 47aeaee9 10080818     .ee..zz....G....
-4000f378:	6fbabad5 f0787888 4a25256f 5c2e2e72     ...o.xx.o%%Jr..\
-4000f388:	381c1c24 57a6a6f1 73b4b4c7 97c6c651     $..8...W...sQ...
-4000f398:	cbe8e823 a1dddd7c e874749c 3e1f1f21     #...|....tt.!..>
-4000f3a8:	964b4bdd 61bdbddc 0d8b8b86 0f8a8a85     .KK....a........
-4000f3b8:	e0707090 7c3e3e42 71b5b5c4 cc6666aa     .pp.B>>|...q.ff.
-4000f3c8:	904848d8 06030305 f7f6f601 1c0e0e12     .HH.............
-4000f3d8:	c26161a3 6a35355f ae5757f9 69b9b9d0     .aa._55j.WW....i
-4000f3e8:	17868691 99c1c158 3a1d1d27 279e9eb9     ....X...'..:...'
-4000f3f8:	d9e1e138 ebf8f813 2b9898b3 22111133     8..........+3.."
-4000f408:	d26969bb a9d9d970 078e8e89 339494a7     .ii.p..........3
-4000f418:	2d9b9bb6 3c1e1e22 15878792 c9e9e920     ...-"..<.... ...
-4000f428:	87cece49 aa5555ff 50282878 a5dfdf7a     I....UU.x((Pz...
-4000f438:	038c8c8f 59a1a1f8 09898980 1a0d0d17     .......Y........
-4000f448:	65bfbfda d7e6e631 844242c6 d06868b8     ...e1....BB..hh.
-4000f458:	824141c3 299999b0 5a2d2d77 1e0f0f11     .AA....)w--Z....
-4000f468:	7bb0b0cb a85454fc 6dbbbbd6 2c16163a     ...{.TT....m:..,
-4000f478:	08040201 80402010 0000361b 00000000     ..... @..6......
-4000f488:	51f4a750 7e416553 1a17a4c3 3a275e96     P..QSeA~.....^':
-4000f498:	3bab6bcb 1f9d45f1 acfa58ab 4be30393     .k.;.E...X.....K
-4000f4a8:	2030fa55 ad766df6 88cc7691 f5024c25     U.0 .mv..v..%L..
-4000f4b8:	4fe5d7fc c52acbd7 26354480 b562a38f     ...O..*..D5&..b.
-4000f4c8:	deb15a49 25ba1b67 45ea0e98 5dfec0e1     IZ..g..%...E...]
-4000f4d8:	c32f7502 814cf012 8d4697a3 6bd3f9c6     .u/...L...F....k
-4000f4e8:	038f5fe7 15929c95 bf6d7aeb 955259da     ._.......zm..YR.
-4000f4f8:	d4be832d 587421d3 49e06929 8ec9c844     -....!tX)i.ID...
-4000f508:	75c2896a f48e7978 99583e6b 27b971dd     j..uxy..k>X..q.'
-4000f518:	bee14fb6 f088ad17 c920ac66 7dce3ab4     .O......f. ..:.}
-4000f528:	63df4a18 e51a3182 97513360 62537f45     .J.c.1..`3Q.E.Sb
-4000f538:	b16477e0 bb6bae84 fe81a01c f9082b94     .wd...k......+..
-4000f548:	70486858 8f45fd19 94de6c87 527bf8b7     XhHp..E..l....{R
-4000f558:	ab73d323 724b02e2 e31f8f57 6655ab2a     #.s...KrW...*.Uf
-4000f568:	b2eb2807 2fb5c203 86c57b9a d33708a5     .(...../.{....7.
-4000f578:	302887f2 23bfa5b2 02036aba ed16825c     ..(0...#.j..\...
-4000f588:	8acf1c2b a779b492 f307f2f0 4e69e2a1     +.....y.......iN
-4000f598:	65daf4cd 0605bed5 d134621f c4a6fe8a     ...e.....b4.....
-4000f5a8:	342e539d a2f355a0 058ae132 a4f6eb75     .S.4.U..2...u...
-4000f5b8:	0b83ec39 4060efaa 5e719f06 bd6e1051     9.....`@..q^Q.n.
-4000f5c8:	3e218af9 96dd063d dd3e05ae 4de6bd46     ..!>=.....>.F..M
-4000f5d8:	91548db5 71c45d05 0406d46f 605015ff     ..T..].qo.....P`
-4000f5e8:	1998fb24 d6bde997 894043cc 67d99e77     $........C@.w..g
-4000f5f8:	b0e842bd 07898b88 e7195b38 79c8eedb     .B......8[.....y
-4000f608:	a17c0a47 7c420fe9 f8841ec9 00000000     G.|...B|........
-4000f618:	09808683 322bed48 1e1170ac 6c5a724e     ....H.+2.p..NrZl
-4000f628:	fd0efffb 0f853856 3daed51e 362d3927     ....V8.....='9-6
-4000f638:	0a0fd964 685ca621 9b5b54d1 24362e3a     d...!.\h.T[.:.6$
-4000f648:	0c0a67b1 9357e70f b4ee96d2 1b9b919e     .g....W.........
-4000f658:	80c0c54f 61dc20a2 5a774b69 1c121a16     O.... .aiKwZ....
-4000f668:	e293ba0a c0a02ae5 3c22e043 121b171d     .....*..C."<....
-4000f678:	0e090d0b f28bc7ad 2db6a8b9 141ea9c8     ...........-....
-4000f688:	57f11985 af75074c ee99ddbb a37f60fd     ...WL.u......`..
-4000f698:	f701269f 5c72f5bc 44663bc5 5bfb7e34     .&....r\.;fD4~.[
-4000f6a8:	8b432976 cb23c6dc b6edfc68 b8e4f163     v)C...#.h...c...
-4000f6b8:	d731dcca 42638510 13972240 84c61120     ..1...cB@".. ...
-4000f6c8:	854a247d d2bb3df8 aef93211 c729a16d     }$J..=...2..m.).
-4000f6d8:	1d9e2f4b dcb230f3 0d8652ec 77c1e3d0     K/...0...R.....w
-4000f6e8:	2bb3166c a970b999 119448fa 47e96422     l..+..p..H.."d.G
-4000f6f8:	a8fc8cc4 a0f03f1a 567d2cd8 223390ef     .....?...,}V..3"
-4000f708:	87494ec7 d938d1c1 8ccaa2fe 98d40b36     .NI...8.....6...
-4000f718:	a6f581cf a57ade28 dab78e26 3fadbfa4     ....(.z.&......?
-4000f728:	2c3a9de4 5078920d 6a5fcc9b 547e4662     ..:,..xP.._jbF~T
-4000f738:	f68d13c2 90d8b8e8 2e39f75e 82c3aff5     ........^.9.....
-4000f748:	9f5d80be 69d0937c 6fd52da9 cf2512b3     ..].|..i.-.o..%.
-4000f758:	c8ac993b 10187da7 e89c636e db3bbb7b     ;....}..nc..{.;.
-4000f768:	cd267809 6e5918f4 ec9ab701 834f9aa8     .x&...Yn......O.
-4000f778:	e6956e65 aaffe67e 21bccf08 ef15e8e6     en..~......!....
-4000f788:	bae79bd9 4a6f36ce ea9f09d4 29b07cd6     .....6oJ.....|.)
-4000f798:	31a4b2af 2a3f2331 c6a59430 35a266c0     ...11#?*0....f.5
-4000f7a8:	744ebc37 fc82caa6 e090d0b0 33a7d815     7.Nt...........3
-4000f7b8:	f104984a 41ecdaf7 7fcd500e 1791f62f     J......A.P../...
-4000f7c8:	764dd68d 43efb04d ccaa4d54 e49604df     ..MvM..CTM......
-4000f7d8:	9ed1b5e3 4c6a881b c12c1fb8 4665517f     ......jL..,..QeF
-4000f7e8:	9d5eea04 018c355d fa877473 fb0b412e     ..^.]5..st...A..
-4000f7f8:	b3671d5a 92dbd252 e9105633 6dd64713     Z.g.R...3V...G.m
-4000f808:	9ad7618c 37a10c7a 59f8148e eb133c89     .a..z..7...Y.<..
-4000f818:	cea927ee b761c935 e11ce5ed 7a47b13c     .'..5.a.....<.Gz
-4000f828:	9cd2df59 55f2733f 1814ce79 73c737bf     Y...?s.Uy....7.s
-4000f838:	53f7cdea 5ffdaa5b df3d6f14 7844db86     ...S[.._.o=...Dx
-4000f848:	caaff381 b968c43e 3824342c c2a3405f     ....>.h.,4$8_@..
-4000f858:	161dc372 bce2250c 283c498b ff0d9541     r....%...I<(A...
-4000f868:	39a80171 080cb3de d8b4e49c 6456c190     q..9..........Vd
-4000f878:	7bcb8461 d532b670 486c5c74 d0b85742     a..{p.2.t\lHBW..
-4000f888:	d56a0952 38a53630 9ea340bf fbd7f381     R.j.06.8.@......
-4000f898:	8239e37c 87ff2f9b 44438e34 cbe9dec4     |.9../..4.CD....
-4000f8a8:	32947b54 3d23c2a6 0b954cee 4ec3fa42     T{.2..#=.L..B..N
-4000f8b8:	66a12e08 b224d928 49a25b76 25d18b6d     ...f(.$.v[.Im..%
-4000f8c8:	64f6f872 16986886 cc5ca4d4 92b6655d     r..d.h....\.]e..
-4000f8d8:	5048706c dab9edfd 5746155e 849d8da7     lpHP....^.FW....
-4000f8e8:	00abd890 0ad3bc8c 0558e4f7 0645b3b8     ..........X...E.
-4000f8f8:	8f1e2cd0 020f3fca 03bdafc1 6b8a1301     .,...?.........k
-4000f908:	4111913a eadc674f cecff297 73e6b4f0     :..AOg.........s
-4000f918:	2274ac96 8535ade7 e837f9e2 6edf751c     ..t"..5...7..u.n
-4000f928:	711af147 89c5291d 0e62b76f 1bbe18aa     G..q.)..o.b.....
-4000f938:	4b3e56fc 2079d2c6 fec0db9a f45acd78     .V>K..y ....x.Z.
-4000f948:	33a8dd1f 31c70788 591012b1 5fec8027     ...3...1...Y'.._
-4000f958:	a97f5160 0d4ab519 9f7ae52d ef9cc993     `Q....J.-.z.....
-4000f968:	4d3be0a0 b0f52aae 3cbbebc8 61995383     ..;M.*.....<.S.a
-4000f978:	7e042b17 26d677ba 631469e1 7d0c2155     .+.~.w.&.i.cU!.}
-4000f988:	44434241 48474645 4c4b4a49 504f4e4d     ABCDEFGHIJKLMNOP
-4000f998:	54535251 58575655 62615a59 66656463     QRSTUVWXYZabcdef
-4000f9a8:	6a696867 6e6d6c6b 7271706f 76757473     ghijklmnopqrstuv
-4000f9b8:	7a797877 33323130 37363534 2f2b3938     wxyz0123456789+/
-4000f9c8:	00000000 00000000 00000000 00000000     ................
-4000f9d8:	01010101 01010101 01010101 00030101     ................
-4000f9e8:	00000000 00000000 00000000 00000000     ................
-4000f9f8:	00000043 7465200a 73252073 7473722c     C.... ets %s,rst
-4000fa08:	75616320 253a6573 62202c64 20746f6f      cause:%d, boot 
-4000fa18:	65646f6d 6425283a 2964252c 00000a0a     mode:(%d,%d)....
-4000fa28:	206e614a 32203820 00333130 20746477     Jan  8 2013.wdt 
-4000fa38:	65736572 00000a74 25207325 000a2073     reset...%s %s ..
-4000fa48:	5f737465 6e69616d 0000632e 6e6b6e75     ets_main.c..unkn
-4000fa58:	206e776f 65736572 00000a74 72657375     own reset...user
-4000fa68:	646f6320 6f642065 000a656e 74696177      code done..wait
-4000fa78:	20676e69 20726f66 74736f68 0000000a     ing for host....
-4000fa88:	64616f6c 25783020 2c783830 6e656c20     load 0x%08x, len
-4000fa98:	2c642520 6f6f7220 6425206d 00000a20      %d, room %d ...
-4000faa8:	73616c66 65722068 65206461 202c7272     flash read err, 
-4000fab8:	000a7325 6c696174 0a642520 00000000     %s..tail %d.....
-4000fac8:	736b6863 30206d75 32302578 00000a78     chksum 0x%02x...
-4000fad8:	6d757363 25783020 0a783230 00000000     csum 0x%02x.....
-4000fae8:	6d757363 72726520 0000000a 25206f68     csum err....ho %
-4000faf8:	61742064 25206c69 6f722064 25206d6f     d tail %d room %
-4000fb08:	00000a64 25207073 000a2070 645f6673     d...sp %p ..sf_d
-4000fb18:	5b706d75 205d6425 203a3061 30257830     ump[%d] a0: 0x%0
-4000fb28:	20207838 203a3161 30257830 20207838     8x  a1: 0x%08x  
-4000fb38:	203a3261 30257830 20207838 203a3361     a2: 0x%08x  a3: 
-4000fb48:	30257830 0a207838 00000000 31637065     0x%08x .....epc1
-4000fb58:	2578303d 2c783830 63706520 78303d32     =0x%08x, epc2=0x
-4000fb68:	78383025 7065202c 303d3363 38302578     %08x, epc3=0x%08
-4000fb78:	65202c78 61766378 3d726464 30257830     x, excvaddr=0x%0
-4000fb88:	202c7838 63706564 2578303d 0a783830     8x, depc=0x%08x.
-4000fb98:	00000000 61746146 7865206c 74706563     ....Fatal except
-4000fba8:	206e6f69 29642528 000a203a 69727065     ion (%d): ..epri
-4000fbb8:	2066746e 62206f6e 000a6675 33323130     ntf no buf..0123
-4000fbc8:	37363534 00003938 33323130 37363534     456789..01234567
-4000fbd8:	62613938 66656463 00000000 33323130     89abcdef....0123
-4000fbe8:	37363534 42413938 46454443 00000000     456789ABCDEF....
-4000fbf8:	6c756e3c 00003e6c 5f737465 656d6974     <null>..ets_time
-4000fc08:	00632e72 746f6f62 2c207075 64646120     r.c.bootup , add
-4000fc18:	78302072 78383025 0000000a 72206f6e     r 0x%08x....no r
-4000fc28:	000a7364 20706973 75676f62 78722073     ds..sip bogus rx
-4000fc38:	6e6f6420 00000a65 64207872 20656e6f      done...rx done 
-4000fc48:	6e6b6e75 0a6e776f 00000000 20706973     unknown.....sip 
-4000fc58:	75676f62 78742073 0000000a 20716573     bogus tx....seq 
-4000fc68:	202c7525 64207525 70252073 0000000a     %u, %u ds %p....
-4000fc78:	75207874 6f6e6b6e 000a6e77 71697872     tx unknown..rxiq
-4000fc88:	7465675f 73696d5f 5f73203a 3d727770     _get_mis: s_pwr=
-4000fc98:	646c6c25 6425202c 2c64252d 00000020     %lld, %d-%d, ...
-4000fca8:	64252820 2964252c 00000020 252c6425      (%d,%d) ...%d,%
-4000fcb8:	00002064 67617473 64252065 4743203a     d ..stage %d: CG
-4000fcc8:	3d4e4941 46206425 4e494147 2c64253d     AIN=%d FGAIN=%d,
-4000fcd8:	5f434420 283d534f 252c6425 202c2964      DC_OS=(%d,%d), 
-4000fce8:	3d434144 2c642528 20296425 0000000a     DAC=(%d,%d) ....
-4000fcf8:	74637770 203a6c72 65746172 253d695f     pwctrl: rate_i=%
-4000fd08:	74202c64 65677261 6f705f74 3d726577     d, target_power=
-4000fd18:	202c6425 65746564 705f7463 7265776f     %d, detect_power
-4000fd28:	0a64253d 00000000 5f6d756e 64253d6b     =%d.....num_k=%d
-4000fd38:	6f70202c 5f726577 3d74756f 202c6425     , power_out=%d, 
-4000fd48:	00000000 5f676572 64253d69 6e69202c     ....reg_i=%d, in
-4000fd58:	61746164 0a64253d 00000000 71697874     data=%d.....txiq
-4000fd68:	6f74203a 615f656e 6e657474 0a64253d     : tone_atten=%d.
-4000fd78:	00000000 002c6425 71697874 6961675f     ....%d,.txiq_gai
-4000fd88:	64253d6e 0000000a 71697874 6168705f     n=%d....txiq_pha
-4000fd98:	253d6573 00000a64 203a7462 00000000     se=%d...bt: ....
-4000fda8:	00000080 21252423 26252340 0000005e     ....#$%!@#%&^...
-4000fdb8:	00000018 00000000 7c010001 00010c00     ...........|....
-4000fdc8:	0c080108 0e080d08 00000f08 00000018     ................
-4000fdd8:	00000020 4000ce60 000004af 8001f00e      ...`..@........
-4000fde8:	8d128c13 00000011 00000018 0000003c     ............<...
-4000fdf8:	4000d310 00000460 8001c00e 8d118c12     ...@`...........
-4000fe08:	000f8e10 0000001c 00000058 4000d770     ........X...p..@
-4000fe18:	00000470 8001b00e 8d0c8c0d 8f0a8e0b     p...............
-4000fe28:	00000009 3fffdab0 3fffeb30 3fffc000     .......?0..?...?
+
+; Block 1
+;   3fffc000 3fffc857 <-- 4000e388
+
+3fffc000:	4000dc44 4000dbe4 4000dc44 4000dc44     D..@...@D..@D..@
+3fffc010:	4000048c 4000dbe0 4000dc44 4000dc44     ...@...@D..@D..@
+3fffc020:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc030:	40000590 40000590 40000590 40000590     ...@...@...@...@
+3fffc040:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc050:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc060:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc070:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc080:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc090:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc0a0:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc0b0:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc0c0:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc0d0:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc0e0:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc0f0:	4000dc44 4000dc44 4000dc44 4000dc44     D..@D..@D..@D..@
+3fffc100:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc110:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc120:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc130:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc140:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc150:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc160:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc170:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc180:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc190:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc1a0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc1b0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc1c0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc1d0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc1e0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc1f0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8     ...@...@...@...@
+3fffc200:	00000000 ffffffff 4000dc3c 0000000e     ........<..@....
+3fffc210:	4000dc3c 0000000d 4000dc3c 0000000c     <..@....<..@....
+3fffc220:	4000dc3c 0000000b 4000dc3c 0000000a     <..@....<..@....
+3fffc230:	4000dc3c 00000009 4000dc3c 00000008     <..@....<..@....
+3fffc240:	4000dc3c 00000007 4000dc3c 00000006     <..@....<..@....
+3fffc250:	4000dc3c 00000005 4000dc3c 00000004     <..@....<..@....
+3fffc260:	4000dc3c 00000003 4000dc3c 00000002     <..@....<..@....
+3fffc270:	4000dc3c 00000001 4000dc3c 00000000     <..@....<..@....
+3fffc280:	ffffc000 00004000 ffffc000 00002000     .....@....... ..
+3fffc290:	ffffe000 00001000 fffff000 00000800     ................
+3fffc2a0:	fffff800 00000400 fffffc00 00000200     ................
+3fffc2b0:	fffffe00 00000100 ffffff00 00000080     ................
+3fffc2c0:	ffffff80 00000040 ffffffc0 00000020     ....@....... ...
+3fffc2d0:	ffffffe0 00000010 fffffff0 00000008     ................
+3fffc2e0:	fffffff8 00000004 fffffffc 00000002     ................
+3fffc2f0:	fffffffe 00000001 00000000 3fffc5e4     ...............?
+3fffc300:	3fffc640 3fffc69c 00000000 00000000     @..?...?........
+3fffc310:	00000000 00000000 00000000 00000000     ................
+3fffc320:	00000000 00000000 00000000 3fffd670     ............p..?
+3fffc330:	00000000 00000000 00000000 00000000     ................
+3fffc340:	00000000 00000000 00000000 00000000     ................
+3fffc350:	00000000 00000000 00000000 00000000     ................
+3fffc360:	00000000 00000000 00000000 00000000     ................
+3fffc370:	00000000 00000000 00000000 00000000     ................
+3fffc380:	00000000 00000000 00000000 00000000     ................
+3fffc390:	00000000 00000000 00000000 00000000     ................
+3fffc3a0:	00000001 00000000 abcd330e e66d1234     .........3..4.m.
+3fffc3b0:	0005deec 0000000b 00000000 00000000     ................
+3fffc3c0:	00000000 00000000 00000000 00000000     ................
+3fffc3d0:	00000000 00000000 00000000 00000000     ................
+3fffc3e0:	00000000 00000000 00000000 00000000     ................
+3fffc3f0:	00000000 00000000 00000000 00000000     ................
+3fffc400:	00000000 00000000 00000000 00000000     ................
+3fffc410:	00000000 00000000 00000000 00000000     ................
+3fffc420:	00000000 00000000 00000000 00000000     ................
+3fffc430:	00000000 00000000 00000000 00000000     ................
+3fffc440:	00000000 00000000 00000000 00000000     ................
+3fffc450:	00000000 00000000 00000000 00000000     ................
+3fffc460:	00000000 00000000 00000000 00000000     ................
+3fffc470:	00000000 00000000 00000000 00000000     ................
+3fffc480:	00000000 00000000 00000000 00000000     ................
+3fffc490:	00000000 00000000 00000000 00000000     ................
+3fffc4a0:	00000000 00000000 00000000 00000000     ................
+3fffc4b0:	00000000 00000000 00000000 00000000     ................
+3fffc4c0:	00000000 00000000 00000000 00000000     ................
+3fffc4d0:	00000000 00000000 00000000 00000000     ................
+3fffc4e0:	00000000 00000000 00000000 00000000     ................
+3fffc4f0:	00000000 00000000 00000000 00000000     ................
+3fffc500:	00000000 00000000 00000000 00000000     ................
+3fffc510:	00000000 00000000 00000000 00000000     ................
+3fffc520:	00000000 00000000 00000000 00000000     ................
+3fffc530:	00000000 00000000 00000000 00000000     ................
+3fffc540:	00000000 00000000 00000000 00000000     ................
+3fffc550:	00000000 00000000 00000000 00000000     ................
+3fffc560:	00000000 00000000 00000000 00000000     ................
+3fffc570:	00000000 00000000 00000000 00000000     ................
+3fffc580:	00000000 00000000 00000000 00000000     ................
+3fffc590:	00000000 00000000 00000000 00000000     ................
+3fffc5a0:	00000000 00000000 00000000 00000000     ................
+3fffc5b0:	00000000 00000000 00000000 00000000     ................
+3fffc5c0:	00000000 00000000 00000000 00000000     ................
+3fffc5d0:	00000000 00000000 00000000 00000000     ................
+3fffc5e0:	00000000 00000000 00000000 00000000     ................
+3fffc5f0:	00000000 00000000 00000000 00000000     ................
+3fffc600:	00000000 00000000 00000000 00000000     ................
+3fffc610:	00000000 00000000 00000000 00000000     ................
+3fffc620:	00000000 00000000 00000000 00000000     ................
+3fffc630:	00000000 00000000 00000000 00000000     ................
+3fffc640:	00000000 00000000 00000000 00000000     ................
+3fffc650:	00000000 00000000 00000000 00000000     ................
+3fffc660:	00000000 00000000 00000000 00000000     ................
+3fffc670:	00000000 00000000 00000000 00000000     ................
+3fffc680:	00000000 00000000 00000000 00000000     ................
+3fffc690:	00000000 00000000 00000000 00000000     ................
+3fffc6a0:	00000000 00000000 00000000 00000000     ................
+3fffc6b0:	00000000 00000000 00000000 00000000     ................
+3fffc6c0:	00000000 00000000 00000000 00000000     ................
+3fffc6d0:	00000000 00000000 00000000 00000000     ................
+3fffc6e0:	00000000 00000000 00000000 00000000     ................
+3fffc6f0:	00000000 00000000 3fffc2f8 000000ff     ...........?....
+3fffc700:	00007073 00000050 ffffffff 00000006     sp..P...........
+3fffc710:	0000000c 3fffc718 001640ef 00400000     .......?.@....@.
+3fffc720:	00010000 00001000 00000100 0000ffff     ................
+3fffc730:	3fffc734 400060c0 400060d0 400060ec     4..?.`.@.`.@.`.@
+3fffc740:	4000610c 4000615c 00000000 400061b8     .a.@\a.@.....a.@
+3fffc750:	40006238 40006260 400062dc 40006394     8b.@`b.@.b.@.c.@
+3fffc760:	400063b0 40006400 40006430 40006484     .c.@.d.@0d.@.d.@
+3fffc770:	4000650c 40006550 400065a4 40006628     .e.@Pe.@.e.@(f.@
+3fffc780:	40006738 4000678c 400067c8 40006830     8g.@.g.@.g.@0h.@
+3fffc790:	00000000 00000000 40006874 400068b4     ........th.@.h.@
+3fffc7a0:	4000698c 40006a1c 40006a98 40006ad4     .i.@.j.@.j.@.j.@
+3fffc7b0:	40006b10 40006c50 40006f84 4000711c     .k.@Pl.@.o.@.q.@
+3fffc7c0:	4000718c 40007268 4000729c 400072d8     .q.@hr.@.r.@.r.@
+3fffc7d0:	4000730c 4000737c 40007410 40007448     .s.@|s.@.t.@Ht.@
+3fffc7e0:	4000747c 400074d8 4000754c 40007610     |t.@.t.@Lu.@.v.@
+3fffc7f0:	40007648 40007688 400076cc 400076fc     Hv.@.v.@.v.@.v.@
+3fffc800:	40007740 400077a0 40007804 4000781c     @w.@.w.@.x.@.x.@
+3fffc810:	40007868 400078dc 40007968 40007a28     hx.@.x.@hy.@(z.@
+3fffc820:	40007bf0 40007eb4 4000804c 40008264     .{.@.~.@L..@d..@
+3fffc830:	40008388 40008610 400088b8 40008a70     ...@...@...@p..@
+3fffc840:	40008b6c 40008c6c 40008d34 00000000     l..@l..@4..@....
+3fffc850:	48505669 00323740 00000000 00000000     iVPH@72.........
+
+; Block 2
+;    3fffc860 3fffdaac <-- 4000ebe8
+
+3fffc860:	3fffc2f8 00000000 00000000 00000000     ...?............
+3fffc870:	5f737465 61706e75 665f6b63 6873616c     ets_unpack_flash
+3fffc880:	646f635f 00000065 00000000 00000000     _code...........
+3fffc890:	40002012 40001fd9 40002012 40001fd9     . .@...@. .@...@
+3fffc8a0:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
+3fffc8b0:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
+3fffc8c0:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
+3fffc8d0:	40001fd9 40001fd9 40001fd9 40002012     ...@...@...@. .@
+3fffc8e0:	40001fd9 40001fd9 40002012 40001fd9     ...@...@. .@...@
+3fffc8f0:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
+3fffc900:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
+3fffc910:	40002012 40001fd9 40002012 40001fd9     . .@...@. .@...@
+3fffc920:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
+3fffc930:	40001fd9 40001fd9 40001fd9 40001fd9     ...@...@...@...@
+3fffc940:	40001fd9 40001fd9 40002010 40001fd9     ...@...@. .@...@
+3fffc950:	40001fd9 40001fd9 40001fd9 40002012     ...@...@...@. .@
+3fffc960:	40001fd9 40001fd9 40002012 00000000     ...@...@. .@....
+3fffc970:	4000225c 40002034 40002034 40002034     \".@4 .@4 .@4 .@
+3fffc980:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffc990:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffc9a0:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffc9b0:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffc9c0:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffc9d0:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffc9e0:	40002034 40002049 40002243 400021b1     4 .@I .@C".@.!.@
+3fffc9f0:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffca00:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffca10:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffca20:	40002034 40002034 4000222e 40002034     4 .@4 .@.".@4 .@
+3fffca30:	400021b1 40002034 40002034 400021b1     .!.@4 .@4 .@.!.@
+3fffca40:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffca50:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffca60:	40002034 40002049 40002243 400021b1     4 .@I .@C".@.!.@
+3fffca70:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffca80:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+3fffca90:	40002034 40002034 40002034 4000219c     4 .@4 .@4 .@.!.@
+3fffcaa0:	40002034 40002034 4000222e 40002034     4 .@4 .@.".@4 .@
+3fffcab0:	400021b1 40002034 40002034 400021b1     .!.@4 .@4 .@.!.@
+3fffcac0:	40002384 400020c4 400020c4 400020c4     .#.@. .@. .@. .@
+3fffcad0:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
+3fffcae0:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
+3fffcaf0:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
+3fffcb00:	400020c4 40002384 400020c4 400020c4     . .@.#.@. .@. .@
+3fffcb10:	4000236c 400020c4 400020c4 400020c4     l#.@. .@. .@. .@
+3fffcb20:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
+3fffcb30:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
+3fffcb40:	40002384 400020c4 400020c4 400020c4     .#.@. .@. .@. .@
+3fffcb50:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
+3fffcb60:	400020c4 400020c4 400020c4 400020c4     . .@. .@. .@. .@
+3fffcb70:	40002354 400020c4 400020c4 400020c4     T#.@. .@. .@. .@
+3fffcb80:	400020c4 40002384 400020c4 400020c4     . .@.#.@. .@. .@
+3fffcb90:	40002354 00000000 00000000 00000000     T#.@............
+3fffcba0:	40003435 40003435 40003500 400034eb     54.@54.@.5.@.4.@
+3fffcbb0:	400034d0 40003440 400034b9 400034a3     .4.@@4.@.4.@.4.@
+3fffcbc0:	4000348d 4000347d 40003468 40003455     .4.@}4.@h4.@U4.@
+3fffcbd0:	0c080400 19161310 24221f1c 2e2c2927     .........."$'),.
+3fffcbe0:	40006ca5 40006d81 40006dc6 40006dc0     .l.@.m.@.m.@.m.@
+3fffcbf0:	40006dba 40006db4 40006dae 40006da8     .m.@.m.@.m.@.m.@
+3fffcc00:	40006da2 40006d9c 40006d96 40006d90     .m.@.m.@.m.@.m.@
+3fffcc10:	40006d8a 40006d84 00000000 00000000     .m.@.m.@........
+3fffcc20:	40006d70 40006dff 40006eb4 40006ea6     pm.@.m.@.n.@.n.@
+3fffcc30:	40006e98 40006e89 40006e78 40006e6a     .n.@.n.@xn.@jn.@
+3fffcc40:	40006e5b 40006e4c 40006e3e 40006e2d     [n.@Ln.@>n.@-n.@
+3fffcc50:	40006e1f 40006e0e 00000000 00000000     .n.@.n.@........
+3fffcc60:	40006df0 40006ec5 40006f55 40006f49     .m.@.n.@Uo.@Io.@
+3fffcc70:	40006f3d 40006f31 40006f25 40006f19     =o.@1o.@%o.@.o.@
+3fffcc80:	40006f0d 40006f01 40006ef5 40006ee9     .o.@.o.@.n.@.n.@
+3fffcc90:	40006edd 40006ed1 00000000 00000000     .n.@.n.@........
+3fffcca0:	40007005 400070cd 40007115 4000710f     .p.@.p.@.q.@.q.@
+3fffccb0:	40007109 40007103 400070fd 400070f7     .q.@.q.@.p.@.p.@
+3fffccc0:	400070f1 400070eb 400070e5 400070df     .p.@.p.@.p.@.p.@
+3fffccd0:	400070d9 400070d3 00000000 00000000     .p.@.p.@........
+3fffcce0:	05040200 0c0b0907 43800000 00000000     ...........C....
+3fffccf0:	c66363a5 f87c7c84 ee777799 f67b7b8d     .cc..||..ww..{{.
+3fffcd00:	fff2f20d d66b6bbd de6f6fb1 91c5c554     .....kk..oo.T...
+3fffcd10:	60303050 02010103 ce6767a9 562b2b7d     P00`.....gg.}++V
+3fffcd20:	e7fefe19 b5d7d762 4dababe6 ec76769a     ....b......M.vv.
+3fffcd30:	8fcaca45 1f82829d 89c9c940 fa7d7d87     E.......@....}}.
+3fffcd40:	effafa15 b25959eb 8e4747c9 fbf0f00b     .....YY..GG.....
+3fffcd50:	41adadec b3d4d467 5fa2a2fd 45afafea     ...Ag......_...E
+3fffcd60:	239c9cbf 53a4a4f7 e4727296 9bc0c05b     ...#...S.rr.[...
+3fffcd70:	75b7b7c2 e1fdfd1c 3d9393ae 4c26266a     ...u.......=j&&L
+3fffcd80:	6c36365a 7e3f3f41 f5f7f702 83cccc4f     Z66lA??~....O...
+3fffcd90:	6834345c 51a5a5f4 d1e5e534 f9f1f108     \44h...Q4.......
+3fffcda0:	e2717193 abd8d873 62313153 2a15153f     .qq.s...S11b?..*
+3fffcdb0:	0804040c 95c7c752 46232365 9dc3c35e     ....R...e##F^...
+3fffcdc0:	30181828 379696a1 0a05050f 2f9a9ab5     (..0...7......./
+3fffcdd0:	0e070709 24121236 1b80809b dfe2e23d     ....6..$....=...
+3fffcde0:	cdebeb26 4e272769 7fb2b2cd ea75759f     &...i''N.....uu.
+3fffcdf0:	1209091b 1d83839e 582c2c74 341a1a2e     ........t,,X...4
+3fffce00:	361b1b2d dc6e6eb2 b45a5aee 5ba0a0fb     -..6.nn..ZZ....[
+3fffce10:	a45252f6 763b3b4d b7d6d661 7db3b3ce     .RR.M;;va......}
+3fffce20:	5229297b dde3e33e 5e2f2f71 13848497     {))R>...q//^....
+3fffce30:	a65353f5 b9d1d168 00000000 c1eded2c     .SS.h.......,...
+3fffce40:	40202060 e3fcfc1f 79b1b1c8 b65b5bed     `  @.......y.[[.
+3fffce50:	d46a6abe 8dcbcb46 67bebed9 7239394b     .jj.F......gK99r
+3fffce60:	944a4ade 984c4cd4 b05858e8 85cfcf4a     .JJ..LL..XX.J...
+3fffce70:	bbd0d06b c5efef2a 4faaaae5 edfbfb16     k...*......O....
+3fffce80:	864343c5 9a4d4dd7 66333355 11858594     .CC..MM.U33f....
+3fffce90:	8a4545cf e9f9f910 04020206 fe7f7f81     .EE.............
+3fffcea0:	a05050f0 783c3c44 259f9fba 4ba8a8e3     .PP.D<<x...%...K
+3fffceb0:	a25151f3 5da3a3fe 804040c0 058f8f8a     .QQ....].@@.....
+3fffcec0:	3f9292ad 219d9dbc 70383848 f1f5f504     ...?...!H88p....
+3fffced0:	63bcbcdf 77b6b6c1 afdada75 42212163     ...c...wu...c!!B
+3fffcee0:	20101030 e5ffff1a fdf3f30e bfd2d26d     0.. ........m...
+3fffcef0:	81cdcd4c 180c0c14 26131335 c3ecec2f     L.......5..&/...
+3fffcf00:	be5f5fe1 359797a2 884444cc 2e171739     .__....5.DD.9...
+3fffcf10:	93c4c457 55a7a7f2 fc7e7e82 7a3d3d47     W......U.~~.G==z
+3fffcf20:	c86464ac ba5d5de7 3219192b e6737395     .dd..]].+..2.ss.
+3fffcf30:	c06060a0 19818198 9e4f4fd1 a3dcdc7f     .``......OO.....
+3fffcf40:	44222266 542a2a7e 3b9090ab 0b888883     f""D~**T...;....
+3fffcf50:	8c4646ca c7eeee29 6bb8b8d3 2814143c     .FF.)......k<..(
+3fffcf60:	a7dede79 bc5e5ee2 160b0b1d addbdb76     y....^^.....v...
+3fffcf70:	dbe0e03b 64323256 743a3a4e 140a0a1e     ;...V22dN::t....
+3fffcf80:	924949db 0c06060a 4824246c b85c5ce4     .II.....l$$H.\\.
+3fffcf90:	9fc2c25d bdd3d36e 43acacef c46262a6     ]...n......C.bb.
+3fffcfa0:	399191a8 319595a4 d3e4e437 f279798b     ...9...17....yy.
+3fffcfb0:	d5e7e732 8bc8c843 6e373759 da6d6db7     2...C...Y77n.mm.
+3fffcfc0:	018d8d8c b1d5d564 9c4e4ed2 49a9a9e0     ....d....NN....I
+3fffcfd0:	d86c6cb4 ac5656fa f3f4f407 cfeaea25     .ll..VV.....%...
+3fffcfe0:	ca6565af f47a7a8e 47aeaee9 10080818     .ee..zz....G....
+3fffcff0:	6fbabad5 f0787888 4a25256f 5c2e2e72     ...o.xx.o%%Jr..\
+3fffd000:	381c1c24 57a6a6f1 73b4b4c7 97c6c651     $..8...W...sQ...
+3fffd010:	cbe8e823 a1dddd7c e874749c 3e1f1f21     #...|....tt.!..>
+3fffd020:	964b4bdd 61bdbddc 0d8b8b86 0f8a8a85     .KK....a........
+3fffd030:	e0707090 7c3e3e42 71b5b5c4 cc6666aa     .pp.B>>|...q.ff.
+3fffd040:	904848d8 06030305 f7f6f601 1c0e0e12     .HH.............
+3fffd050:	c26161a3 6a35355f ae5757f9 69b9b9d0     .aa._55j.WW....i
+3fffd060:	17868691 99c1c158 3a1d1d27 279e9eb9     ....X...'..:...'
+3fffd070:	d9e1e138 ebf8f813 2b9898b3 22111133     8..........+3.."
+3fffd080:	d26969bb a9d9d970 078e8e89 339494a7     .ii.p..........3
+3fffd090:	2d9b9bb6 3c1e1e22 15878792 c9e9e920     ...-"..<.... ...
+3fffd0a0:	87cece49 aa5555ff 50282878 a5dfdf7a     I....UU.x((Pz...
+3fffd0b0:	038c8c8f 59a1a1f8 09898980 1a0d0d17     .......Y........
+3fffd0c0:	65bfbfda d7e6e631 844242c6 d06868b8     ...e1....BB..hh.
+3fffd0d0:	824141c3 299999b0 5a2d2d77 1e0f0f11     .AA....)w--Z....
+3fffd0e0:	7bb0b0cb a85454fc 6dbbbbd6 2c16163a     ...{.TT....m:..,
+3fffd0f0:	08040201 80402010 0000361b 00000000     ..... @..6......
+3fffd100:	51f4a750 7e416553 1a17a4c3 3a275e96     P..QSeA~.....^':
+3fffd110:	3bab6bcb 1f9d45f1 acfa58ab 4be30393     .k.;.E...X.....K
+3fffd120:	2030fa55 ad766df6 88cc7691 f5024c25     U.0 .mv..v..%L..
+3fffd130:	4fe5d7fc c52acbd7 26354480 b562a38f     ...O..*..D5&..b.
+3fffd140:	deb15a49 25ba1b67 45ea0e98 5dfec0e1     IZ..g..%...E...]
+3fffd150:	c32f7502 814cf012 8d4697a3 6bd3f9c6     .u/...L...F....k
+3fffd160:	038f5fe7 15929c95 bf6d7aeb 955259da     ._.......zm..YR.
+3fffd170:	d4be832d 587421d3 49e06929 8ec9c844     -....!tX)i.ID...
+3fffd180:	75c2896a f48e7978 99583e6b 27b971dd     j..uxy..k>X..q.'
+3fffd190:	bee14fb6 f088ad17 c920ac66 7dce3ab4     .O......f. ..:.}
+3fffd1a0:	63df4a18 e51a3182 97513360 62537f45     .J.c.1..`3Q.E.Sb
+3fffd1b0:	b16477e0 bb6bae84 fe81a01c f9082b94     .wd...k......+..
+3fffd1c0:	70486858 8f45fd19 94de6c87 527bf8b7     XhHp..E..l....{R
+3fffd1d0:	ab73d323 724b02e2 e31f8f57 6655ab2a     #.s...KrW...*.Uf
+3fffd1e0:	b2eb2807 2fb5c203 86c57b9a d33708a5     .(...../.{....7.
+3fffd1f0:	302887f2 23bfa5b2 02036aba ed16825c     ..(0...#.j..\...
+3fffd200:	8acf1c2b a779b492 f307f2f0 4e69e2a1     +.....y.......iN
+3fffd210:	65daf4cd 0605bed5 d134621f c4a6fe8a     ...e.....b4.....
+3fffd220:	342e539d a2f355a0 058ae132 a4f6eb75     .S.4.U..2...u...
+3fffd230:	0b83ec39 4060efaa 5e719f06 bd6e1051     9.....`@..q^Q.n.
+3fffd240:	3e218af9 96dd063d dd3e05ae 4de6bd46     ..!>=.....>.F..M
+3fffd250:	91548db5 71c45d05 0406d46f 605015ff     ..T..].qo.....P`
+3fffd260:	1998fb24 d6bde997 894043cc 67d99e77     $........C@.w..g
+3fffd270:	b0e842bd 07898b88 e7195b38 79c8eedb     .B......8[.....y
+3fffd280:	a17c0a47 7c420fe9 f8841ec9 00000000     G.|...B|........
+3fffd290:	09808683 322bed48 1e1170ac 6c5a724e     ....H.+2.p..NrZl
+3fffd2a0:	fd0efffb 0f853856 3daed51e 362d3927     ....V8.....='9-6
+3fffd2b0:	0a0fd964 685ca621 9b5b54d1 24362e3a     d...!.\h.T[.:.6$
+3fffd2c0:	0c0a67b1 9357e70f b4ee96d2 1b9b919e     .g....W.........
+3fffd2d0:	80c0c54f 61dc20a2 5a774b69 1c121a16     O.... .aiKwZ....
+3fffd2e0:	e293ba0a c0a02ae5 3c22e043 121b171d     .....*..C."<....
+3fffd2f0:	0e090d0b f28bc7ad 2db6a8b9 141ea9c8     ...........-....
+3fffd300:	57f11985 af75074c ee99ddbb a37f60fd     ...WL.u......`..
+3fffd310:	f701269f 5c72f5bc 44663bc5 5bfb7e34     .&....r\.;fD4~.[
+3fffd320:	8b432976 cb23c6dc b6edfc68 b8e4f163     v)C...#.h...c...
+3fffd330:	d731dcca 42638510 13972240 84c61120     ..1...cB@".. ...
+3fffd340:	854a247d d2bb3df8 aef93211 c729a16d     }$J..=...2..m.).
+3fffd350:	1d9e2f4b dcb230f3 0d8652ec 77c1e3d0     K/...0...R.....w
+3fffd360:	2bb3166c a970b999 119448fa 47e96422     l..+..p..H.."d.G
+3fffd370:	a8fc8cc4 a0f03f1a 567d2cd8 223390ef     .....?...,}V..3"
+3fffd380:	87494ec7 d938d1c1 8ccaa2fe 98d40b36     .NI...8.....6...
+3fffd390:	a6f581cf a57ade28 dab78e26 3fadbfa4     ....(.z.&......?
+3fffd3a0:	2c3a9de4 5078920d 6a5fcc9b 547e4662     ..:,..xP.._jbF~T
+3fffd3b0:	f68d13c2 90d8b8e8 2e39f75e 82c3aff5     ........^.9.....
+3fffd3c0:	9f5d80be 69d0937c 6fd52da9 cf2512b3     ..].|..i.-.o..%.
+3fffd3d0:	c8ac993b 10187da7 e89c636e db3bbb7b     ;....}..nc..{.;.
+3fffd3e0:	cd267809 6e5918f4 ec9ab701 834f9aa8     .x&...Yn......O.
+3fffd3f0:	e6956e65 aaffe67e 21bccf08 ef15e8e6     en..~......!....
+3fffd400:	bae79bd9 4a6f36ce ea9f09d4 29b07cd6     .....6oJ.....|.)
+3fffd410:	31a4b2af 2a3f2331 c6a59430 35a266c0     ...11#?*0....f.5
+3fffd420:	744ebc37 fc82caa6 e090d0b0 33a7d815     7.Nt...........3
+3fffd430:	f104984a 41ecdaf7 7fcd500e 1791f62f     J......A.P../...
+3fffd440:	764dd68d 43efb04d ccaa4d54 e49604df     ..MvM..CTM......
+3fffd450:	9ed1b5e3 4c6a881b c12c1fb8 4665517f     ......jL..,..QeF
+3fffd460:	9d5eea04 018c355d fa877473 fb0b412e     ..^.]5..st...A..
+3fffd470:	b3671d5a 92dbd252 e9105633 6dd64713     Z.g.R...3V...G.m
+3fffd480:	9ad7618c 37a10c7a 59f8148e eb133c89     .a..z..7...Y.<..
+3fffd490:	cea927ee b761c935 e11ce5ed 7a47b13c     .'..5.a.....<.Gz
+3fffd4a0:	9cd2df59 55f2733f 1814ce79 73c737bf     Y...?s.Uy....7.s
+3fffd4b0:	53f7cdea 5ffdaa5b df3d6f14 7844db86     ...S[.._.o=...Dx
+3fffd4c0:	caaff381 b968c43e 3824342c c2a3405f     ....>.h.,4$8_@..
+3fffd4d0:	161dc372 bce2250c 283c498b ff0d9541     r....%...I<(A...
+3fffd4e0:	39a80171 080cb3de d8b4e49c 6456c190     q..9..........Vd
+3fffd4f0:	7bcb8461 d532b670 486c5c74 d0b85742     a..{p.2.t\lHBW..
+3fffd500:	d56a0952 38a53630 9ea340bf fbd7f381     R.j.06.8.@......
+3fffd510:	8239e37c 87ff2f9b 44438e34 cbe9dec4     |.9../..4.CD....
+3fffd520:	32947b54 3d23c2a6 0b954cee 4ec3fa42     T{.2..#=.L..B..N
+3fffd530:	66a12e08 b224d928 49a25b76 25d18b6d     ...f(.$.v[.Im..%
+3fffd540:	64f6f872 16986886 cc5ca4d4 92b6655d     r..d.h....\.]e..
+3fffd550:	5048706c dab9edfd 5746155e 849d8da7     lpHP....^.FW....
+3fffd560:	00abd890 0ad3bc8c 0558e4f7 0645b3b8     ..........X...E.
+3fffd570:	8f1e2cd0 020f3fca 03bdafc1 6b8a1301     .,...?.........k
+3fffd580:	4111913a eadc674f cecff297 73e6b4f0     :..AOg.........s
+3fffd590:	2274ac96 8535ade7 e837f9e2 6edf751c     ..t"..5...7..u.n
+3fffd5a0:	711af147 89c5291d 0e62b76f 1bbe18aa     G..q.)..o.b.....
+3fffd5b0:	4b3e56fc 2079d2c6 fec0db9a f45acd78     .V>K..y ....x.Z.
+3fffd5c0:	33a8dd1f 31c70788 591012b1 5fec8027     ...3...1...Y'.._
+3fffd5d0:	a97f5160 0d4ab519 9f7ae52d ef9cc993     `Q....J.-.z.....
+3fffd5e0:	4d3be0a0 b0f52aae 3cbbebc8 61995383     ..;M.*.....<.S.a
+3fffd5f0:	7e042b17 26d677ba 631469e1 7d0c2155     .+.~.w.&.i.cU!.}
+3fffd600:	44434241 48474645 4c4b4a49 504f4e4d     ABCDEFGHIJKLMNOP
+3fffd610:	54535251 58575655 62615a59 66656463     QRSTUVWXYZabcdef
+3fffd620:	6a696867 6e6d6c6b 7271706f 76757473     ghijklmnopqrstuv
+3fffd630:	7a797877 33323130 37363534 2f2b3938     wxyz0123456789+/
+3fffd640:	00000000 00000000 00000000 00000000     ................
+3fffd650:	01010101 01010101 01010101 00030101     ................
+3fffd660:	00000000 00000000 00000000 00000000     ................
+3fffd670:	00000043 7465200a 73252073 7473722c     C.... ets %s,rst
+3fffd680:	75616320 253a6573 62202c64 20746f6f      cause:%d, boot 
+3fffd690:	65646f6d 6425283a 2964252c 00000a0a     mode:(%d,%d)....
+3fffd6a0:	206e614a 32203820 00333130 20746477     Jan  8 2013.wdt 
+3fffd6b0:	65736572 00000a74 25207325 000a2073     reset...%s %s ..
+3fffd6c0:	5f737465 6e69616d 0000632e 6e6b6e75     ets_main.c..unkn
+3fffd6d0:	206e776f 65736572 00000a74 72657375     own reset...user
+3fffd6e0:	646f6320 6f642065 000a656e 74696177      code done..wait
+3fffd6f0:	20676e69 20726f66 74736f68 0000000a     ing for host....
+3fffd700:	64616f6c 25783020 2c783830 6e656c20     load 0x%08x, len
+3fffd710:	2c642520 6f6f7220 6425206d 00000a20      %d, room %d ...
+3fffd720:	73616c66 65722068 65206461 202c7272     flash read err, 
+3fffd730:	000a7325 6c696174 0a642520 00000000     %s..tail %d.....
+3fffd740:	736b6863 30206d75 32302578 00000a78     chksum 0x%02x...
+3fffd750:	6d757363 25783020 0a783230 00000000     csum 0x%02x.....
+3fffd760:	6d757363 72726520 0000000a 25206f68     csum err....ho %
+3fffd770:	61742064 25206c69 6f722064 25206d6f     d tail %d room %
+3fffd780:	00000a64 25207073 000a2070 645f6673     d...sp %p ..sf_d
+3fffd790:	5b706d75 205d6425 203a3061 30257830     ump[%d] a0: 0x%0
+3fffd7a0:	20207838 203a3161 30257830 20207838     8x  a1: 0x%08x  
+3fffd7b0:	203a3261 30257830 20207838 203a3361     a2: 0x%08x  a3: 
+3fffd7c0:	30257830 0a207838 00000000 31637065     0x%08x .....epc1
+3fffd7d0:	2578303d 2c783830 63706520 78303d32     =0x%08x, epc2=0x
+3fffd7e0:	78383025 7065202c 303d3363 38302578     %08x, epc3=0x%08
+3fffd7f0:	65202c78 61766378 3d726464 30257830     x, excvaddr=0x%0
+3fffd800:	202c7838 63706564 2578303d 0a783830     8x, depc=0x%08x.
+3fffd810:	00000000 61746146 7865206c 74706563     ....Fatal except
+3fffd820:	206e6f69 29642528 000a203a 69727065     ion (%d): ..epri
+3fffd830:	2066746e 62206f6e 000a6675 33323130     ntf no buf..0123
+3fffd840:	37363534 00003938 33323130 37363534     456789..01234567
+3fffd850:	62613938 66656463 00000000 33323130     89abcdef....0123
+3fffd860:	37363534 42413938 46454443 00000000     456789ABCDEF....
+3fffd870:	6c756e3c 00003e6c 5f737465 656d6974     <null>..ets_time
+3fffd880:	00632e72 746f6f62 2c207075 64646120     r.c.bootup , add
+3fffd890:	78302072 78383025 0000000a 72206f6e     r 0x%08x....no r
+3fffd8a0:	000a7364 20706973 75676f62 78722073     ds..sip bogus rx
+3fffd8b0:	6e6f6420 00000a65 64207872 20656e6f      done...rx done 
+3fffd8c0:	6e6b6e75 0a6e776f 00000000 20706973     unknown.....sip 
+3fffd8d0:	75676f62 78742073 0000000a 20716573     bogus tx....seq 
+3fffd8e0:	202c7525 64207525 70252073 0000000a     %u, %u ds %p....
+3fffd8f0:	75207874 6f6e6b6e 000a6e77 71697872     tx unknown..rxiq
+3fffd900:	7465675f 73696d5f 5f73203a 3d727770     _get_mis: s_pwr=
+3fffd910:	646c6c25 6425202c 2c64252d 00000020     %lld, %d-%d, ...
+3fffd920:	64252820 2964252c 00000020 252c6425      (%d,%d) ...%d,%
+3fffd930:	00002064 67617473 64252065 4743203a     d ..stage %d: CG
+3fffd940:	3d4e4941 46206425 4e494147 2c64253d     AIN=%d FGAIN=%d,
+3fffd950:	5f434420 283d534f 252c6425 202c2964      DC_OS=(%d,%d), 
+3fffd960:	3d434144 2c642528 20296425 0000000a     DAC=(%d,%d) ....
+3fffd970:	74637770 203a6c72 65746172 253d695f     pwctrl: rate_i=%
+3fffd980:	74202c64 65677261 6f705f74 3d726577     d, target_power=
+3fffd990:	202c6425 65746564 705f7463 7265776f     %d, detect_power
+3fffd9a0:	0a64253d 00000000 5f6d756e 64253d6b     =%d.....num_k=%d
+3fffd9b0:	6f70202c 5f726577 3d74756f 202c6425     , power_out=%d, 
+3fffd9c0:	00000000 5f676572 64253d69 6e69202c     ....reg_i=%d, in
+3fffd9d0:	61746164 0a64253d 00000000 71697874     data=%d.....txiq
+3fffd9e0:	6f74203a 615f656e 6e657474 0a64253d     : tone_atten=%d.
+3fffd9f0:	00000000 002c6425 71697874 6961675f     ....%d,.txiq_gai
+3fffda00:	64253d6e 0000000a 71697874 6168705f     n=%d....txiq_pha
+3fffda10:	253d6573 00000a64 203a7462 00000000     se=%d...bt: ....
+3fffda20:	00000080 21252423 26252340 0000005e     ....#$%!@#%&^...
+3fffda30:	00000018 00000000 7c010001 00010c00     ...........|....
+3fffda40:	0c080108 0e080d08 00000f08 00000018     ................
+3fffda50:	00000020 4000ce60 000004af 8001f00e      ...`..@........
+3fffda60:	8d128c13 00000011 00000018 0000003c     ............<...
+3fffda70:	4000d310 00000460 8001c00e 8d118c12     ...@`...........
+3fffda80:	000f8e10 0000001c 00000058 4000d770     ........X...p..@
+3fffda90:	00000470 8001b00e 8d0c8c0d 8f0a8e0b     p...............
+3fffdaa0:	00000009 3fffdab0 3fffeb30
+
+; Here is part of the result of running "strings" on bootrom.bin
+;
+; }ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
+;  ets %s,rst cause:%d, boot mode:(%d,%d)
+; Jan  8 2013
+; wdt reset
+; %s %s 
+; ets_main.c
+; unknown reset
+; user code done
+; waiting for host
+; load 0x%08x, len %d, room %d 
+; flash read err, %s
+; tail %d
+; chksum 0x%02x
+; csum 0x%02x
+; csum err
+; ho %d tail %d room %d
+; sp %p 
+; sf_dump[%d] a0: 0x%08x  a1: 0x%08x  a2: 0x%08x  a3: 0x%08x 
+; epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x
+; Fatal exception (%d): 
+; eprintf no buf
+; 0123456789
+; 0123456789abcdef
+; 0123456789ABCDEF
+; ets_timer.c
+; bootup , addr 0x%08x
+; no rds
+; sip bogus rx done
+; rx done unknown
+; sip bogus tx
+; seq %u, %u ds %p
+; tx unknown
+; rxiq_get_mis: s_pwr=%lld, %d-%d, 
+;  (%d,%d) 
+; %d,%d 
+; stage %d: CGAIN=%d FGAIN=%d, DC_OS=(%d,%d), DAC=(%d,%d) 
+; pwctrl: rate_i=%d, target_power=%d, detect_power=%d
+; num_k=%d, power_out=%d, 
+; reg_i=%d, indata=%d
+; txiq: tone_atten=%d
+; txiq_gain=%d
+; txiq_phase=%d
+; bt: 
+; #$%!@#%&^
+
+; Block 3  4000fe34
+;      3fffdaac 3fffdab0 <-- 4000fe34
+; These 4 bytes get their own block
+
+3fffdaac:	3fffc000
+
+; And these are just unused bytes at the end of the ROM
+
 4000fe38:	00000000 00000000 00000000 00000000     ................
 4000fe48:	00000000 00000000 00000000 00000000     ................
 4000fe58:	00000000 00000000 00000000 00000000     ................

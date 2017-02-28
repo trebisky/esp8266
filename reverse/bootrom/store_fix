@@ -1,0 +1,107 @@
+#!/bin/ruby
+
+#$infile = "boot.txt"
+$infile = "store.txt"
+#$start = "4000e388 <_rom_store>:"
+$start = /^4000e388/
+
+# A typical and difficult line would be:
+# 4000ed28:	40002034 40002034 40002034 40002034     4 .@4 .@4 .@4 .@
+
+#$rex = /^(\S+):(\s+)(\S+)(\s+)(\S+)(\s+)(\S+)(\s+)(\S+)(\s+)(.*)/
+$rex = /^(\S+):(\s+)(.*)/
+
+$bdata = Array.new
+
+def tweak ( addr )
+    a = addr.to_i(16)
+    $bdata.each { |b|
+	if a >= b[0] && a < b[1]
+	    return (a-b[2]).to_s(16)
+	end
+    }
+    return nil
+end
+
+# ------------
+
+def odd ( line )
+    md = /^(\S+):(\s+)(.*)/.match line
+    unless md
+	puts line
+	return
+    end
+
+    new = tweak(md[1])
+    unless new
+	puts line
+	return
+    end
+
+    #puts md.size
+    #puts "ONE " + md[1]
+    #puts "TWO " + md[2]
+    #puts "THREE " + md[3]
+    print new + ":" + md[2] + md[3] + "\n"
+end
+
+def process ( line )
+    if line =~ /^;/
+	puts line
+	return
+    end
+    if line =~ /^$/
+	puts line
+	return
+    end
+    md = $rex.match line
+    unless md
+	odd line
+	return
+    end
+
+    new = tweak(md[1])
+    unless new
+	puts line
+	return
+    end
+
+    print new + ":" + md[2] + md[3] + "\n"
+end
+
+# We have 3 blocks, copied as per the following table
+
+# 4000e328:       3fffc000 3fffc857 4000e388
+# 4000e334:       3fffc860 3fffdaac 4000ebe8
+# 4000e340:       3fffdaac 3fffdab0 4000fe34
+
+def block ( ds, de, rs )
+    size = de - ds
+    off = rs - ds
+    printf( "Block: %08x to %08x  %d\n", rs, rs+size, off )
+    x = Array.new
+    x[0] = rs
+    x[1] = rs + size
+    x[2] = off
+    $bdata << x
+end
+
+def init_blocks
+    block( 0x3fffc000, 0x3fffc857, 0x4000e388 )
+    block( 0x3fffc860, 0x3fffdaac, 0x4000ebe8 )
+    block( 0x3fffdaac, 0x3fffdab0, 0x4000fe34 )
+end
+
+run = false
+
+init_blocks
+
+File.foreach( $infile ) { |line|
+    run = true if line =~ $start
+    if ( run )
+	# puts line
+	process line
+    end
+}
+
+# THE END
