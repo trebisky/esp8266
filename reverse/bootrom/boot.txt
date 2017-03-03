@@ -1,17 +1,38 @@
 ; Annotated ESP8266 bootrom disassembly.
 ;
-;	Tom Trebisky 1-7-2016 began from Kongo's disassembly
+;	Tom Trebisky 1-7-2016 began studying Kongo's disassembly
 ;	Tom Trebisky 1-24-2016 migrated to my own disassembly
 ;	Tom Trebisky 2-28-2017 busy with this again.
 ;
 ; This is the ESP8266 bootrom -- 64K in size.
 ;
-; I did a couple of things differently when I did the disassembly.
-; one is that I used the true addresses ( starting at 40000000 ).
-; another is that I made the byte order memory correct.
-; I went to some pains to collect the bytes for the constants
-;  referenced by l32r instructions.
+; I began with the bin file and made multiple passes to get
+; this into an initial form that I liked.  Then I began adding
+; annotation in the form of comments (like this one).
 ;
+; TODO --
+; Get a firm understanding of ESP8266 interrupts.
+;
+;---------------------------------------------------
+;
+; I did a couple of special things to generate the initial disassembly.
+; - I converted the ".bin" file to a ".elf" file using a C program
+;    that I wrote.  This let me add a symbol table derived from
+;    the list of symbols in PROVIDE statements in eagle.rom.addr.v6.ld
+;    This also let me set the proper text addresses for the
+;    disassembly.  I keep the byte order correct (which is
+;    reversed, i.e. little endian for 32 bit constants).
+;
+; - then I did the disassembly in sections based on those symbol
+;    table addresses as starting points.  This greatly reduced but
+;    did not eliminate the mis-aligned disassembly.
+; - then I wrote some scripts to find all the l32r statements
+;    and the 32 bit constants they reference and make the
+;    display of these values civilized.
+; - sometime late I understood the relocation of a large block
+;    of data near the end of the ROM and rewrote the addresses
+;    for that, which was a great help.
+
 ; I still find it necessary to "polish" the disassembly by
 ;  hand, finding improperly disassmbled sections of code and
 ;  so forth.
@@ -23,22 +44,6 @@
 ;
 ; The ESP8266 bootrom is in some on-chip immutable ROM at
 ;    a base address of 0x40000000
-; At this point all addresses are relative to that base
-;	(this is the way Kongo's disassembly is done)
-; I have yet to find reason to adjust this, but if it becomes
-;   a point of confusion I will consider a script to do so.
-;
-; Kongo said the following:
-;
-;    "Negative addresses, i.e 0xfffb8d38, wrap around into 0x3ffb8d38,
-;     that is, DRAM. Not perfect, I know, but I'm getting tired of xt-objdump."
-;         "kongo 140907"  (so it looks like his work was done in 9/2014).
-;
-;  What I think he is saying here is that since he disassembled this at a
-;  starting address of 0 (rather than 0x40000000), when you have a negative
-;  offset which ought to carry you below 0x40000000 to an address like
-;  0x3ffb8d38, you instead go below zero and get 0xfffb8d38.
-;  This should be fixed in my disassembly which uses the proper base.
 ;
 ; It is easy to dump the bootrom as binary using:
 ;	PORT            = /dev/ttyUSB1
@@ -54,8 +59,9 @@
 ;  start addresses for each subroutine.  A big improvement over the naive
 ;  disassembly and very much something to start work from.
 ;
-; I compared the binary I pulled from my chips with the one Kongo began with
-;  and found them identical.
+; I compared the binary I pulled from my chips with the one Kongo began
+;  with and found them identical.  As far as I know there is only one version
+;  of the bootrom in the wild.
 ;
 ; ---------------------------------------------------------------
 ;
@@ -167,10 +173,11 @@
 
 40000020 <_NMIExceptionVector>:
 40000020:	103300        	rfi	3
-40000023:	000000        	ill
-40000026:	000000        	ill
-40000029:	000000        	ill
-4000002c:	000000        	ill
+
+40000023:	000000
+40000026:	000000
+40000029:	000000
+4000002c:	000000
 4000002f:	00
 
 ; spin with break exception
@@ -179,14 +186,14 @@
 40000030:	004100        	break	1, 0		; breakpoint exception
 40000033:	46feff        	j	40000030 <_KernelExceptionVector>
 
-40000036:	000000        	ill
-40000039:	000000        	ill
-4000003c:	000000        	ill
-4000003f:	000000        	ill
-40000042:	000000        	ill
-40000045:	000000        	ill
-40000048:	000000        	ill
-4000004b:	000000        	ill
+40000036:	000000
+40000039:	000000
+4000003c:	000000
+4000003f:	000000
+40000042:	000000
+40000045:	000000
+40000048:	000000
+4000004b:	000000
 4000004e:	0000
 
 ; Note 3fffdaac holds 3fffc000
@@ -202,18 +209,19 @@
 40000062:	4971      	s32i.n	a4, a1, 28
 40000064:	a00300        	jx	a3
 
-40000067:	000000        	ill
-4000006a:	000000        	ill
-4000006d:	000000        	ill
+40000067:	000000
+4000006a:	000000
+4000006d:	000000
 
 ; spin with break exception
 
 40000070 <_DoubleExceptionVector>:
 40000070:	404100        	break	1, 4		; breakpoint exception
 40000073:	46feff        	j	40000070 <_DoubleExceptionVector>
-40000076:	000000        	ill
-40000079:	000000        	ill
-4000007c:	000000        	ill
+
+40000076:	000000
+40000079:	000000
+4000007c:	000000
 4000007f:	00
 
 ; Reset apparently sets the PC to 0x40000080, so we end up here
@@ -240,8 +248,8 @@
 40000094:	f3000040	.long 0x400000f3
 40000098:	28e30040	.long 0x4000e328
 
-4000009c:	000000        	ill
-4000009f:	000000        	ill
+4000009c:	000000
+4000009f:	000000
 400000a2:	0000
 
 ; We seem to be done with vectors and it is code from here on out.
@@ -395,199 +403,16 @@
 ; probably everything above this was coded in assembly language
 ; and the call to _start is the transition to C code.
 
-; a lot of zero padding for some reason ...
-; one zero object in the middle of it all is
-; referenced by a l32r
+; a lot of zero padding follows here
+;  betwixt the assembly section and what
+;  I think is the C section
 
-4000014c:	0000
-4000014e:	000000        	ill
-40000151:	000000        	ill
-40000154:	000000        	ill
-40000157:	000000        	ill
-4000015a:	000000        	ill
-4000015d:	000000        	ill
-40000160:	000000        	ill
-40000163:	000000        	ill
-40000166:	000000        	ill
-40000169:	000000        	ill
-4000016c:	000000        	ill
-4000016f:	000000        	ill
-40000172:	000000        	ill
-40000175:	000000        	ill
-40000178:	000000        	ill
-4000017b:	000000        	ill
-4000017e:	000000        	ill
-40000181:	000000        	ill
-40000184:	000000        	ill
-40000187:	000000        	ill
-4000018a:	000000        	ill
-4000018d:	000000        	ill
-40000190:	000000        	ill
-40000193:	000000        	ill
-40000196:	000000        	ill
-40000199:	000000        	ill
-4000019c:	000000        	ill
-4000019f:	000000        	ill
-400001a2:	000000        	ill
-400001a5:	000000        	ill
-400001a8:	000000        	ill
-400001ab:	000000        	ill
-400001ae:	000000        	ill
-400001b1:	000000        	ill
-400001b4:	000000        	ill
-400001b7:	000000        	ill
-400001ba:	000000        	ill
-400001bd:	000000        	ill
-400001c0:	000000        	ill
-400001c3:	000000        	ill
-400001c6:	000000        	ill
-400001c9:	000000        	ill
-400001cc:	000000        	ill
-400001cf:	000000        	ill
-400001d2:	000000        	ill
-400001d5:	000000        	ill
-400001d8:	000000        	ill
-400001db:	000000        	ill
-400001de:	000000        	ill
-400001e1:	000000        	ill
-400001e4:	000000        	ill
-400001e7:	000000        	ill
-400001ea:	000000        	ill
-400001ed:	000000        	ill
-400001f0:	000000        	ill
-400001f3:	000000        	ill
-400001f6:	000000        	ill
-400001f9:	000000        	ill
-400001fc:	000000        	ill
-400001ff:	000000        	ill
-40000202:	000000        	ill
-40000205:	000000        	ill
-40000208:	000000        	ill
-4000020b:	000000        	ill
-4000020e:	000000        	ill
-40000211:	000000        	ill
-40000214:	000000        	ill
-40000217:	000000        	ill
-4000021a:	000000        	ill
-4000021d:	000000        	ill
-40000220:	000000        	ill
-40000223:	000000        	ill
-40000226:	000000        	ill
-40000229:	000000        	ill
-4000022c:	000000        	ill
-4000022f:	000000        	ill
-40000232:	000000        	ill
-40000235:	000000        	ill
-40000238:	000000        	ill
-4000023b:	000000        	ill
-4000023e:	000000        	ill
-40000241:	000000        	ill
-40000244:	000000        	ill
-40000247:	000000        	ill
-4000024a:	000000        	ill
-4000024d:	000000        	ill
-40000250:	000000        	ill
-40000253:	000000        	ill
-40000256:	000000        	ill
-40000259:	000000        	ill
-4000025c:	000000        	ill
-4000025f:	000000        	ill
-40000262:	000000        	ill
-40000265:	000000        	ill
-40000268:	000000        	ill
-4000026b:	000000        	ill
-4000026e:	000000        	ill
-40000271:	000000        	ill
-40000274:	000000        	ill
-40000277:	000000        	ill
-4000027a:	000000        	ill
-4000027d:	000000        	ill
-40000280:	000000        	ill
-40000283:	000000        	ill
-40000286:	0000
-40000288:	00000000	.long 0x00000000
-4000028c:	000000        	ill
-4000028f:	000000        	ill
-40000292:	000000        	ill
-40000295:	000000        	ill
-40000298:	000000        	ill
-4000029b:	000000        	ill
-4000029e:	000000        	ill
-400002a1:	000000        	ill
-400002a4:	000000        	ill
-400002a7:	000000        	ill
-400002aa:	000000        	ill
-400002ad:	000000        	ill
-400002b0:	000000        	ill
-400002b3:	000000        	ill
-400002b6:	000000        	ill
-400002b9:	000000        	ill
-400002bc:	000000        	ill
-400002bf:	000000        	ill
-400002c2:	000000        	ill
-400002c5:	000000        	ill
-400002c8:	000000        	ill
-400002cb:	000000        	ill
-400002ce:	000000        	ill
-400002d1:	000000        	ill
-400002d4:	000000        	ill
-400002d7:	000000        	ill
-400002da:	000000        	ill
-400002dd:	000000        	ill
-400002e0:	000000        	ill
-400002e3:	000000        	ill
-400002e6:	000000        	ill
-400002e9:	000000        	ill
-400002ec:	000000        	ill
-400002ef:	000000        	ill
-400002f2:	000000        	ill
-400002f5:	000000        	ill
-400002f8:	000000        	ill
-400002fb:	000000        	ill
-400002fe:	000000        	ill
-40000301:	000000        	ill
-40000304:	000000        	ill
-40000307:	000000        	ill
-4000030a:	000000        	ill
-4000030d:	000000        	ill
-40000310:	000000        	ill
-40000313:	000000        	ill
-40000316:	000000        	ill
-40000319:	000000        	ill
-4000031c:	000000        	ill
-4000031f:	000000        	ill
-40000322:	000000        	ill
-40000325:	000000        	ill
-40000328:	000000        	ill
-4000032b:	000000        	ill
-4000032e:	000000        	ill
-40000331:	000000        	ill
-40000334:	000000        	ill
-40000337:	000000        	ill
-4000033a:	000000        	ill
-4000033d:	000000        	ill
-40000340:	000000        	ill
-40000343:	000000        	ill
-40000346:	000000        	ill
-40000349:	000000        	ill
-4000034c:	000000        	ill
-4000034f:	000000        	ill
-40000352:	000000        	ill
-40000355:	000000        	ill
-40000358:	000000        	ill
-4000035b:	000000        	ill
-4000035e:	000000        	ill
-40000361:	000000        	ill
-40000364:	000000        	ill
-40000367:	000000        	ill
-4000036a:	000000        	ill
-4000036d:	000000        	ill
-40000370:	000000        	ill
-40000373:	000000        	ill
-40000376:	000000        	ill
-40000379:	000000        	ill
-4000037c:	000000        	ill
-4000037f:	00
+4000014c:	00000000
+	....
+	....
+	....
+	....
+4000037c:	00000000
 
 40000380:	00000040	.long 0x40000000
 40000384:	b0daff3f	.long 0x3fffdab0
@@ -23843,6 +23668,15 @@
 ; I have translated these addresses to what they would be at their
 ; final relocated destination in RAM, since those addresses are what
 ; is referenced through the bootrom.
+
+; These are the only defined symbols I have yet found for RAM objects.
+;
+; 3fffc714 flashchip
+; 3fffccf0 Te0
+; 3fffd0f0 rcons
+; 3fffd100 Td0
+; 3fffd500 Td4s
+; 3fffde10 UartDev
 
 4000e388 <_rom_store>:
 
