@@ -2,6 +2,9 @@
 ;
 ;	Tom Trebisky 1-7-2016 began from Kongo's disassembly
 ;	Tom Trebisky 1-24-2016 migrated to my own disassembly
+;	Tom Trebisky 2-28-2017 busy with this again.
+;
+; This is the ESP8266 bootrom -- 64K in size.
 ;
 ; I did a couple of things differently when I did the disassembly.
 ; one is that I used the true addresses ( starting at 40000000 ).
@@ -62,7 +65,7 @@
 ;
 ;	a0 - used for subroutine return address
 ;	a1 - stack pointer
-;	a2 - first subroutine argument and possible return value
+;	a2 - first subroutine argument and return value if there is any
 ;
 ; There is a 662 page "instruction set architecture" manual available,
 ;  which is almost indispensible for sorting this stuff out.
@@ -72,7 +75,7 @@
 ; the locations of big items.
 ;
 ; 0x0000 0000 to 0x1fff ffff - empty, causes fault when reading
-; 0x3ff0 0000 to 0x3ff0 0fff - IO registers
+; 0x3ff0 0000 to 0x3ff0 0fff - "dport0" IO registers, see below
 ; 0x3ffe 8000 to 0x3ffb ffff - user data ram (80k)
 ; 0x3fff c000 to 0x3fff ffff - ETS system data ram (16k)
 ; 0x4000 0000 to 0x4000 ffff - bootrom, read only, cannot be changed (64k)
@@ -81,6 +84,14 @@
 ; 0x4010 c000 to 0x4010 ffff - iRam, cache (16k)
 ; 0x4020 0000 to 0x401f ffff - SPI flash
 ;
+; The claim is that up to 1M of flash can be "mapped", typically to 0x4010 0000
+; but reputedly at any 1M boundary.
+; There are two 16k RAM objects than can be used either as cache or as iRam.
+; My understanding of this is that if you designate them to be used as cache
+; then you don't get to use them as iRAM at a specific address, but they get
+; used dynamically for the 1M of mapped flash.
+;
+; -----------------------------------------------------------------------
 ; Some basics on xtensa assembly:
 ;  There are 16 registers a0 to a15
 ;  a0 is used for subroutine calls (it holds the return address).
@@ -98,6 +109,30 @@
 ;    beqz as, addr      branches to addr if as == 0
 
 ; -----------------------------------------------------------------------
+; Notes on the dport0 registers
+; These are accessed (as is often done), by a base address 0x200 behind
+; their actual location, namely 0x3feffe00
+; 0x3feffe00			- base for three IO registers in an odd spot - call it "Poochie"
+;	+204 = 0x3ff0 0004 = INTC_EDGE_EN
+;	       0x3ff0 0014 = CPU_SPEED  (not used in this boot code)
+;	+20c = 0x3ff0 000C = SPI_READY
+;	+224 = 0x3ff0 0024 = SPI__bank (see comments where used).
+;
+; Three bits are understood in INTC_EDGE_EN
+;	0x01 enables watchdog interrupts
+;	0x02 enables TIMER_FRC1 interrupts (not used in this ROM)
+;	0x04 enables TIMER_FRCC interrupts
+;
+; The CPU speed control is done by the low bit, i.e 0x0001
+;  when it is clear, the cpu runs at 80 Mhz.
+;  when it is set, the cpu runs at 160 Mhz.
+;  The bootrom runs at 52 Mhz and we have no clue why, or how to jump to 80.
+; 
+; MAC address and chip info can be found here as follows:
+;  0x3FF00050	OTP_MAC0[1]	OTP Memory (Contains byte 6 of MAC address at 0x3FF00053)
+;  0x3FF00054	OTP_MAC1[1]	OTP Memory (Contains bytes 4-5 of MAC address at 0x3FF00055, 0x3FF00054)
+;  0x3FF00058	OTP_CHIPID[1]	OTP Memory (Apparently contains info about chip model/version)
+;  0x3FF0005C	OTP_MAC3	OTP Memory (Contains vendor portion (bytes 1-3) of MAC address)
 ;
 ; -----------------------------------------------------------------------
 
@@ -153,6 +188,8 @@
 40000048:	000000        	ill
 4000004b:	000000        	ill
 4000004e:	0000
+
+; Note 3fffdaac holds 3fffc000
 
 40000050 <_UserExceptionVector>:
 40000050:	12d1ff        	addmi	a1, a1, 0xffffff00
@@ -628,7 +665,7 @@
 ; should never return
 4000044c:	f04100        	break	1, 15			; breakpoint exception
 4000044f:	46feff        	j	4000044c		; spin if main returns
-40000452:	0000f6        	excw
+40000452:	0000
 
 ; -----------------
 ;
@@ -665,7 +702,8 @@
 40000488:	0df0      	ret.n
 4000048a:	0000
 
-; in rom_store table
+; referenced in rom_store table
+
 4000048c <_xtos_l1int_handler>:
 4000048c:	5981      	s32i.n	a5, a1, 32
 4000048e:	2c12      	movi.n	a2, 33
@@ -776,7 +814,8 @@
 40000590 <_xtos_cause3_handler>:
 40000590:	0c32      	movi.n	a2, 3
 40000592:	860000        	j	40000598 <_xtos_c_wrapper_handler>
-40000595:	000000        	ill
+
+40000595:	000000
 
 40000598 <_xtos_c_wrapper_handler>:
 40000598:	5981      	s32i.n	a5, a1, 32
@@ -823,8 +862,8 @@
 400005f0:	4170ff		l32r	a4, 400003b0	; ( 3fffc6f8 )
 400005f3:	4804      	l32i.n	a4, a4, 0
 400005f5:	0c03      	movi.n	a3, 0
-400005f7:	22642a        	s32i	a2, a4, 168
-400005fa:	32642b        	s32i	a3, a4, 172
+400005f7:	22642a        	s32i	a2, a4, 168	; save seed
+400005fa:	32642b        	s32i	a3, a4, 172	; seed Z
 400005fd:	0df0      	ret.n
 400005ff:	00
 
@@ -832,33 +871,37 @@
 40000600:	516dff		l32r	a5, 400003b4	; ( 5851f42d )
 40000603:	416dff		l32r	a4, 400003b8	; ( 4c957f2d )
 40000606:	216aff		l32r	a2, 400003b0	; ( 3fffc6f8 )
-40000609:	12c1f0        	addi	a1, a1, -16
-4000060c:	026100        	s32i	a0, a1, 0
+40000609:	12c1f0        	addi	a1, a1, -16	; stack space
+4000060c:	026100        	s32i	a0, a1, 0	; save return
 4000060f:	222200        	l32i	a2, a2, 0
 40000612:	226101        	s32i	a2, a1, 4
-40000615:	32222b        	l32i	a3, a2, 172
-40000618:	22222a        	l32i	a2, a2, 168
+40000615:	32222b        	l32i	a3, a2, 172	; seed Z
+40000618:	22222a        	l32i	a2, a2, 168	; seed
 4000061b:	450300        	call0	40000650 <__muldi3>
 4000061e:	0811      	l32i.n	a0, a1, 4
 40000620:	4d02      	mov.n	a4, a2
 40000622:	1b22      	addi.n	a2, a2, 1
 40000624:	47b214        	bgeu	a2, a4, 4000063c
+
 40000627:	22602a        	s32i	a2, a0, 168
 4000062a:	4164ff		l32r	a4, 400003bc	; ( 7fffffff )
-4000062d:	1b23      	addi.n	a2, a3, 1
-4000062f:	22602b        	s32i	a2, a0, 172
-40000632:	402210        	and	a2, a2, a4
+4000062d:	1b23      	addi.n	a2, a3, 1	; add one
+4000062f:	22602b        	s32i	a2, a0, 172	; save it
+40000632:	402210        	and	a2, a2, a4	; return this
 40000635:	0801      	l32i.n	a0, a1, 0
 40000637:	12c110        	addi	a1, a1, 16
 4000063a:	0df0      	ret.n
-4000063c:	22602a        	s32i	a2, a0, 168
-4000063f:	32602b        	s32i	a3, a0, 172
+
+4000063c:	22602a        	s32i	a2, a0, 168	; save seed
+4000063f:	32602b        	s32i	a3, a0, 172	; save seed Z
 40000642:	215eff		l32r	a2, 400003bc	; ( 7fffffff )
 40000645:	0801      	l32i.n	a0, a1, 0
-40000647:	202310        	and	a2, a3, a2
+40000647:	202310        	and	a2, a3, a2	; return this
 4000064a:	12c110        	addi	a1, a1, 16
 4000064d:	0df0      	ret.n
 4000064f:	00
+
+; Used only by rand above
 
 40000650 <__muldi3>:
 40000650:	12c1d0        	addi	a1, a1, -48
@@ -1165,7 +1208,7 @@
 40000913:	022113        	l32i	a0, a1, 76
 40000916:	12c170        	addi	a1, a1, 112
 40000919:	0df0      	ret.n
-4000091b:	0012c1        	mul16u	a1, a2, a0
+4000091b:	00
 
 4000091c <get_first_seg>:
 4000091c:	12c1e0        	addi	a1, a1, -32
@@ -1224,6 +1267,7 @@
 4000099d:	aaa1      	add.n	a10, a1, a10
 4000099f:	990a      	s32i.n	a9, a10, 0
 400009a1:	460700        	j	400009c2 <get_first_seg+0xa6>
+
 400009a4:	618cfe		l32r	a6, 400003d4	; ( 00000014 )
 400009a7:	6a61      	add.n	a6, a1, a6
 400009a9:	6806      	l32i.n	a6, a6, 0
@@ -1237,6 +1281,7 @@
 400009bb:	0c02      	movi.n	a2, 0
 400009bd:	2921      	s32i.n	a2, a1, 8
 400009bf:	860d00        	j	400009f9 <get_first_seg+0xdd>
+
 400009c2:	0c08      	movi.n	a8, 0
 400009c4:	7801      	l32i.n	a7, a1, 0
 400009c6:	720700        	l8ui	a7, a7, 0
@@ -1703,6 +1748,9 @@
 40000df9:	0df0      	ret.n
 40000dfb:	00
 
+; Cute little stub routine
+;  called just below in ets_run()
+
 40000dfc <sub_0dfc>:
 40000dfc:	0df0      	ret.n
 40000dfe:	0000
@@ -1924,6 +1972,9 @@
 
 40000fb8:	d0dcff3f	.long 0x3fffdcd0
 
+; This just saves its argument (in a2) to location 3fffdcd0
+; It will be fetched from there and branched to when the time comes.
+
 40000fbc <ets_set_user_start>:
 40000fbc:	31ffff		l32r	a3, 40000fb8	; ( 3fffdcd0 )
 40000fbf:	2903      	s32i.n	a2, a3, 0
@@ -1935,7 +1986,7 @@
 40000fcc:	74d6ff3f	.long 0x3fffd674
 40000fd0:	b8d6ff3f	.long 0x3fffd6b8
 40000fd4:	c0d6ff3f	.long 0x3fffd6c0
-40000fd8:	e0170040	.long 0x40001730
+40000fd8:	e0170040	.long 0x400017e0
 40000fdc:	78180040	.long 0x40001878
 40000fe0:	dcd6ff3f	.long 0x3fffd6dc
 40000fe4:	acd6ff3f	.long 0x3fffd6ac
@@ -2044,13 +2095,15 @@
 
 40001069:	054601        	call0	400024cc <ets_printf>
 
+; 3fffdcd0 holds the user start address.
+
 4000106c:	01d3ff		l32r	a0, 40000fb8	; ( 3fffdcd0 )
 4000106f:	f63d02        	bgeui	a13, 3, 40001075
 40001072:	56bd0a        	bnez	a13, 40001121
 
 40001075:	263d11        	beqi	a13, 3, 4000108a
 40001078:	62cdfc        	addi	a6, a13, -4
-4000107b:	169609        	beqz	a6, 40001118
+4000107b:	169609        	beqz	a6, 40001118	; wdt reset
 4000107e:	b67d02        	bltui	a13, 7, 40001084
 40001081:	c62a00        	j	40001130
 
@@ -2065,26 +2118,38 @@
 40001099:	822c46        	l32i	a8, a12, 0x118
 4000109c:	922000        	l32i	a9, a0, 0
 4000109f:	808025        	extui	a8, a8, 16, 3
-400010a2:	661818        	bnei	a8, 1, 400010be <main+0xd2>
-400010a5:	565901        	bnez	a9, 400010be <main+0xd2>
-400010a8:	c52500        	call0	40001308 <sub_1308>
-400010ab:	16f200        	beqz	a2, 400010be <main+0xd2>
+400010a2:	661818        	bnei	a8, 1, 400010be
+400010a5:	565901        	bnez	a9, 400010be
 
+; This call seems to be what copies an app out of flash
+; and gets it ready to run.
+; It returns 0 if everything is good to go.
+; It returns 1 if there is trouble (read error or bad cksum).
+
+400010a8:	c52500        	call0	40001308 <sub_1308>
+
+400010ab:	16f200        	beqz	a2, 400010be
+
+; Some kind of trouble loading the app.
+;
 ; Format is "%s %s \n"
 ;  a3 points to "ets_main.c"
-;  a4 seems fishy for something to pass to a %s
+;  a4 = 181 seems fishy for something to pass to a %s
 
 400010ae:	21c8ff		l32r	a2, 40000fd0	; ( 3fffd6b8 )	printf format
 400010b1:	31c8ff		l32r	a3, 40000fd4	; ( 3fffd6c0 )  printf arg1
 400010b4:	42a0b5        	movi	a4, 181		; printf arg2
 400010b7:	454101        	call0	400024cc <ets_printf>
-400010ba:	06ffff        	j	400010ba <main+0xce>
+400010ba:	06ffff        	j	400010ba	; ** spin !!
 400010bd:	00
 
+; We look to be good to go to run the app.
 ; set a raft of exception handlers
+
 400010be:	22a009        	movi	a2, 9
-400010c1:	31c5ff        	l32r	a3, 40000fd8 ( 0x40001730 )
+400010c1:	31c5ff        	l32r	a3, 40000fd8 ( 0x400017e0 )
 400010c4:	c538ff        	call0	40000454 <_xtos_set_exception_handler>
+
 400010c7:	c1c5ff		l32r	a12, 40000fdc	; ( 40001878 )
 400010ca:	0c02      	movi.n	a2, 0
 400010cc:	3d0c      	mov.n	a3, a12
@@ -2105,10 +2170,16 @@
 400010ef:	22a008        	movi	a2, 8
 400010f2:	0536ff        	call0	40000454 <_xtos_set_exception_handler>
 
+; fetch the start address.
+
 400010f5:	21b0ff		l32r	a2, 40000fb8	; ( 3fffdcd0 )
 400010f8:	2802      	l32i.n	a2, a2, 0
 400010fa:	162200        	beqz	a2, 40001100
+
+; **** **** This is what branches to user code
 400010fd:	c00200        	callx0	a2
+
+; The user code probably won't return, but it might !!
 ; Format follows: "user code done"
 40001100:	21b8ff		l32r	a2, 40000fe0	; ( 3fffd6dc )
 40001103:	853c01        	call0	400024cc <ets_printf>
@@ -2127,8 +2198,9 @@
 
 40001121:	21a5ff		l32r	a2, 40000fb8	; ( 3fffdcd0 )
 40001124:	450800        	call0	400011ac <sub_11ac>
+
 40001127:	01a4ff		l32r	a0, 40000fb8	; ( 3fffdcd0 )
-4000112a:	06d7ff        	j	4000108a <main+0x9e>
+4000112a:	06d7ff        	j	4000108a
 4000112d:	000000        	ill
 
 ; Format: "unknown reset"
@@ -2140,20 +2212,20 @@
 40001139:	31a6ff		l32r	a3, 40000fd4	; ( 3fffd6c0 )
 4000113c:	42a0bb        	movi	a4, 187
 4000113f:	c53801        	call0	400024cc <ets_printf>
-40001142:	06ffff        	j	40001142 <main+0x156>
+40001142:	06ffff        	j	40001142	; *** spin !!
 40001145:	000000        	ill
 
 ; Here if boot bits match 111
 
 40001148:	0c12      	movi.n	a2, 1
 4000114a:	055304        	call0	4000567c <sip_init_attach>
-4000114d:	46beff        	j	4000104a <main+0x5e>
+4000114d:	46beff        	j	4000104a
 
 ; Here if boot bits match 100
 
 40001150:	0c22      	movi.n	a2, 2
 40001152:	855204        	call0	4000567c <sip_init_attach>
-40001155:	46bcff        	j	4000104a <main+0x5e>
+40001155:	46bcff        	j	4000104a
 
 ; END of main()
 
@@ -2197,67 +2269,70 @@
 400011b6:	c02000        	memw
 400011b9:	022c46        	l32i	a0, a12, 0x118
 400011bc:	2911      	s32i.n	a2, a1, 4
-400011be:	277010        	bbci	a0, 18, 400011d2 <sub_11ac+0x26>
+400011be:	277010        	bbci	a0, 18, 400011d2
 400011c1:	c02000        	memw
 400011c4:	222c46        	l32i	a2, a12, 0x118
 400011c7:	0c10      	movi.n	a0, 1
 400011c9:	202d25        	extui	a2, a2, 29, 3
 400011cc:	22c2fe        	addi	a2, a2, -2
-400011cf:	162209        	beqz	a2, 40001265 <sub_11ac+0xb9>
+400011cf:	162209        	beqz	a2, 40001265
 400011d2:	0c00      	movi.n	a0, 0
 400011d4:	c02000        	memw
 400011d7:	322c46        	l32i	a3, a12, 0x118
 400011da:	303025        	extui	a3, a3, 16, 3
 400011dd:	32c3fd        	addi	a3, a3, -3
-400011e0:	16c30c        	beqz	a3, 400012b0 <sub_11ac+0x104>
+400011e0:	16c30c        	beqz	a3, 400012b0
 400011e3:	c02000        	memw
 400011e6:	422c46        	l32i	a4, a12, 0x118
 400011e9:	006074        	extui	a6, a0, 0, 8
 400011ec:	404025        	extui	a4, a4, 16, 3
-400011ef:	262475        	beqi	a4, 2, 40001268 <sub_11ac+0xbc>
+400011ef:	262475        	beqi	a4, 2, 40001268
 400011f2:	6921      	s32i.n	a6, a1, 8
 400011f4:	c02000        	memw
 400011f7:	522c46        	l32i	a5, a12, 0x118
 400011fa:	0c00      	movi.n	a0, 0
 400011fc:	505025        	extui	a5, a5, 16, 3
-400011ff:	261577        	beqi	a5, 1, 4000127a <sub_11ac+0xce>
+400011ff:	261577        	beqi	a5, 1, 4000127a
 40001202:	c02000        	memw
 40001205:	722c46        	l32i	a7, a12, 0x118
-40001208:	277717        	bbci	a7, 18, 40001223 <sub_11ac+0x77>
+40001208:	277717        	bbci	a7, 18, 40001223
 4000120b:	c02000        	memw
 4000120e:	822c46        	l32i	a8, a12, 0x118
 40001211:	f02000        	nop
 40001214:	808d25        	extui	a8, a8, 29, 3
-40001217:	262808        	beqi	a8, 2, 40001223 <sub_11ac+0x77>
+40001217:	262808        	beqi	a8, 2, 40001223
 ; Format: "waiting for host"
 4000121a:	21e0ff		l32r	a2, 4000119c	; ( 3fffd6ec )
 4000121d:	c52a01        	call0	400024cc <ets_printf>
 40001220:	02a001        	movi	a0, 1
 40001223:	c02000        	memw
 40001226:	922c46        	l32i	a9, a12, 0x118
-40001229:	27790e        	bbci	a9, 18, 4000123b <sub_11ac+0x8f>
+40001229:	27790e        	bbci	a9, 18, 4000123b
 4000122c:	c02000        	memw
 4000122f:	a22c46        	l32i	a10, a12, 0x118
 40001232:	026100        	s32i	a0, a1, 0
 40001235:	a0ad25        	extui	a10, a10, 29, 3
-40001238:	262a55        	beqi	a10, 2, 40001291 <sub_11ac+0xe5>
-4000123b:	66200e        	bnei	a0, 2, 4000124d <sub_11ac+0xa1>
+40001238:	262a55        	beqi	a10, 2, 40001291
+4000123b:	66200e        	bnei	a0, 2, 4000124d
 4000123e:	21d8ff		l32r	a2, 400011a0	; ( 3fffa000 )
 40001241:	31d8ff		l32r	a3, 400011a4	; ( 00002000 )
 40001244:	4811      	l32i.n	a4, a1, 4
 40001246:	051202        	call0	40003368 <UartDwnLdProc>
-40001249:	c60000        	j	40001250 <sub_11ac+0xa4>
+40001249:	c60000        	j	40001250
+
 4000124c:	0005f1        	excw
 4000124f:	ff          	.byte 0xff
 40001250:	b22102        	l32i	a11, a1, 8
-40001253:	165b00        	beqz	a11, 4000125c <sub_11ac+0xb0>
+40001253:	165b00        	beqz	a11, 4000125c
 40001256:	22a000        	movi	a2, 0
 40001259:	856402        	call0	400038a4 <uart_buff_switch>
 4000125c:	c841      	l32i.n	a12, a1, 16
 4000125e:	0831      	l32i.n	a0, a1, 12
 40001260:	12c120        	addi	a1, a1, 32
 40001263:	0df0      	ret.n
-40001265:	c6daff        	j	400011d4 <sub_11ac+0x28>
+
+40001265:	c6daff        	j	400011d4
+
 40001268:	0811      	l32i.n	a0, a1, 4
 4000126a:	c1cfff		l32r	a12, 400011a8	; ( 40100000 )
 4000126d:	c900      	s32i.n	a12, a0, 0
@@ -2265,6 +2340,7 @@
 40001271:	0831      	l32i.n	a0, a1, 12
 40001273:	12c120        	addi	a1, a1, 32
 40001276:	0df0      	ret.n
+
 40001278:	000022        	excw
 4000127b:	210232		l32r	a2, 3ffcda84
 4000127e:	a00005        	extui	a0, a10, 16, 1
@@ -2273,7 +2349,8 @@
 40001286:	222102        	l32i	a2, a1, 8
 40001289:	c57402        	call0	400039d8 <uart_div_modify>
 4000128c:	0c20      	movi.n	a0, 2
-4000128e:	06dcff        	j	40001202 <sub_11ac+0x56>
+4000128e:	06dcff        	j	40001202
+
 40001291:	222102        	l32i	a2, a1, 8
 40001294:	c57702        	call0	40003a14 <Uart_Init>
 40001297:	2821      	l32i.n	a2, a1, 8
@@ -2281,11 +2358,12 @@
 4000129c:	2c02      	movi.n	a2, 32
 4000129e:	85d0ff        	call0	40000fa8 <ets_isr_unmask>
 400012a1:	3801      	l32i.n	a3, a1, 0
-400012a3:	9ce3      	beqz.n	a3, 400012c5 <sub_11ac+0x119>
+400012a3:	9ce3      	beqz.n	a3, 400012c5
 400012a5:	2c02      	movi.n	a2, 32
 400012a7:	05cfff        	call0	40000f98 <ets_isr_mask>
 400012aa:	0801      	l32i.n	a0, a1, 0
-400012ac:	c6e2ff        	j	4000123b <sub_11ac+0x8f>
+400012ac:	c6e2ff        	j	4000123b
+
 400012af:	000539        	excw
 400012b2:	030221        	excw
 400012b5:	035221        	excw
@@ -2297,15 +2375,15 @@
 400012c5:	85f601        	call0	40003230 <UartConnCheck>
 400012c8:	206074        	extui	a6, a2, 0, 8
 400012cb:	626100        	s32i	a6, a1, 0
-400012ce:	5636fd        	bnez	a6, 400012a5 <sub_11ac+0xf9>
+400012ce:	5636fd        	bnez	a6, 400012a5
 400012d1:	453904        	call0	40005668 <sip_get_state>
 400012d4:	92c2fe        	addi	a9, a2, -2
 400012d7:	82a001        	movi	a8, 1
 400012da:	0c07      	movi.n	a7, 0
 400012dc:	907883        	moveqz	a7, a8, a9
 400012df:	7901      	s32i.n	a7, a1, 0
-400012e1:	1607fe        	beqz	a7, 400012c5 <sub_11ac+0x119>
-400012e4:	46efff        	j	400012a5 <sub_11ac+0xf9>
+400012e1:	1607fe        	beqz	a7, 400012c5
+400012e4:	46efff        	j	400012a5
 400012e7:	00
 
 400012e8:	00d7ff3f	.long 0x3fffd700
@@ -2317,18 +2395,23 @@
 40001300:	50d7ff3f	.long 0x3fffd750
 40001304:	60d7ff3f	.long 0x3fffd760
 
+; SPI load
 ; called from main()
 
+; This seems to be what is called to load an app
+;  from flash and get it ready to run.
+
 40001308 <sub_1308>:
-40001308:	22a000        	movi	a2, 0
-4000130b:	42a010        	movi	a4, 16
-4000130e:	12c1a0        	addi	a1, a1, -96
+40001308:	22a000        	movi	a2, 0		; a2 = 0
+4000130b:	42a010        	movi	a4, 16		; a4 = 16
+4000130e:	12c1a0        	addi	a1, a1, -96	; stack space
 40001311:	c2610f        	s32i	a12, a1, 60
 40001314:	d26110        	s32i	a13, a1, 64
 40001317:	e26111        	s32i	a14, a1, 68
 4000131a:	f26112        	s32i	a15, a1, 72
-4000131d:	3d01      	mov.n	a3, a1
-4000131f:	09e1      	s32i.n	a0, a1, 56
+4000131d:	3d01      	mov.n	a3, a1		; read 16 bytes here
+4000131f:	09e1      	s32i.n	a0, a1, 56	; save a0 for return
+; calls SPIRead ( 0, stack, 16 )
 40001321:	857f03        	call0	40004b1c <SPIRead>
 40001324:	ccc2      	bnez.n	a2, 40001334
 40001326:	e20101        	l8ui	a14, a1, 1
@@ -2336,7 +2419,10 @@
 4000132b:	020100        	l8ui	a0, a1, 0
 4000132e:	22a0e9        	movi	a2, 233
 40001331:	271013        	beq	a0, a2, 40001348
-40001334:	0c12      	movi.n	a2, 1
+
+; trouble
+; could not read first 16 bytes
+40001334:	0c12      	movi.n	a2, 1		; return 1
 40001336:	c8f1      	l32i.n	a12, a1, 60
 40001338:	d22110        	l32i	a13, a1, 64
 4000133b:	e22111        	l32i	a14, a1, 68
@@ -2344,10 +2430,11 @@
 40001341:	08e1      	l32i.n	a0, a1, 56
 40001343:	12c160        	addi	a1, a1, 96
 40001346:	0df0      	ret.n
+
 40001348:	220102        	l8ui	a2, a1, 2
 4000134b:	055a03        	call0	400048ec <SPIReadModeCnfig>
-4000134e:	3d01      	mov.n	a3, a1
-40001350:	1c04      	movi.n	a4, 16
+4000134e:	3d01      	mov.n	a3, a1		; read to here.
+40001350:	1c04      	movi.n	a4, 16		; another 16 bytes
 40001352:	22010e        	l8ui	a2, a1, 14
 40001355:	f20108        	l8ui	a15, a1, 8
 40001358:	d2010b        	l8ui	a13, a1, 11
@@ -2366,14 +2453,15 @@
 4000137f:	22010d        	l8ui	a2, a1, 13
 40001382:	80ff11        	slli	a15, a15, 8
 40001385:	20ff20        	or	a15, a15, a2
-40001388:	22a010        	movi	a2, 16
+40001388:	22a010        	movi	a2, 16		; starting offset in flash
 4000138b:	80ff11        	slli	a15, a15, 8
 4000138e:	00ff20        	or	a15, a15, a0
 40001391:	857803        	call0	40004b1c <SPIRead>
 40001394:	56c2f9        	bnez	a2, 40001334
+
 40001397:	d26114        	s32i	a13, a1, 80
 4000139a:	c9b1      	s32i.n	a12, a1, 44
-4000139c:	169e21        	beqz	a14, 400015b9 <sub_1308+0x2b1>
+4000139c:	169e21        	beqz	a14, 400015b9
 4000139f:	322114        	l32i	a3, a1, 80
 400013a2:	1961      	s32i.n	a1, a1, 24
 400013a4:	c2a0ef        	movi	a12, 239
@@ -2387,7 +2475,18 @@
 400013b7:	e22115        	l32i	a14, a1, 84
 400013ba:	30f320        	or	a15, a3, a3
 
+; Here is the message we see when an app is being
+;    loaded from flash
+;    Something like:  
+; load 0x40100000, len 27188, room 16
+; tail 4
+; chksum 0xc0
+; load 0x3ffe8000, len 884, room 4
+; tail 0
+; chksum 0x30
+;
 ; Format: "load 0x%08x, len %d, room %d "
+
 400013bd:	21caff		l32r	a2, 400012e8	; ( 3fffd700 )
 400013c0:	62210c        	l32i	a6, a1, 48
 400013c3:	52a010        	movi	a5, 16
@@ -2396,25 +2495,27 @@
 400013cb:	505074        	extui	a5, a5, 0, 8
 400013ce:	526116        	s32i	a5, a1, 88
 400013d1:	850f01        	call0	400024cc <ets_printf>
+
 400013d4:	0861      	l32i.n	a0, a1, 24
 400013d6:	a8c1      	l32i.n	a10, a1, 48
 400013d8:	0c03      	movi.n	a3, 0
 400013da:	522116        	l32i	a5, a1, 88
 400013dd:	0c1b      	movi.n	a11, 1
-400013df:	57be01        	bgeu	a14, a5, 400013e4 <sub_1308+0xdc>
+400013df:	57be01        	bgeu	a14, a5, 400013e4
 400013e2:	0c0b      	movi.n	a11, 0
 400013e4:	b9a1      	s32i.n	a11, a1, 40
 400013e6:	4d0a      	mov.n	a4, a10
 400013e8:	b04393        	movnez	a4, a3, a11
-400013eb:	165b32        	beqz	a11, 40001714 <sub_1308+0x40c>
+400013eb:	165b32        	beqz	a11, 40001714
 400013ee:	0c38      	movi.n	a8, 3
-400013f0:	578802        	bany	a8, a5, 400013f6 <sub_1308+0xee>
-400013f3:	467700        	j	400015d4 <sub_1308+0x2cc>
+400013f0:	578802        	bany	a8, a5, 400013f6
+400013f3:	467700        	j	400015d4
+
 400013f6:	e26115        	s32i	a14, a1, 84
-400013f9:	a61543        	blti	a5, 1, 40001440 <sub_1308+0x138>
+400013f9:	a61543        	blti	a5, 1, 40001440
 400013fc:	0c0e      	movi.n	a14, 0
 400013fe:	0c13      	movi.n	a3, 1
-40001400:	076511        	bbci	a5, 0, 40001415 <sub_1308+0x10d>
+40001400:	076511        	bbci	a5, 0, 40001415
 40001403:	e20000        	l8ui	a14, a0, 0
 40001406:	e24f00        	s8i	a14, a15, 0
 40001409:	1b00      	addi.n	a0, a0, 1
@@ -2423,7 +2524,7 @@
 40001410:	ed03      	mov.n	a14, a3
 40001412:	c0c074        	extui	a12, a12, 0, 8
 40001415:	502141        	srli	a2, a5, 1
-40001418:	ac12      	beqz.n	a2, 4000143d <sub_1308+0x135>
+40001418:	ac12      	beqz.n	a2, 4000143d
 4000141a:	2bee      	addi.n	a14, a14, 2
 4000141c:	220000        	l8ui	a2, a0, 0
 4000141f:	224f00        	s8i	a2, a15, 0
@@ -2435,12 +2536,12 @@
 40001431:	f2cf02        	addi	a15, a15, 2
 40001434:	20cc30        	xor	a12, a12, a2
 40001437:	c0c074        	extui	a12, a12, 0, 8
-4000143a:	579edc        	bne	a14, a5, 4000141a <sub_1308+0x112>
+4000143a:	579edc        	bne	a14, a5, 4000141a
 4000143d:	e22115        	l32i	a14, a1, 84
 40001440:	503ec0        	sub	a3, a14, a5
 40001443:	303441        	srli	a3, a3, 4
 40001446:	39d1      	s32i.n	a3, a1, 52
-40001448:	160b32        	beqz	a11, 4000176c <sub_1308+0x464>
+40001448:	160b32        	beqz	a11, 4000176c
 4000144b:	aa5e      	add.n	a5, a14, a10
 4000144d:	52c5f0        	addi	a5, a5, -16
 40001450:	505034        	extui	a5, a5, 0, 4
@@ -2448,14 +2549,14 @@
 40001455:	407074        	extui	a7, a4, 0, 8
 40001458:	68d1      	l32i.n	a6, a1, 52
 4000145a:	79c1      	s32i.n	a7, a1, 48
-4000145c:	a61655        	blti	a6, 1, 400014b5 <sub_1308+0x1ad>
+4000145c:	a61655        	blti	a6, 1, 400014b5
 4000145f:	0c0e      	movi.n	a14, 0
 40001461:	026106        	s32i	a0, a1, 24
 40001464:	222113        	l32i	a2, a1, 76
 40001467:	3d01      	mov.n	a3, a1
 40001469:	1c04      	movi.n	a4, 16
 4000146b:	056b03        	call0	40004b1c <SPIRead>
-4000146e:	56221f        	bnez	a2, 40001664 <sub_1308+0x35c>
+4000146e:	56221f        	bnez	a2, 40001664
 40001471:	822113        	l32i	a8, a1, 76
 40001474:	0c00      	movi.n	a0, 0
 40001476:	82c810        	addi	a8, a8, 16
@@ -2472,7 +2573,7 @@
 40001493:	000074        	extui	a0, a0, 0, 8
 40001496:	c0c230        	xor	a12, a2, a12
 40001499:	c0c074        	extui	a12, a12, 0, 8
-4000149c:	66b0dc        	bnei	a0, 16, 4000147c <sub_1308+0x174>
+4000149c:	66b0dc        	bnei	a0, 16, 4000147c
 4000149f:	2d0f      	mov.n	a2, a15
 400014a1:	3d01      	mov.n	a3, a1
 400014a3:	42a010        	movi	a4, 16
@@ -2481,10 +2582,10 @@
 400014ab:	f2cf10        	addi	a15, a15, 16
 400014ae:	48d1      	l32i.n	a4, a1, 52
 400014b0:	1bee      	addi.n	a14, a14, 1
-400014b2:	479eae        	bne	a14, a4, 40001464 <sub_1308+0x15c>
+400014b2:	479eae        	bne	a14, a4, 40001464
 400014b5:	52210a        	l32i	a5, a1, 40
 400014b8:	026106        	s32i	a0, a1, 24
-400014bb:	167501        	beqz	a5, 400014d6 <sub_1308+0x1ce>
+400014bb:	167501        	beqz	a5, 400014d6
 400014be:	222113        	l32i	a2, a1, 76
 400014c1:	3d01      	mov.n	a3, a1
 400014c3:	1c04      	movi.n	a4, 16
@@ -2496,6 +2597,7 @@
 400014d3:	726113        	s32i	a7, a1, 76
 400014d6:	3891      	l32i.n	a3, a1, 36
 
+; Aha, here is the tail message ...
 ; Format: "tail %d"
 400014d8:	2185ff		l32r	a2, 400012ec	; ( 3fffd734 )
 400014db:	303074        	extui	a3, a3, 0, 8
@@ -2503,14 +2605,14 @@
 400014e0:	85fe00        	call0	400024cc <ets_printf>
 400014e3:	0871      	l32i.n	a0, a1, 28
 400014e5:	0c34      	movi.n	a4, 3
-400014e7:	078402        	bany	a4, a0, 400014ed <sub_1308+0x1e5>
-400014ea:	866500        	j	40001684 <sub_1308+0x37c>
+400014e7:	078402        	bany	a4, a0, 400014ed
+400014ea:	866500        	j	40001684
 
-400014ed:	a6104b        	blti	a0, 1, 4000153c <sub_1308+0x234>
+400014ed:	a6104b        	blti	a0, 1, 4000153c
 400014f0:	3d00      	mov.n	a3, a0
 400014f2:	0c0e      	movi.n	a14, 0
 400014f4:	0c15      	movi.n	a5, 1
-400014f6:	076016        	bbci	a0, 0, 40001510 <sub_1308+0x208>
+400014f6:	076016        	bbci	a0, 0, 40001510
 400014f9:	2861      	l32i.n	a2, a1, 24
 400014fb:	ed05      	mov.n	a14, a5
 400014fd:	420200        	l8ui	a4, a2, 0
@@ -2521,7 +2623,7 @@
 4000150a:	c0c430        	xor	a12, a4, a12
 4000150d:	c0c074        	extui	a12, a12, 0, 8
 40001510:	305141        	srli	a5, a3, 1
-40001513:	165502        	beqz	a5, 4000153c <sub_1308+0x234>
+40001513:	165502        	beqz	a5, 4000153c
 40001516:	2861      	l32i.n	a2, a1, 24
 40001518:	2bee      	addi.n	a14, a14, 2
 4000151a:	320200        	l8ui	a3, a2, 0
@@ -2535,8 +2637,9 @@
 40001530:	f2cf02        	addi	a15, a15, 2
 40001533:	30cc30        	xor	a12, a12, a3
 40001536:	c0c074        	extui	a12, a12, 0, 8
-40001539:	079ed9        	bne	a14, a0, 40001516 <sub_1308+0x20e>
+40001539:	079ed9        	bne	a14, a0, 40001516
 
+; And here is the chksum !!
 ; Format: "chksum 0x%02x"
 4000153c:	216dff		l32r	a2, 400012f0	; ( 3fffd740 )
 4000153f:	3d0c      	mov.n	a3, a12
@@ -2544,14 +2647,14 @@
 40001544:	4881      	l32i.n	a4, a1, 32
 40001546:	0871      	l32i.n	a0, a1, 28
 40001548:	0b44      	addi.n	a4, a4, -1
-4000154a:	163422        	beqz	a4, 40001771 <sub_1308+0x469>
+4000154a:	163422        	beqz	a4, 40001771
 4000154d:	e8c1      	l32i.n	a14, a1, 48
 4000154f:	1c0f      	movi.n	a15, 16
 40001551:	eae0      	add.n	a14, a0, a14
 40001553:	e0ffc0        	sub	a15, a15, a14
 40001556:	f0f074        	extui	a15, a15, 0, 8
-40001559:	f68f02        	bgeui	a15, 8, 4000155f <sub_1308+0x257>
-4000155c:	467000        	j	40001721 <sub_1308+0x419>
+40001559:	f68f02        	bgeui	a15, 8, 4000155f
+4000155c:	467000        	j	40001721
 
 4000155f:	7861      	l32i.n	a7, a1, 24
 40001561:	8b8e      	addi.n	a8, a14, 8
@@ -2587,25 +2690,28 @@
 400015b4:	8981      	s32i.n	a8, a1, 32
 400015b6:	5608e0        	bnez	a8, 400013ba
 400015b9:	28b1      	l32i.n	a2, a1, 44
-400015bb:	05a0ff        	call0	40000fbc <ets_set_user_start>
-400015be:	0c02      	movi.n	a2, 0
+
+; Execution will start at the address we stash here.
+400015bb:	05a0ff        	call0	40000fbc <ets_set_user_start>	XXX ***
+400015be:	0c02      	movi.n	a2, 0		; return 0
 400015c0:	c8f1      	l32i.n	a12, a1, 60
 400015c2:	d22110        	l32i	a13, a1, 64
 400015c5:	e22111        	l32i	a14, a1, 68
 400015c8:	f22112        	l32i	a15, a1, 72
-400015cb:	08e1      	l32i.n	a0, a1, 56
-400015cd:	12c160        	addi	a1, a1, 96
+400015cb:	08e1      	l32i.n	a0, a1, 56	; restore return
+400015cd:	12c160        	addi	a1, a1, 96	; restore stack
 400015d0:	0df0      	ret.n
+400015d2:	0000
 
-400015d2:	000016        	excw
-400015d5:	85e6e2        	call0	3ffe4440 <_DebugExceptionVector-0x1bbd0>
-400015d8:	611550		l32r	a6, 3ffd562c
-400015db:	9241e6        	s8i	a9, a1, 230
-400015de:	1902      	s32i.n	a1, a2, 0
-400015e0:	0697ff        	j	40001440 <sub_1308+0x138>
+400015d4:	1685e6        	beqz	a5, 40001440
+400015d7:	e26115        	s32i	a14, a1, 84
+400015da:	509241        	srli	a9, a5, 2
+400015dd:	e61902        	bgei	a9, 1, 400015e3
+400015e0:	0697ff        	j	40001440
+
 400015e3:	0c0e      	movi.n	a14, 0
 400015e5:	0c18      	movi.n	a8, 1
-400015e7:	276525        	bbci	a5, 2, 40001610 <sub_1308+0x308>
+400015e7:	276525        	bbci	a5, 2, 40001610
 400015ea:	ed08      	mov.n	a14, a8
 400015ec:	620001        	l8ui	a6, a0, 1
 400015ef:	220003        	l8ui	a2, a0, 3
@@ -2621,7 +2727,7 @@
 4000160b:	226f00        	s32i	a2, a15, 0
 4000160e:	4bff      	addi.n	a15, a15, 4
 40001610:	903141        	srli	a3, a9, 1
-40001613:	166304        	beqz	a3, 4000165d <sub_1308+0x355>
+40001613:	166304        	beqz	a3, 4000165d
 40001616:	2bee      	addi.n	a14, a14, 2
 40001618:	320002        	l8ui	a3, a0, 2
 4000161b:	820001        	l8ui	a8, a0, 1
@@ -2647,31 +2753,32 @@
 40001654:	291f      	s32i.n	a2, a15, 4
 40001656:	8b00      	addi.n	a0, a0, 8
 40001658:	8bff      	addi.n	a15, a15, 8
-4000165a:	979eb8        	bne	a14, a9, 40001616 <sub_1308+0x30e>
+4000165a:	979eb8        	bne	a14, a9, 40001616
 4000165d:	e22115        	l32i	a14, a1, 84
-40001660:	0677ff        	j	40001440 <sub_1308+0x138>
+40001660:	0677ff        	j	40001440
 40001663:	00
 
 ; Format: "flash read err, %s"
 40001664:	2124ff        	l32r	a2, 400012f4	; ( 3fffd720 )
 40001667:	3124ff        	l32r	a3, 400012f8
 4000166a:	05e600        	call0	400024cc <ets_printf>
-4000166d:	22a001        	movi	a2, 1
+4000166d:	22a001        	movi	a2, 1		; return 1
 40001670:	c2210f        	l32i	a12, a1, 60
 40001673:	d22110        	l32i	a13, a1, 64
 40001676:	e22111        	l32i	a14, a1, 68
 40001679:	f22112        	l32i	a15, a1, 72
-4000167c:	02210e        	l32i	a0, a1, 56
-4000167f:	12c160        	addi	a1, a1, 96
+4000167c:	02210e        	l32i	a0, a1, 56	; restore return
+4000167f:	12c160        	addi	a1, a1, 96	; restore stack
 40001682:	0df0      	ret.n
 
 40001684:	1640eb        	beqz	a0, 4000153c
 40001687:	008241        	srli	a8, a0, 2
-4000168a:	e61802        	bgei	a8, 1, 40001690 <sub_1308+0x388>
-4000168d:	c6aaff        	j	4000153c <sub_1308+0x234>
+4000168a:	e61802        	bgei	a8, 1, 40001690
+4000168d:	c6aaff        	j	4000153c
+
 40001690:	0c0e      	movi.n	a14, 0
 40001692:	0c19      	movi.n	a9, 1
-40001694:	276028        	bbci	a0, 2, 400016c0 <sub_1308+0x3b8>
+40001694:	276028        	bbci	a0, 2, 400016c0
 40001697:	2861      	l32i.n	a2, a1, 24
 40001699:	ed09      	mov.n	a14, a9
 4000169b:	520201        	l8ui	a5, a2, 1
@@ -2689,7 +2796,7 @@
 400016bc:	2961      	s32i.n	a2, a1, 24
 400016be:	4bff      	addi.n	a15, a15, 4
 400016c0:	804141        	srli	a4, a8, 1
-400016c3:	1654e7        	beqz	a4, 4000153c <sub_1308+0x234>
+400016c3:	1654e7        	beqz	a4, 4000153c
 400016c6:	2861      	l32i.n	a2, a1, 24
 400016c8:	2bee      	addi.n	a14, a14, 2
 400016ca:	420202        	l8ui	a4, a2, 2
@@ -2717,12 +2824,13 @@
 40001708:	8b22      	addi.n	a2, a2, 8
 4000170a:	2961      	s32i.n	a2, a1, 24
 4000170c:	8bff      	addi.n	a15, a15, 8
-4000170e:	879eb4        	bne	a14, a8, 400016c6 <sub_1308+0x3be>
-40001711:	c689ff        	j	4000153c <sub_1308+0x234>
+4000170e:	879eb4        	bne	a14, a8, 400016c6
+40001711:	c689ff        	j	4000153c
+
 40001714:	e991      	s32i.n	a14, a1, 36
 40001716:	406074        	extui	a6, a4, 0, 8
 40001719:	69c1      	s32i.n	a6, a1, 48
-4000171b:	8665ff        	j	400014b5 <sub_1308+0x1ad>
+4000171b:	8665ff        	j	400014b5
 4000171e:	000000        	ill
 
 ; Format:  "ho %d tail %d room %d"
@@ -2739,7 +2847,7 @@
 4000173a:	103120        	or	a3, a1, a1
 4000173d:	42a010        	movi	a4, 16
 40001740:	853d03        	call0	40004b1c <SPIRead>
-40001743:	569207        	bnez	a2, 400017c0 <sub_1308+0x4b8>
+40001743:	569207        	bnez	a2, 400017c0
 40001746:	322113        	l32i	a3, a1, 76
 40001749:	0c84      	movi.n	a4, 8
 4000174b:	22c110        	addi	a2, a1, 16
@@ -2753,11 +2861,11 @@
 40001761:	457e0c        	call0	4000df48 <memcpy>
 40001764:	3841      	l32i.n	a3, a1, 16
 40001766:	e851      	l32i.n	a14, a1, 20
-40001768:	068eff        	j	400015a4 <sub_1308+0x29c>
+40001768:	068eff        	j	400015a4
 4000176b:	00
 
 4000176c:	e991      	s32i.n	a14, a1, 36
-4000176e:	c638ff        	j	40001455 <sub_1308+0x14d>
+4000176e:	c638ff        	j	40001455
 
 ; Format: "csum 0x%02x"
 40001771:	21e3fe		l32r	a2, 40001300	; ( 3fffd750 )
@@ -2765,18 +2873,18 @@
 40001777:	45d500        	call0	400024cc <ets_printf>
 4000177a:	62010f        	l8ui	a6, a1, 15
 4000177d:	c066c0        	sub	a6, a6, a12
-40001780:	1656e3        	beqz	a6, 400015b9 <sub_1308+0x2b1>
+40001780:	1656e3        	beqz	a6, 400015b9
 
 ; Format: "csum err....ho %"
 40001783:	21e0fe		l32r	a2, 40001304	; ( 3fffd760 )
 40001786:	45d400        	call0	400024cc <ets_printf>
-40001789:	22a001        	movi	a2, 1
+40001789:	22a001        	movi	a2, 1		; return 1
 4000178c:	c8f1      	l32i.n	a12, a1, 60
 4000178e:	d22110        	l32i	a13, a1, 64
 40001791:	e22111        	l32i	a14, a1, 68
 40001794:	f22112        	l32i	a15, a1, 72
-40001797:	08e1      	l32i.n	a0, a1, 56
-40001799:	12c160        	addi	a1, a1, 96
+40001797:	08e1      	l32i.n	a0, a1, 56	; restore return
+40001799:	12c160        	addi	a1, a1, 96	; restore stack
 4000179c:	0df0      	ret.n
 4000179e:	0000
 
@@ -2784,20 +2892,20 @@
 400017a0:	21d5fe        	l32r	a2, 400012f4	; ( 3fffd720 )
 400017a3:	32a1d0        	movi	a3, 0x1d0
 400017a6:	45d200        	call0	400024cc <ets_printf>
-400017a9:	22a001        	movi	a2, 1
+400017a9:	22a001        	movi	a2, 1		; return 0
 400017ac:	c2210f        	l32i	a12, a1, 60
 400017af:	d22110        	l32i	a13, a1, 64
 400017b2:	e22111        	l32i	a14, a1, 68
 400017b5:	f22112        	l32i	a15, a1, 72
-400017b8:	02210e        	l32i	a0, a1, 56
-400017bb:	12c160        	addi	a1, a1, 96
+400017b8:	02210e        	l32i	a0, a1, 56	; restore return
+400017bb:	12c160        	addi	a1, a1, 96	; restore stack
 400017be:	0df0      	ret.n
 
 ; Format: "flash read err, %s"
 400017c0:	21cdfe        	l32r	a2, 400012f4	; ( 3fffd720 )
 400017c3:	32a20d        	movi	a3, 0x20d
 400017c6:	45d000        	call0	400024cc <ets_printf>
-400017c9:	067bff        	j	400015b9 <sub_1308+0x2b1>
+400017c9:	067bff        	j	400015b9
 
 400017cc:	00000000
 
@@ -2806,7 +2914,7 @@
 400017d8:	8cd7ff3f	.long 0x3fffd78c
 400017dc:	ccd7ff3f	.long 0x3fffd7cc
 
-; Subroutine, no calls visible.
+; Subroutine, set as exception handler
 
 400017e0:	12c1f0        	addi	a1, a1, -16
 400017e3:	d921      	s32i.n	a13, a1, 8
@@ -2829,11 +2937,11 @@
 4000180d:	7920      	s32i.n	a7, a0, 8
 4000180f:	422481        	l32i	a4, a4, 0x204
 40001812:	4930      	s32i.n	a4, a0, 12
-40001814:	8c92      	beqz.n	a2, 40001821 <sub_1308+0x519>
+40001814:	8c92      	beqz.n	a2, 40001821
 40001816:	1bee      	addi.n	a14, a14, 1
 40001818:	30c320        	or	a12, a3, a3
 4000181b:	02c010        	addi	a0, a0, 16
-4000181e:	5790dc        	bne	a0, a5, 400017fe <sub_1308+0x4f6>
+4000181e:	5790dc        	bne	a0, a5, 400017fe
 40001821:	3d0c      	mov.n	a3, a12
 
 ; Format: "sp %p "
@@ -2841,7 +2949,7 @@
 40001826:	101120        	or	a1, a1, a1
 40001829:	05ca00        	call0	400024cc <ets_printf>
 4000182c:	0c0c      	movi.n	a12, 0
-4000182e:	a61e1a        	blti	a14, 1, 4000184c <sub_1308+0x544>
+4000182e:	a61e1a        	blti	a14, 1, 4000184c
 
 ; Format: "sf_dump[%d] a0: 0x%08x  a1: 0x%08x  a2: 0x%08x  a3: 0x%08x "
 40001831:	21e9ff		l32r	a2, 400017d8	; ( 3fffd78c )
@@ -2853,7 +2961,7 @@
 40001841:	85c800        	call0	400024cc <ets_printf>
 40001844:	d2cd10        	addi	a13, a13, 16
 40001847:	1bcc      	addi.n	a12, a12, 1
-40001849:	e79ce4        	bne	a12, a14, 40001831 <sub_1308+0x529>
+40001849:	e79ce4        	bne	a12, a14, 40001831
 
 ; Format: "epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x"
 4000184c:	21e4ff		l32r	a2, 400017dc	; ( 3fffd7cc )
@@ -5295,7 +5403,7 @@
 40002e56:	0df0      	ret.n
 
 40002e58:	242e0040	.long 0x40002e24
-40002e5c:	00feef3f	.long 0x3feffe00
+40002e5c:	00feef3f	.long 0x3feffe00	; Poochie
 40002e60:	3c2e0040	.long 0x40002e3c
 40002e64:	c0ddff3f	.long 0x3fffddc0
 
@@ -5309,14 +5417,15 @@
 40002e7a:	4900      	s32i.n	a4, a0, 0	; 0 --> 3fffddb0
 40002e7c:	8510fe        	call0	40000f88 <ets_isr_attach>
 
+; Enable TIMER_FRC2 interrupt
 40002e7f:	0c44      	movi.n	a4, 4		; a4 = 4
-40002e81:	31f6ff		l32r	a3, 40002e5c	; ( 3feffe00 )
+40002e81:	31f6ff		l32r	a3, 40002e5c	; ( 3feffe00 )	Poochie
 40002e84:	c02000        	memw
-40002e87:	222381        	l32i	a2, a3, 0x204	; read HW
+40002e87:	222381        	l32i	a2, a3, 0x204	; INTC_EDGE_EN
 40002e8a:	3df0      	nop.n
 40002e8c:	402220        	or	a2, a2, a4	; HW |= 4
 40002e8f:	c02000        	memw
-40002e92:	226381        	s32i	a2, a3, 0x204	; write HW
+40002e92:	226381        	s32i	a2, a3, 0x204	; INTC_EDGE_EN
 
 40002e95:	22a400        	movi	a2, 0x400	; a2 = 0x400
 40002e98:	c510fe        	call0	40000fa8 <ets_isr_unmask>
@@ -5340,6 +5449,7 @@
 40002ec1:	12c110        	addi	a1, a1, 16	; stack
 40002ec4:	0df0      	ret.n
 40002ec6:	0000
+
 40002ec8:	04c7ff3f	.long 0x3fffc704
 
 40002ecc <ets_delay_us>:
@@ -5645,13 +5755,16 @@
 4000318e:	42a000        	movi	a4, 0
 40003191:	0c82      	movi.n	a2, 8
 40003193:	45dffd        	call0	40000f88 <ets_isr_attach>
+
+; Enable Watchdog interrupt.
 40003196:	0c16      	movi.n	a6, 1
-40003198:	5131ff		l32r	a5, 40002e5c	; ( 3feffe00 )
+40003198:	5131ff		l32r	a5, 40002e5c	; ( 3feffe00 )	Poochie
 4000319b:	c02000        	memw
-4000319e:	422581        	l32i	a4, a5, 0x204
+4000319e:	422581        	l32i	a4, a5, 0x204	; INTC_EDGE_EN
 400031a1:	604420        	or	a4, a4, a6
 400031a4:	c02000        	memw
-400031a7:	426581        	s32i	a4, a5, 0x204
+400031a7:	426581        	s32i	a4, a5, 0x204	; INTC_EDGE_EN
+
 400031aa:	0801      	l32i.n	a0, a1, 0
 400031ac:	12c110        	addi	a1, a1, 16
 400031af:	0df0      	ret.n
@@ -5916,6 +6029,7 @@
 40003439:	b971      	s32i.n	a11, a1, 28
 4000343b:	0871      	l32i.n	a0, a1, 28
 4000343d:	46dfff        	j	400033be <UartDwnLdProc+0x56>
+
 40003440:	e02e20        	or	a2, a14, a14
 40003443:	32c11c        	addi	a3, a1, 28
 40003446:	104120        	or	a4, a1, a1
@@ -5923,12 +6037,16 @@
 4000344c:	d2a005        	movi	a13, 5
 4000344f:	d24c01        	s8i	a13, a12, 1
 40003452:	46f9ff        	j	4000343b <UartDwnLdProc+0xd3>
+
+; new flash parameters
+; referenced in a dispatch table
 40003455:	2d0e      	mov.n	a2, a14
 40003457:	32c11c        	addi	a3, a1, 28
 4000345a:	052300        	call0	4000368c <FlashDwnLdParamCfgMsgProc>
 4000345d:	0cb0      	movi.n	a0, 11
 4000345f:	024c01        	s8i	a0, a12, 1
-40003462:	46f5ff        	j	4000343b <UartDwnLdProc+0xd3>
+40003462:	46f5ff        	j	4000343b
+
 40003465:	000000        	ill
 40003468:	e02e20        	or	a2, a14, a14
 4000346b:	32c11c        	addi	a3, a1, 28
@@ -6144,10 +6262,10 @@
 40003661:	0901      	s32i.n	a0, a1, 0
 40003663:	6964      	s32i.n	a6, a4, 24
 40003665:	0c60      	movi.n	a0, 6
-40003667:	579206        	bne	a2, a5, 40003671 <FlashDwnLdStopReqMsgProc+0x19>
+40003667:	579206        	bne	a2, a5, 40003671
 4000366a:	8844      	l32i.n	a8, a4, 16
 4000366c:	7804      	l32i.n	a7, a4, 0
-4000366e:	87170a        	beq	a7, a8, 4000367c <FlashDwnLdStopReqMsgProc+0x24>
+4000366e:	87170a        	beq	a7, a8, 4000367c
 40003671:	0c12      	movi.n	a2, 1
 40003673:	0903      	s32i.n	a0, a3, 0
 40003675:	0801      	l32i.n	a0, a1, 0
@@ -6158,7 +6276,7 @@
 40003682:	022100        	l32i	a0, a1, 0
 40003685:	12c110        	addi	a1, a1, 16
 40003688:	800000        	ret
-4000368b:	007d02        	excw
+4000368b:	00
 
 4000368c <FlashDwnLdParamCfgMsgProc>:
 4000368c:	7d02      	mov.n	a7, a2
@@ -6166,13 +6284,14 @@
 40003691:	0901      	s32i.n	a0, a1, 0
 40003693:	021201        	l16ui	a0, a2, 2
 40003696:	1c82      	movi.n	a2, 24
-40003698:	27100c        	beq	a0, a2, 400036a8 <FlashDwnLdParamCfgMsgProc+0x1c>
+40003698:	27100c        	beq	a0, a2, 400036a8
 4000369b:	0c12      	movi.n	a2, 1
 4000369d:	0c54      	movi.n	a4, 5
 4000369f:	0801      	l32i.n	a0, a1, 0
 400036a1:	4903      	s32i.n	a4, a3, 0
 400036a3:	12c110        	addi	a1, a1, 16
 400036a6:	0df0      	ret.n
+
 400036a8:	222702        	l32i	a2, a7, 8
 400036ab:	322703        	l32i	a3, a7, 12
 400036ae:	422704        	l32i	a4, a7, 16
@@ -6184,19 +6303,19 @@
 400036bc:	0801      	l32i.n	a0, a1, 0
 400036be:	12c110        	addi	a1, a1, 16
 400036c1:	0df0      	ret.n
-400036c3:	005212        	excw
+400036c3:	00
 
 400036c4 <MemDwnLdStartMsgProc>:
 400036c4:	521201        	l16ui	a5, a2, 2
 400036c7:	0c57      	movi.n	a7, 5
-400036c9:	26b505        	beqi	a5, 16, 400036d2 <MemDwnLdStartMsgProc+0xe>
+400036c9:	26b505        	beqi	a5, 16, 400036d2
 400036cc:	7903      	s32i.n	a7, a3, 0
 400036ce:	0c12      	movi.n	a2, 1
 400036d0:	0df0      	ret.n
 400036d2:	8842      	l32i.n	a8, a2, 16
 400036d4:	6198ff		l32r	a6, 40003534	; ( 00001800 )
 400036d7:	a822      	l32i.n	a10, a2, 8
-400036d9:	8736ef        	bltu	a6, a8, 400036cc <MemDwnLdStartMsgProc+0x8>
+400036d9:	8736ef        	bltu	a6, a8, 400036cc
 400036dc:	a904      	s32i.n	a10, a4, 0
 400036de:	9832      	l32i.n	a9, a2, 12
 400036e0:	9914      	s32i.n	a9, a4, 4
@@ -7521,10 +7640,10 @@
 
 ; called from SPIRead only
 ;	with:
+;	  a2 = mystery control block in RAM
 ;	  a3 = offset in flash
 ;	  a4 = buffer address
 ;	  a5 = byte count
-;	  a2 = mystery control block in RAM
 
 400042ac <sub_42ac>:
 400042ac:	12c1f0        	addi	a1, a1, -16	; stack
@@ -7604,9 +7723,9 @@
 40004357:	202074        	extui	a2, a2, 0, 8
 4000435a:	2793d8        	bne	a3, a2, 40004336
 4000435d:	c61400        	j	400043b4
+40004360:	00
 
-40004360:	00a6cd88
-
+40004361:	a6cd88        	blti	a13, 32, 400042ed
 40004364:	508e20        	or	a8, a14, a5
 40004367:	c02000        	memw
 4000436a:	8910      	s32i.n	a8, a0, 4
@@ -7614,11 +7733,11 @@
 4000436f:	4900      	s32i.n	a4, a0, 0
 40004371:	c02000        	memw
 40004374:	7800      	l32i.n	a7, a0, 0
-40004376:	8c87      	beqz.n	a7, 40004382 <sub_42ac+0xd6>
+40004376:	8c87      	beqz.n	a7, 40004382
 40004378:	c02000        	memw
 4000437b:	9800      	l32i.n	a9, a0, 0
 4000437d:	3df0      	nop.n
-4000437f:	5659ff        	bnez	a9, 40004378 <sub_42ac+0xcc>
+4000437f:	5659ff        	bnez	a9, 40004378
 40004382:	0c02      	movi.n	a2, 0
 40004384:	0032a0        	addx4	a3, a2, a0
 40004387:	c02000        	memw
@@ -7634,10 +7753,10 @@
 400043a0:	322310        	l32i	a3, a3, 64
 400043a3:	3906      	s32i.n	a3, a6, 0
 400043a5:	202074        	extui	a2, a2, 0, 8
-400043a8:	6682d8        	bnei	a2, 8, 40004384 <sub_42ac+0xd8>
+400043a8:	6682d8        	bnei	a2, 8, 40004384
 400043ab:	e2ce20        	addi	a14, a14, 32
 400043ae:	d2cde0        	addi	a13, a13, -32
-400043b1:	e61dac        	bgei	a13, 1, 40004361 <sub_42ac+0xb5>
+400043b1:	e61dac        	bgei	a13, 1, 40004361
 
 400043b4:	0c02      	movi.n	a2, 0
 400043b6:	c811      	l32i.n	a12, a1, 4
@@ -7701,60 +7820,68 @@
 40004438:	00000040	.long 0x40000000
 4000443c:	12c1
 
+; Called with one argument, a pointer to the SPI-param block
+
 4000443c <SPI_write_enable>:
-4000443c:	12c1f0        	addi	a1, a1, -16
+4000443c:	12c1f0        	addi	a1, a1, -16	; stack space
 4000443f:	d931      	s32i.n	a13, a1, 12
 40004441:	c921      	s32i.n	a12, a1, 8
-40004443:	0911      	s32i.n	a0, a1, 4
-40004445:	cd02      	mov.n	a12, a2
-40004447:	0c00      	movi.n	a0, 0
-40004449:	0901      	s32i.n	a0, a1, 0
+40004443:	0911      	s32i.n	a0, a1, 4	; save return
+40004445:	cd02      	mov.n	a12, a2		; SPI-param
+40004447:	0c00      	movi.n	a0, 0		; a0 = 0
+40004449:	0901      	s32i.n	a0, a1, 0	; write to stack
 4000444b:	050400        	call0	4000448c <Wait_SPI_Idle>
+
 4000444e:	31faff		l32r	a3, 40004438	; ( 40000000 )
 40004451:	01dcf2		l32r	a0, 40000fc4	; ( 60000200 )
 40004454:	c02000        	memw
-40004457:	3900      	s32i.n	a3, a0, 0
+40004457:	3900      	s32i.n	a3, a0, 0	; write to IO
 40004459:	c02000        	memw
-4000445c:	2800      	l32i.n	a2, a0, 0
-4000445e:	168200        	beqz	a2, 4000446a <SPI_write_enable+0x2e>
+4000445c:	2800      	l32i.n	a2, a0, 0	; read back
+4000445e:	168200        	beqz	a2, 4000446a
 40004461:	c02000        	memw
-40004464:	422000        	l32i	a4, a0, 0
-40004467:	5664ff        	bnez	a4, 40004461 <SPI_write_enable+0x25>
+40004464:	422000        	l32i	a4, a0, 0	; read back again
+40004467:	5664ff        	bnez	a4, 40004461	; spin till zero
+
 4000446a:	5801      	l32i.n	a5, a1, 0
 4000446c:	0c2d      	movi.n	a13, 2
-4000446e:	17e50b        	bbsi	a5, 1, 4000447d <SPI_write_enable+0x41>
+4000446e:	17e50b        	bbsi	a5, 1, 4000447d
 40004471:	2d0c      	mov.n	a2, a12
 40004473:	3d01      	mov.n	a3, a1
 40004475:	05f5ff        	call0	400043c8 <SPI_read_status>
 40004478:	6801      	l32i.n	a6, a1, 0
-4000447a:	d706f3        	bnone	a6, a13, 40004471 <SPI_write_enable+0x35>
+4000447a:	d706f3        	bnone	a6, a13, 40004471
 4000447d:	0c02      	movi.n	a2, 0
 4000447f:	c821      	l32i.n	a12, a1, 8
 40004481:	d831      	l32i.n	a13, a1, 12
 40004483:	0811      	l32i.n	a0, a1, 4
 40004485:	12c110        	addi	a1, a1, 16
 40004488:	0df0      	ret.n
-4000448a:	000012        	excw
+4000448a:	0000
+
+; Bit 9 in the SPI_READY register indicates SPI ready/idle status
 
 4000448c <Wait_SPI_Idle>:
 4000448c:	12c1f0        	addi	a1, a1, -16
-4000448f:	0911      	s32i.n	a0, a1, 4
-40004491:	0172fa		l32r	a0, 40002e5c	; ( 3feffe00 )
+4000448f:	0911      	s32i.n	a0, a1, 4	; save return
+40004491:	0172fa		l32r	a0, 40002e5c	; ( 3feffe00 )	Poochie
 40004494:	c02000        	memw
-40004497:	322083        	l32i	a3, a0, 0x20c
-4000449a:	976308        	bbci	a3, 9, 400044a6 <Wait_SPI_Idle+0x1a>
+
+40004497:	322083        	l32i	a3, a0, 0x20c	; SPI_READY
+4000449a:	976308        	bbci	a3, 9, 400044a6	; clear ?
 4000449d:	c02000        	memw
-400044a0:	422083        	l32i	a4, a0, 0x20c
-400044a3:	97e4f6        	bbsi	a4, 9, 4000449d <Wait_SPI_Idle+0x11>
+400044a0:	422083        	l32i	a4, a0, 0x20c	; SPI_READY
+400044a3:	97e4f6        	bbsi	a4, 9, 4000449d	; spin till clear
+
 400044a6:	3d01      	mov.n	a3, a1
 400044a8:	c5f1ff        	call0	400043c8 <SPI_read_status>
-400044ab:	0c06      	movi.n	a6, 0
-400044ad:	5811      	l32i.n	a5, a1, 4
-400044af:	0c10      	movi.n	a0, 1
-400044b1:	12c110        	addi	a1, a1, 16
+400044ab:	0c06      	movi.n	a6, 0		; a6 = 0
+400044ad:	5811      	l32i.n	a5, a1, 4	; fetch return
+400044af:	0c10      	movi.n	a0, 1		; a0 = 1
+400044b1:	12c110        	addi	a1, a1, 16	; restore stack
 400044b4:	200683        	moveqz	a0, a6, a2
-400044b7:	2d00      	mov.n	a2, a0
-400044b9:	0d05      	mov.n	a0, a5
+400044b7:	2d00      	mov.n	a2, a0		; a2 = a0 (return value)
+400044b9:	0d05      	mov.n	a0, a5		; restore return
 400044bb:	0df0      	ret.n
 400044bd:	000000        	ill
 
@@ -7926,35 +8053,45 @@
 4000465a:	12c110        	addi	a1, a1, 16
 4000465d:	0df0      	ret.n
 4000465f:	00
+
 40004660:	fffffdff	.long 0xfffdffff
 40004664:	00000200	.long 0x00020000
 40004668:	fffffffd	.long 0xfdffffff
 4000466c:	fffff8fb	.long 0xfbf8ffff
-40004670:	ff          	.byte 0xff
-40004671:	ff          	.byte 0xff
-40004672:	ff          	.byte 0xff
-40004673:	fe          	.byte 0xfe
-40004674:	ff          	.byte 0xff
-40004675:	ff          	.byte 0xff
-40004676:	ff          	.byte 0xff
-40004677:	fc82      	bnez.n	a2, 400046b3 <Cache_Read_Enable+0x3b>
+
+40004670:	fffffff3
+40004674:	fffffffc
+
+; Cache Read Enable - enable SPI mapping via cache
+
+; What is meant by cache here?  Apparently the cache mapped over SPI flash ?
+; This is controlled by bits in the SPI_READY register.
+; 
+; 0x0001 - cache flush start
+; 0x0002 - cache is empty
+; 0x0100 - (bit 8) undocumented, but gets lots of attention here.
+; 0x0200 - (bit 9) SPI is ready/idle
 
 40004678 <Cache_Read_Enable>:
-40004678:	82a100        	movi	a8, 0x100
-4000467b:	71f8f9		l32r	a7, 40002e5c	; ( 3feffe00 )
+40004678:	82a100        	movi	a8, 0x100	; used way down below
+4000467b:	71f8f9		l32r	a7, 40002e5c	; ( 3feffe00 )	Poochie
 4000467e:	c02000        	memw
-40004681:	522783        	l32i	a5, a7, 0x20c
-40004684:	62aeff        	movi	a6, 0xfffffeff
-40004687:	876519        	bbci	a5, 8, 400046a4 <Cache_Read_Enable+0x2c>
+
+; spin here until bit 8 in SPI_READY is clear
+; (we loop while clearing the bit)
+40004681:	522783        	l32i	a5, a7, 0x20c	; SPI_READY
+40004684:	62aeff        	movi	a6, 0xfffffeff	; ~0x100
+40004687:	876519        	bbci	a5, 8, 400046a4
 4000468a:	c02000        	memw
-4000468d:	a22783        	l32i	a10, a7, 0x20c
+4000468d:	a22783        	l32i	a10, a7, 0x20c	; SPI_READY
 40004690:	60aa10        	and	a10, a10, a6
 40004693:	c02000        	memw
-40004696:	a26783        	s32i	a10, a7, 0x20c
+40004696:	a26783        	s32i	a10, a7, 0x20c	; SPI_READY
 40004699:	c02000        	memw
-4000469c:	922783        	l32i	a9, a7, 0x20c
+4000469c:	922783        	l32i	a9, a7, 0x20c	; SPI_READY
 4000469f:	3df0      	nop.n
-400046a1:	87e9e5        	bbsi	a9, 8, 4000468a <Cache_Read_Enable+0x12>
+400046a1:	87e9e5        	bbsi	a9, 8, 4000468a
+
 400046a4:	51efff		l32r	a5, 40004660	; ( fffdffff )
 400046a7:	7ceb      	movi.n	a11, -2
 400046a9:	a2a001        	movi	a10, 1
@@ -7965,26 +8102,32 @@
 400046b7:	c02000        	memw
 400046ba:	626902        	s32i	a6, a9, 8
 400046bd:	c02000        	memw
-400046c0:	522783        	l32i	a5, a7, 0x20c
-400046c3:	b05510        	and	a5, a5, a11
+
+400046c0:	522783        	l32i	a5, a7, 0x20c	; SPI_READY
+400046c3:	b05510        	and	a5, a5, a11	; -2 (clear bit 0)
 400046c6:	c02000        	memw
-400046c9:	526783        	s32i	a5, a7, 0x20c
+400046c9:	526783        	s32i	a5, a7, 0x20c	; SPI_READY
 400046cc:	c02000        	memw
-400046cf:	622783        	l32i	a6, a7, 0x20c
-400046d2:	a06620        	or	a6, a6, a10
+400046cf:	622783        	l32i	a6, a7, 0x20c	; SPI_READY
+400046d2:	a06620        	or	a6, a6, a10	; 1 (set bit 0)
 400046d5:	c02000        	memw
-400046d8:	626783        	s32i	a6, a7, 0x20c
+400046d8:	626783        	s32i	a6, a7, 0x20c	; SPI_READY
 400046db:	c02000        	memw
-400046de:	522783        	l32i	a5, a7, 0x20c
-400046e1:	17e508        	bbsi	a5, 1, 400046ed <Cache_Read_Enable+0x75>
+
+; spin until cache empty bit is set.
+
+400046de:	522783        	l32i	a5, a7, 0x20c	; SPI_READY
+400046e1:	17e508        	bbsi	a5, 1, 400046ed
 400046e4:	c02000        	memw
-400046e7:	622783        	l32i	a6, a7, 0x20c
-400046ea:	1766f6        	bbci	a6, 1, 400046e4 <Cache_Read_Enable+0x6c>
+400046e7:	622783        	l32i	a6, a7, 0x20c	; SPI_READY
+400046ea:	1766f6        	bbci	a6, 1, 400046e4
+
 400046ed:	c02000        	memw
-400046f0:	622783        	l32i	a6, a7, 0x20c
-400046f3:	b06610        	and	a6, a6, a11
+400046f0:	622783        	l32i	a6, a7, 0x20c	; SPI_READY
+400046f3:	b06610        	and	a6, a6, a11	; clear bit 0
 400046f6:	c02000        	memw
-400046f9:	626783        	s32i	a6, a7, 0x20c
+400046f9:	626783        	s32i	a6, a7, 0x20c	; SPI_READY
+
 400046fc:	51daff		l32r	a5, 40004664	; ( 00020000 )
 400046ff:	c02000        	memw
 40004702:	a829      	l32i.n	a10, a9, 8
@@ -7992,149 +8135,200 @@
 40004707:	c02000        	memw
 4000470a:	a929      	s32i.n	a10, a9, 8
 4000470c:	c02000        	memw
-4000470f:	622783        	l32i	a6, a7, 0x20c
-40004712:	16220c        	beqz	a2, 400047d8 <Cache_Read_Enable+0x160>
+
+4000470f:	622783        	l32i	a6, a7, 0x20c	; SPI_READY
+40004712:	16220c        	beqz	a2, 400047d8
 40004715:	92c2ff        	addi	a9, a2, -1
 40004718:	164909        	beqz	a9, 400047b0 <Cache_Read_Enable+0x138>
 4000471b:	51d3ff		l32r	a5, 40004668	; ( fdffffff )
 4000471e:	c02000        	memw
-40004721:	222783        	l32i	a2, a7, 0x20c
+40004721:	222783        	l32i	a2, a7, 0x20c	; SPI_READY
 40004724:	502210        	and	a2, a2, a5
 40004727:	c02000        	memw
-4000472a:	226783        	s32i	a2, a7, 0x20c
+4000472a:	226783        	s32i	a2, a7, 0x20c	; SPI_READY
 4000472d:	b163fe		l32r	a11, 400040bc	; ( 01000000 )
 40004730:	c02000        	memw
-40004733:	a22783        	l32i	a10, a7, 0x20c
+40004733:	a22783        	l32i	a10, a7, 0x20c	; SPI_READY
 40004736:	b0aa20        	or	a10, a10, a11
 40004739:	c02000        	memw
-4000473c:	a26783        	s32i	a10, a7, 0x20c
+4000473c:	a26783        	s32i	a10, a7, 0x20c	; SPI_READY
 4000473f:	51cbff		l32r	a5, 4000466c	; ( fbf8ffff )
 40004742:	c02000        	memw
-40004745:	222783        	l32i	a2, a7, 0x20c
+40004745:	222783        	l32i	a2, a7, 0x20c	; SPI_READY
 40004748:	502210        	and	a2, a2, a5
 4000474b:	c02000        	memw
-4000474e:	226783        	s32i	a2, a7, 0x20c
+4000474e:	226783        	s32i	a2, a7, 0x20c	; SPI_READY
 40004751:	60b401        	slli	a11, a4, 26
 40004754:	00a311        	slli	a10, a3, 16
 40004757:	b0aa20        	or	a10, a10, a11
 4000475a:	c02000        	memw
-4000475d:	922783        	l32i	a9, a7, 0x20c
+4000475d:	922783        	l32i	a9, a7, 0x20c	; SPI_READY
 40004760:	a09920        	or	a9, a9, a10
 40004763:	c02000        	memw
-40004766:	926783        	s32i	a9, a7, 0x20c
-40004769:	acd4      	beqz.n	a4, 4000479a <Cache_Read_Enable+0x122>
-4000476b:	a2a018        	movi	a10, 24
+40004766:	926783        	s32i	a9, a7, 0x20c	; SPI_READY
+40004769:	acd4      	beqz.n	a4, 4000479a
+
+; set two bits in the SPI__bank register
+; 0x08 When clear IRAM is mapped at 40108000h..4010BFFFh.
+;	When set that region reads as 0.
+; 0x10 When clear IRAM is mapped at 4010C000h..4010FFFFh.
+;	When set that region reads as 0.
+; When they are both set ?? who can say.
+
+4000476b:	a2a018        	movi	a10, 24		; 0x18
 4000476e:	c02000        	memw
-40004771:	922789        	l32i	a9, a7, 0x224
+40004771:	922789        	l32i	a9, a7, 0x224	; SPI__bank
 40004774:	a09920        	or	a9, a9, a10
 40004777:	c02000        	memw
-4000477a:	926789        	s32i	a9, a7, 0x224
-4000477d:	87e617        	bbsi	a6, 8, 40004798 <Cache_Read_Enable+0x120>
+4000477a:	926789        	s32i	a9, a7, 0x224	; SPI__bank
+
+; Check bit 8 (0x100) if it is set, we are happy.
+; If not, spin trying to set it until we can read it back set.
+; then return.
+
+4000477d:	87e617        	bbsi	a6, 8, 40004798
 40004780:	c02000        	memw
-40004783:	222783        	l32i	a2, a7, 0x20c
-40004786:	802220        	or	a2, a2, a8
+40004783:	222783        	l32i	a2, a7, 0x20c	; SPI_READY
+40004786:	802220        	or	a2, a2, a8	; 0x100 - undocumented
 40004789:	c02000        	memw
-4000478c:	226783        	s32i	a2, a7, 0x20c
+4000478c:	226783        	s32i	a2, a7, 0x20c	; SPI_READY
 4000478f:	c02000        	memw
-40004792:	b22783        	l32i	a11, a7, 0x20c
-40004795:	870be7        	bnone	a11, a8, 40004780 <Cache_Read_Enable+0x108>
+40004792:	b22783        	l32i	a11, a7, 0x20c	; SPI_READY
+40004795:	870be7        	bnone	a11, a8, 40004780
 40004798:	0df0      	ret.n
-4000479a:	0c84      	movi.n	a4, 8
+
+; set one bit in the SPI__bank register
+4000479a:	0c84      	movi.n	a4, 8		; 0x08
 4000479c:	c02000        	memw
-4000479f:	322789        	l32i	a3, a7, 0x224
+4000479f:	322789        	l32i	a3, a7, 0x224	; SPI__bank
 400047a2:	403320        	or	a3, a3, a4
 400047a5:	c02000        	memw
-400047a8:	326789        	s32i	a3, a7, 0x224
-400047ab:	86f3ff        	j	4000477d <Cache_Read_Enable+0x105>
+400047a8:	326789        	s32i	a3, a7, 0x224	; SPI__bank
+400047ab:	86f3ff        	j	4000477d
+
 400047ae:	0000b1        	sra	a0, a0
 400047b1:	b0ffc0        	sub	a15, a15, a11
 400047b4:	2000a2        	excw
-400047b7:	2783b0        	bany	a3, a2, 4000476b <Cache_Read_Enable+0xf3>
+400047b7:	2783b0        	bany	a3, a2, 4000476b
 400047ba:	aa10      	add.n	a1, a0, a10
 400047bc:	c02000        	memw
-400047bf:	a26783        	s32i	a10, a7, 0x20c
+400047bf:	a26783        	s32i	a10, a7, 0x20c	; SPI_READY
 400047c2:	916bfe		l32r	a9, 40004170	; ( 02000000 )
 400047c5:	c02000        	memw
-400047c8:	522783        	l32i	a5, a7, 0x20c
+400047c8:	522783        	l32i	a5, a7, 0x20c	; SPI_READY
 400047cb:	905520        	or	a5, a5, a9
 400047ce:	c02000        	memw
-400047d1:	526783        	s32i	a5, a7, 0x20c
-400047d4:	c6d9ff        	j	4000473f <Cache_Read_Enable+0xc7>
-400047d7:	0051a7        	excw
-400047da:	ff          	.byte 0xff
+400047d1:	526783        	s32i	a5, a7, 0x20c	; SPI_READY
+400047d4:	c6d9ff        	j	4000473f
+400047d7:	00
+
+400047d8:	51a7ff        	l32r	a5, 40004674 <spi_flash_attach+0x30>
 400047db:	c02000        	memw
-400047de:	222783        	l32i	a2, a7, 0x20c
+400047de:	222783        	l32i	a2, a7, 0x20c	; SPI_READY
 400047e1:	502210        	and	a2, a2, a5
 400047e4:	c02000        	memw
-400047e7:	226783        	s32i	a2, a7, 0x20c
+400047e7:	226783        	s32i	a2, a7, 0x20c	; SPI_READY
 400047ea:	46d4ff        	j	4000473f <Cache_Read_Enable+0xc7>
 400047ed:	000000        	ill
 
+; Cache Read Disable - disable SPI mapping via cache
+
 400047f0 <Cache_Read_Disable>:
-400047f0:	319bf9		l32r	a3, 40002e5c	; ( 3feffe00 )
+400047f0:	319bf9		l32r	a3, 40002e5c	; ( 3feffe00 )	Poochie
 400047f3:	c02000        	memw
-400047f6:	222383        	l32i	a2, a3, 0x20c
+
+; spin until bit 0x100 in SPI_READY is clear
+; (clearing it while spinning).
+400047f6:	222383        	l32i	a2, a3, 0x20c	; SPI_READY
 400047f9:	42aeff        	movi	a4, 0xfffffeff
-400047fc:	876217        	bbci	a2, 8, 40004817 <Cache_Read_Disable+0x27>
+400047fc:	876217        	bbci	a2, 8, 40004817
 400047ff:	c02000        	memw
-40004802:	622383        	l32i	a6, a3, 0x20c
+40004802:	622383        	l32i	a6, a3, 0x20c	; SPI_READY
 40004805:	406610        	and	a6, a6, a4
 40004808:	c02000        	memw
-4000480b:	626383        	s32i	a6, a3, 0x20c
+4000480b:	626383        	s32i	a6, a3, 0x20c	; SPI_READY
 4000480e:	c02000        	memw
-40004811:	522383        	l32i	a5, a3, 0x20c
-40004814:	87e5e7        	bbsi	a5, 8, 400047ff <Cache_Read_Disable+0xf>
+40004811:	522383        	l32i	a5, a3, 0x20c	; SPI_READY
+40004814:	87e5e7        	bbsi	a5, 8, 400047ff
+
+; clear bit 0x20000 (bit 17) in 0x60000200
+
 40004817:	5192ff		l32r	a5, 40004660	; ( fffdffff )
 4000481a:	7ce7      	movi.n	a7, -2
 4000481c:	0c1a      	movi.n	a10, 1
 4000481e:	41e9f1		l32r	a4, 40000fc4	; ( 60000200 )
 40004821:	c02000        	memw
-40004824:	2824      	l32i.n	a2, a4, 8
-40004826:	502210        	and	a2, a2, a5
+40004824:	2824      	l32i.n	a2, a4, 8	; 60000208
+40004826:	502210        	and	a2, a2, a5	; clear bit 17
 40004829:	c02000        	memw
-4000482c:	2924      	s32i.n	a2, a4, 8
+4000482c:	2924      	s32i.n	a2, a4, 8	; 60000208
 4000482e:	c02000        	memw
-40004831:	b22383        	l32i	a11, a3, 0x20c
-40004834:	70bb10        	and	a11, a11, a7
+
+; clear then set bit 0 in SPI_READY
+
+40004831:	b22383        	l32i	a11, a3, 0x20c	; SPI_READY
+40004834:	70bb10        	and	a11, a11, a7	; -2
 40004837:	c02000        	memw
-4000483a:	b26383        	s32i	a11, a3, 0x20c
+4000483a:	b26383        	s32i	a11, a3, 0x20c	; SPI_READY
 4000483d:	c02000        	memw
-40004840:	922383        	l32i	a9, a3, 0x20c
+40004840:	922383        	l32i	a9, a3, 0x20c	; SPI_READY
 40004843:	a09920        	or	a9, a9, a10
 40004846:	c02000        	memw
-40004849:	926383        	s32i	a9, a3, 0x20c
+40004849:	926383        	s32i	a9, a3, 0x20c	; SPI_READY
 4000484c:	c02000        	memw
-4000484f:	822383        	l32i	a8, a3, 0x20c
-40004852:	17e80a        	bbsi	a8, 1, 40004860 <Cache_Read_Disable+0x70>
+
+; spin until bit 1 in SPI_READY is set
+4000484f:	822383        	l32i	a8, a3, 0x20c	; SPI_READY
+40004852:	17e80a        	bbsi	a8, 1, 40004860
 40004855:	c02000        	memw
-40004858:	622383        	l32i	a6, a3, 0x20c
+40004858:	622383        	l32i	a6, a3, 0x20c	; SPI_READY
 4000485b:	3df0      	nop.n
-4000485d:	1766f4        	bbci	a6, 1, 40004855 <Cache_Read_Disable+0x65>
+4000485d:	1766f4        	bbci	a6, 1, 40004855
 40004860:	c02000        	memw
-40004863:	822383        	l32i	a8, a3, 0x20c
+
+; clear bit 0 in SPI_READY, then return
+40004863:	822383        	l32i	a8, a3, 0x20c	; SPI_READY
 40004866:	708810        	and	a8, a8, a7
 40004869:	c02000        	memw
-4000486c:	826383        	s32i	a8, a3, 0x20c
+4000486c:	826383        	s32i	a8, a3, 0x20c	; SPI_READY
 4000486f:	0df0      	ret.n
 40004871:	000000        	ill
+
+: ------------------------------------------------------------
+; The following is a pointer to a pointer to a block of Flash
+; Config parameters.  The initial setup looks like this.
+; The block itself holds 6 values.
+; These initial parameters hold unless they are overridden by
+; a call to SPIParamCfg() in response to a UART command.
+; This is the SPI-param block
+
 40004874:	14c7ff3f	.long 0x3fffc714
+
+;  3fffc714:	3fffc718	; pointer
+;  3fffc718:	001640ef	; + 0
+;  3fffc71c:	00400000	; + 4
+;  3fffc720:	00010000	; + 8
+;  3fffc724:	00001000	; + 12
+;  3fffc728:	00000100	; + 16
+;  3fffc72c:	0000ffff	; + 20
 
 40004878 <SPIUnlock>:
 40004878:	21ffff		l32r	a2, 40004874	; ( 3fffc714 )
 4000487b:	12c1f0        	addi	a1, a1, -16
 4000487e:	0901      	s32i.n	a0, a1, 0
-40004880:	222200        	l32i	a2, a2, 0
+40004880:	222200        	l32i	a2, a2, 0	; deref
 40004883:	85bbff        	call0	4000443c <SPI_write_enable>
-40004886:	8c72      	beqz.n	a2, 40004891 <SPIUnlock+0x19>
+40004886:	8c72      	beqz.n	a2, 40004891
 40004888:	0c12      	movi.n	a2, 1
 4000488a:	0801      	l32i.n	a0, a1, 0
 4000488c:	12c110        	addi	a1, a1, 16
 4000488f:	0df0      	ret.n
+
 40004891:	21f8ff		l32r	a2, 40004874	; ( 3fffc714 )
 40004894:	0c03      	movi.n	a3, 0
-40004896:	222200        	l32i	a2, a2, 0
+40004896:	222200        	l32i	a2, a2, 0	; deref
 40004899:	45b6ff        	call0	40004400 <SPI_write_status>
-4000489c:	5682fe        	bnez	a2, 40004888 <SPIUnlock+0x10>
+4000489c:	5682fe        	bnez	a2, 40004888
 4000489f:	0c02      	movi.n	a2, 0
 400048a1:	0801      	l32i.n	a0, a1, 0
 400048a3:	12c110        	addi	a1, a1, 16
@@ -8144,7 +8338,7 @@
 400048a8:	21f3ff		l32r	a2, 40004874	; ( 3fffc714 )
 400048ab:	12c1f0        	addi	a1, a1, -16
 400048ae:	0901      	s32i.n	a0, a1, 0
-400048b0:	222200        	l32i	a2, a2, 0
+400048b0:	222200        	l32i	a2, a2, 0	; deref
 400048b3:	85b8ff        	call0	4000443c <SPI_write_enable>
 400048b6:	8c72      	beqz.n	a2, 400048c1 <SPILock+0x19>
 400048b8:	0c12      	movi.n	a2, 1
@@ -8160,12 +8354,12 @@
 400048d1:	0801      	l32i.n	a0, a1, 0
 400048d3:	12c110        	addi	a1, a1, 16
 400048d6:	0df0      	ret.n
+
 400048d8:	ff9f6ffe	.long 0xfe6f9fff
 400048dc:	00200001	.long 0x01002000
 400048e0:	00201000	.long 0x00102000
 400048e4:	00208000	.long 0x00802000
 400048e8:	00600000	.long 0x00006000
-400048ec:	12c1
 
 400048ec <SPIReadModeCnfig>:
 400048ec:	12c1f0        	addi	a1, a1, -16
@@ -8178,10 +8372,10 @@
 400048ff:	403310        	and	a3, a3, a4
 40004902:	c02000        	memw
 40004905:	3920      	s32i.n	a3, a0, 8
-40004907:	bc92      	beqz.n	a2, 40004944 <SPIReadModeCnfig+0x58>
-40004909:	26125c        	beqi	a2, 1, 40004969 <SPIReadModeCnfig+0x7d>
-4000490c:	262261        	beqi	a2, 2, 40004971 <SPIReadModeCnfig+0x85>
-4000490f:	263266        	beqi	a2, 3, 40004979 <SPIReadModeCnfig+0x8d>
+40004907:	bc92      	beqz.n	a2, 40004944
+40004909:	26125c        	beqi	a2, 1, 40004969
+4000490c:	262261        	beqi	a2, 2, 40004971
+4000490f:	263266        	beqi	a2, 3, 40004979
 40004912:	82c2fc        	addi	a8, a2, -4
 40004915:	7123f2		l32r	a7, 400011a4	; ( 00002000 )
 40004918:	0c06      	movi.n	a6, 0
@@ -8201,8 +8395,9 @@
 4000493c:	0811      	l32i.n	a0, a1, 4
 4000493e:	12c110        	addi	a1, a1, 16
 40004941:	0df0      	ret.n
-40004943:	0001e6        	excw
-40004946:	ff          	.byte 0xff
+40004943:	00
+
+40004944:	01e6ff        	l32r	a0, 400048dc
 40004947:	0901      	s32i.n	a0, a1, 0
 40004949:	2805      	l32i.n	a2, a5, 0
 4000494b:	45b7ff        	call0	400044c0 <sub_44c0>
@@ -8217,24 +8412,27 @@
 40004962:	0c02      	movi.n	a2, 0
 40004964:	12c110        	addi	a1, a1, 16
 40004967:	0df0      	ret.n
+
 40004969:	61ddff		l32r	a6, 400048e0	; ( 00102000 )
 4000496c:	6901      	s32i.n	a6, a1, 0
-4000496e:	46ebff        	j	4000491f <SPIReadModeCnfig+0x33>
+4000496e:	46ebff        	j	4000491f
+
 40004971:	71dcff		l32r	a7, 400048e4	; ( 00802000 )
 40004974:	7901      	s32i.n	a7, a1, 0
-40004976:	46e9ff        	j	4000491f <SPIReadModeCnfig+0x33>
+40004976:	46e9ff        	j	4000491f
+
 40004979:	81dbff		l32r	a8, 400048e8	; ( 00006000 )
 4000497c:	8901      	s32i.n	a8, a1, 0
-4000497e:	46e7ff        	j	4000491f <SPIReadModeCnfig+0x33>
+4000497e:	46e7ff        	j	4000491f
 40004981:	000000        	ill
 
 40004984 <SPIEraseChip>:
 40004984:	21bcff		l32r	a2, 40004874	; ( 3fffc714 )
 40004987:	12c1f0        	addi	a1, a1, -16
 4000498a:	0901      	s32i.n	a0, a1, 0
-4000498c:	222200        	l32i	a2, a2, 0
+4000498c:	222200        	l32i	a2, a2, 0	; deref
 4000498f:	c5aaff        	call0	4000443c <SPI_write_enable>
-40004992:	8c72      	beqz.n	a2, 4000499d <SPIEraseChip+0x19>
+40004992:	8c72      	beqz.n	a2, 4000499d
 40004994:	0c12      	movi.n	a2, 1
 40004996:	0801      	l32i.n	a0, a1, 0
 40004998:	12c110        	addi	a1, a1, 16
@@ -8243,7 +8441,7 @@
 400049a0:	f02000        	nop
 400049a3:	2802      	l32i.n	a2, a2, 0
 400049a5:	856dff        	call0	40004080 <sub_4080>
-400049a8:	5682fe        	bnez	a2, 40004994 <SPIEraseChip+0x10>
+400049a8:	5682fe        	bnez	a2, 40004994
 400049ab:	0c02      	movi.n	a2, 0
 400049ad:	0801      	l32i.n	a0, a1, 0
 400049af:	12c110        	addi	a1, a1, 16
@@ -8529,14 +8727,14 @@
 
 40004c2c <SPIParamCfg>:
 40004c2c:	8112ff		l32r	a8, 40004874	; ( 3fffc714 )
-40004c2f:	8808      	l32i.n	a8, a8, 0
+40004c2f:	8808      	l32i.n	a8, a8, 0	; deref
 40004c31:	3918      	s32i.n	a3, a8, 4
 40004c33:	4928      	s32i.n	a4, a8, 8
 40004c35:	5938      	s32i.n	a5, a8, 12
 40004c37:	6948      	s32i.n	a6, a8, 16
 40004c39:	2908      	s32i.n	a2, a8, 0
 40004c3b:	7958      	s32i.n	a7, a8, 20
-40004c3d:	0c02      	movi.n	a2, 0
+40004c3d:	0c02      	movi.n	a2, 0		; always return 0
 40004c3f:	0df0      	ret.n
 40004c41:	000000        	ill
 
@@ -9564,7 +9762,7 @@
 400055d3:	82c20c        	addi	a8, a2, 12
 400055d6:	702720        	or	a2, a7, a7
 400055d9:	826100        	s32i	a8, a1, 0
-400055dc:	c59dfb        	call0	40000fbc <ets_set_user_start>
+400055dc:	c59dfb        	call0	40000fbc <ets_set_user_start>	XXX ***
 400055df:	01d4fe		l32r	a0, 40005130	; ( 3fffdff0 )
 400055e2:	8840      	l32i.n	a8, a0, 16
 400055e4:	076828        	bbci	a8, 0, 40005610 <sip_install_rx_data_cb+0x1b4>
@@ -21490,6 +21688,8 @@
 4000ce5b:	0df0      	ret.n
 4000ce5d:	000000        	ill
 
+; gcc long division
+
 4000ce60 <__divdi3>:
 4000ce60:	8d04      	mov.n	a8, a4
 4000ce62:	7d05      	mov.n	a7, a5
@@ -21539,6 +21739,7 @@
 4000cecf:	c2212a        	l32i	a12, a1, 168
 4000ced2:	4a11      	add.n	a1, a1, a4
 4000ced4:	0df0      	ret.n
+
 4000ced6:	000082        	mull	a0, a0, a0
 4000ced9:	6126a0		l32r	a6, 3fff4f74
 4000cedc:	f740a2        	ball	a0, a15, 4000ce82 <__divdi3+0x22>
@@ -21651,6 +21852,7 @@
 4000d010:	c2211b        	l32i	a12, a1, 108
 4000d013:	0bcc      	addi.n	a12, a12, -1
 4000d015:	46a6ff        	j	4000ceb2 <__divdi3+0x52>
+
 4000d018:	7cfd      	movi.n	a13, -1
 4000d01a:	d0c330        	xor	a12, a3, a13
 4000d01d:	1b0c      	addi.n	a0, a12, 1
@@ -22839,40 +23041,50 @@
 4000dc88:	307230        	xor	a7, a2, a3
 4000dc8b:	206160        	abs	a6, a2
 4000dc8e:	303160        	abs	a3, a3
-4000dc91:	b62337        	bltui	a3, 2, 4000dccc <__divsi3+0x44>
+4000dc91:	b62337        	bltui	a3, 2, 4000dccc
 4000dc94:	605141        	srli	a5, a6, 1
-4000dc97:	37353d        	bltu	a5, a3, 4000dcd8 <__divsi3+0x50>
+4000dc97:	37353d        	bltu	a5, a3, 4000dcd8
 4000dc9a:	50f640        	nsau	a5, a6
 4000dc9d:	40f340        	nsau	a4, a3
 4000dca0:	5044c0        	sub	a4, a4, a5
 4000dca3:	001440        	ssl	a4
 4000dca6:	0033a1        	sll	a3, a3
 4000dca9:	22a000        	movi	a2, 0
-4000dcac:	373604        	bltu	a6, a3, 4000dcb4 <__divsi3+0x2c>
+
+4000dcac:	373604        	bltu	a6, a3, 4000dcb4
 4000dcaf:	3066c0        	sub	a6, a6, a3
 4000dcb2:	1b22      	addi.n	a2, a2, 1
+
 4000dcb4:	f02211        	slli	a2, a2, 1
 4000dcb7:	303141        	srli	a3, a3, 1
 4000dcba:	0b44      	addi.n	a4, a4, -1
-4000dcbc:	56c4fe        	bnez	a4, 4000dcac <__divsi3+0x24>
-4000dcbf:	373601        	bltu	a6, a3, 4000dcc4 <__divsi3+0x3c>
+4000dcbc:	56c4fe        	bnez	a4, 4000dcac
+4000dcbf:	373601        	bltu	a6, a3, 4000dcc4
 4000dcc2:	1b22      	addi.n	a2, a2, 1
 4000dcc4:	205060        	neg	a5, a2
 4000dcc7:	7025a3        	movltz	a2, a5, a7
 4000dcca:	0df0      	ret.n
-4000dccc:	9c53      	beqz.n	a3, 4000dce5 <__divsi3+0x5d>
+
+4000dccc:	9c53      	beqz.n	a3, 4000dce5
 4000dcce:	602060        	neg	a2, a6
 4000dcd1:	7026b3        	movgez	a2, a6, a7
 4000dcd4:	0df0      	ret.n
-4000dcd6:	000037        	excw
-4000dcd9:	36100c        	excw
-4000dcdc:	127cf4        	excw
+4000dcd6:	0000
+
+4000dcd8:	373610        	bltu	a6, a3, 4000dcec
+4000dcdb:	0c12      	movi.n	a2, 1
+4000dcdd:	7cf4      	movi.n	a4, -1
 4000dcdf:	7024a3        	movltz	a2, a4, a7
 4000dce2:	0df0      	ret.n
-4000dce4:	000000        	ill
-4000dce7:	004449        	excw
-4000dcea:	56300c        	bnez	a0, 4000ddb1 <rc4_skip+0x49>
-4000dced:	020df0        	l8ui	a0, a13, 240
+
+4000dce4:	00000000		; ??
+4000dce8:	44495630		; ??
+
+4000dcec:	0c02      	movi.n	a2, 0
+4000dcee:	0df0      	ret.n
+
+
+; Used many places.
 
 4000dcf0 <__umulsidi3>:
 4000dcf0:	12c1e0        	addi	a1, a1, -32
@@ -22886,14 +23098,14 @@
 4000dd04:	30b4c1        	mul16u	a11, a4, a3
 4000dd07:	0c09      	movi.n	a9, 0
 4000dd09:	ba66      	add.n	a6, a6, a11
-4000dd0b:	b7b602        	bgeu	a6, a11, 4000dd11 <__umulsidi3+0x21>
+4000dd0b:	b7b602        	bgeu	a6, a11, 4000dd11
 4000dd0e:	92c901        	addi	a9, a9, 1
 4000dd11:	104040        	ssai	16
 4000dd14:	609981        	src	a9, a9, a6
 4000dd17:	30b2c1        	mul16u	a11, a2, a3
 4000dd1a:	0066a1        	sll	a6, a6
 4000dd1d:	ba66      	add.n	a6, a6, a11
-4000dd1f:	b7b601        	bgeu	a6, a11, 4000dd24 <__umulsidi3+0x34>
+4000dd1f:	b7b601        	bgeu	a6, a11, 4000dd24
 4000dd22:	1b99      	addi.n	a9, a9, 1
 4000dd24:	5034c1        	mul16u	a3, a4, a5
 4000dd27:	9a33      	add.n	a3, a3, a9
@@ -24018,6 +24230,7 @@
 3fffdaa0:	00000009 3fffdab0 3fffeb30
 
 ; Here is part of the result of running "strings" on bootrom.bin
+;  This is handier than trying to yank strings out of the dump above.
 ;
 ; }ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/
 ;  ets %s,rst cause:%d, boot mode:(%d,%d)
@@ -24067,10 +24280,11 @@
 ; Block 3  4000fe34
 ;      3fffdaac 3fffdab0 <-- 4000fe34
 ; These 4 bytes get their own block
+;	(they must be very special !!!)
 
 3fffdaac:	3fffc000
 
-; And these are just unused bytes at the end of the ROM
+; And what follows are just unused bytes at the end of the ROM
 
 4000fe38:	00000000 00000000 00000000 00000000     ................
 4000fe48:	00000000 00000000 00000000 00000000     ................
