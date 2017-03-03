@@ -1102,7 +1102,9 @@
 4000080c:	c841      	l32i.n	a12, a1, 16
 4000080e:	12c120        	addi	a1, a1, 32
 40000811:	0df0      	ret.n
-40000813:	0012c1        	mul16u	a1, a2, a0
+40000813:	00
+
+; never called ??
 
 40000814 <cmd_parse>:
 40000814:	12c190        	addi	a1, a1, -112
@@ -1129,7 +1131,7 @@
 40000848:	050d00        	call0	4000091c <get_first_seg>
 4000084b:	0c05      	movi.n	a5, 0
 4000084d:	420110        	l8ui	a4, a1, 16
-40000850:	579412        	bne	a4, a5, 40000866 <cmd_parse+0x52>
+40000850:	579412        	bne	a4, a5, 40000866
 40000853:	81ddfe		l32r	a8, 400003c8	; ( 00000068 )
 40000856:	8a81      	add.n	a8, a1, a8
 40000858:	8808      	l32i.n	a8, a8, 0
@@ -1137,14 +1139,15 @@
 4000085c:	7908      	s32i.n	a7, a8, 0
 4000085e:	0c16      	movi.n	a6, 1
 40000860:	626114        	s32i	a6, a1, 80
-40000863:	462a00        	j	40000910 <cmd_parse+0xfc>
+40000863:	462a00        	j	40000910
+
 40000866:	21d7fe		l32r	a2, 400003c4	; ( 00000064 )
 40000869:	2a21      	add.n	a2, a1, a2
 4000086b:	2802      	l32i.n	a2, a2, 0
 4000086d:	32c110        	addi	a3, a1, 16
 40000870:	45650b        	call0	4000bec8 <strcpy>
 40000873:	0c03      	movi.n	a3, 0
-40000875:	379212        	bne	a2, a3, 4000088b <cmd_parse+0x77>
+40000875:	379212        	bne	a2, a3, 4000088b
 40000878:	61d4fe		l32r	a6, 400003c8	; ( 00000068 )
 4000087b:	6a61      	add.n	a6, a1, a6
 4000087d:	6806      	l32i.n	a6, a6, 0
@@ -1152,12 +1155,13 @@
 40000881:	5906      	s32i.n	a5, a6, 0
 40000883:	0c14      	movi.n	a4, 1
 40000885:	426114        	s32i	a4, a1, 80
-40000888:	062100        	j	40000910 <cmd_parse+0xfc>
+40000888:	062100        	j	40000910
+
 4000088b:	922110        	l32i	a9, a1, 64
 4000088e:	926111        	s32i	a9, a1, 68
 40000891:	0c08      	movi.n	a8, 0
 40000893:	722111        	l32i	a7, a1, 68
-40000896:	871765        	beq	a7, a8, 400008ff <cmd_parse+0xeb>
+40000896:	871765        	beq	a7, a8, 400008ff
 40000899:	222111        	l32i	a2, a1, 68
 4000089c:	32c110        	addi	a3, a1, 16
 4000089f:	42c140        	addi	a4, a1, 64
@@ -1166,11 +1170,11 @@
 400008a8:	026111        	s32i	a0, a1, 68
 400008ab:	0c0b      	movi.n	a11, 0
 400008ad:	a20110        	l8ui	a10, a1, 16
-400008b0:	b71a43        	beq	a10, a11, 400008f7 <cmd_parse+0xe3>
+400008b0:	b71a43        	beq	a10, a11, 400008f7
 400008b3:	22c110        	addi	a2, a1, 16
 400008b6:	32c148        	addi	a3, a1, 72
 400008b9:	451a00        	call0	40000a60 <convert_para_str>
-400008bc:	661213        	bnei	a2, 1, 400008d3 <cmd_parse+0xbf>
+400008bc:	661213        	bnei	a2, 1, 400008d3
 400008bf:	41c2fe		l32r	a4, 400003c8	; ( 00000068 )
 400008c2:	4a41      	add.n	a4, a1, a4
 400008c4:	4804      	l32i.n	a4, a4, 0
@@ -1178,7 +1182,8 @@
 400008c9:	3904      	s32i.n	a3, a4, 0
 400008cb:	0c12      	movi.n	a2, 1
 400008cd:	226114        	s32i	a2, a1, 80
-400008d0:	060f00        	j	40000910 <cmd_parse+0xfc>
+400008d0:	060f00        	j	40000910
+
 400008d3:	81befe		l32r	a8, 400003cc	; ( 0000006c )
 400008d6:	8a81      	add.n	a8, a1, a8
 400008d8:	8808      	l32i.n	a8, a8, 0
@@ -1196,7 +1201,7 @@
 400008f5:	5906      	s32i.n	a5, a6, 0
 400008f7:	0c0a      	movi.n	a10, 0
 400008f9:	922111        	l32i	a9, a1, 68
-400008fc:	a79999        	bne	a9, a10, 40000899 <cmd_parse+0x85>
+400008fc:	a79999        	bne	a9, a10, 40000899
 400008ff:	21b2fe		l32r	a2, 400003c8	; ( 00000068 )
 40000902:	2a21      	add.n	a2, a1, a2
 40000904:	2802      	l32i.n	a2, a2, 0
@@ -1234,22 +1239,23 @@
 4000094b:	0c05      	movi.n	a5, 0
 4000094d:	4801      	l32i.n	a4, a1, 0
 4000094f:	420400        	l8ui	a4, a4, 0
-40000952:	579402        	bne	a4, a5, 40000958 <get_first_seg+0x3c>
-40000955:	462100        	j	400009de <get_first_seg+0xc2>
+40000952:	579402        	bne	a4, a5, 40000958
+40000955:	462100        	j	400009de
+
 40000958:	0cd6      	movi.n	a6, 13
 4000095a:	5801      	l32i.n	a5, a1, 0
 4000095c:	520500        	l8ui	a5, a5, 0
-4000095f:	67157b        	beq	a5, a6, 400009de <get_first_seg+0xc2>
+4000095f:	67157b        	beq	a5, a6, 400009de
 40000962:	6801      	l32i.n	a6, a1, 0
 40000964:	620600        	l8ui	a6, a6, 0
-40000967:	269673        	beqi	a6, 10, 400009de <get_first_seg+0xc2>
+40000967:	269673        	beqi	a6, 10, 400009de
 4000096a:	7801      	l32i.n	a7, a1, 0
 4000096c:	720700        	l8ui	a7, a7, 0
-4000096f:	26c731        	beqi	a7, 32, 400009a4 <get_first_seg+0x88>
+4000096f:	26c731        	beqi	a7, 32, 400009a4
 40000972:	0c99      	movi.n	a9, 9
 40000974:	8801      	l32i.n	a8, a1, 0
 40000976:	820800        	l8ui	a8, a8, 0
-40000979:	971827        	beq	a8, a9, 400009a4 <get_first_seg+0x88>
+40000979:	971827        	beq	a8, a9, 400009a4
 4000097c:	0196fe		l32r	a0, 400003d4	; ( 00000014 )
 4000097f:	0a01      	add.n	a0, a1, a0
 40000981:	0800      	l32i.n	a0, a0, 0
@@ -1266,7 +1272,7 @@
 4000099a:	a18efe		l32r	a10, 400003d4	; ( 00000014 )
 4000099d:	aaa1      	add.n	a10, a1, a10
 4000099f:	990a      	s32i.n	a9, a10, 0
-400009a1:	460700        	j	400009c2 <get_first_seg+0xa6>
+400009a1:	460700        	j	400009c2
 
 400009a4:	618cfe		l32r	a6, 400003d4	; ( 00000014 )
 400009a7:	6a61      	add.n	a6, a1, a6
@@ -1280,19 +1286,20 @@
 400009b9:	3904      	s32i.n	a3, a4, 0
 400009bb:	0c02      	movi.n	a2, 0
 400009bd:	2921      	s32i.n	a2, a1, 8
-400009bf:	860d00        	j	400009f9 <get_first_seg+0xdd>
+400009bf:	860d00        	j	400009f9
 
 400009c2:	0c08      	movi.n	a8, 0
 400009c4:	7801      	l32i.n	a7, a1, 0
 400009c6:	720700        	l8ui	a7, a7, 0
-400009c9:	871711        	beq	a7, a8, 400009de <get_first_seg+0xc2>
+400009c9:	871711        	beq	a7, a8, 400009de
 400009cc:	0cd9      	movi.n	a9, 13
 400009ce:	8801      	l32i.n	a8, a1, 0
 400009d0:	820800        	l8ui	a8, a8, 0
-400009d3:	971807        	beq	a8, a9, 400009de <get_first_seg+0xc2>
+400009d3:	971807        	beq	a8, a9, 400009de
 400009d6:	9801      	l32i.n	a9, a1, 0
 400009d8:	920900        	l8ui	a9, a9, 0
-400009db:	66998b        	bnei	a9, 10, 4000096a <get_first_seg+0x4e>
+400009db:	66998b        	bnei	a9, 10, 4000096a
+
 400009de:	317dfe		l32r	a3, 400003d4	; ( 00000014 )
 400009e1:	3a31      	add.n	a3, a1, a3
 400009e3:	3803      	l32i.n	a3, a3, 0
@@ -1302,14 +1309,14 @@
 400009ed:	0a01      	add.n	a0, a1, a0
 400009ef:	0800      	l32i.n	a0, a0, 0
 400009f1:	0c0b      	movi.n	a11, 0
-400009f3:	b9
-400009f4:	000c0aa9	.long 0xa90a0c00
-400009f8:	21
+400009f3:	b900      	s32i.n	a11, a0, 0
+400009f5:	0c0a      	movi.n	a10, 0
+400009f7:	a921      	s32i.n	a10, a1, 8
 400009f9:	2821      	l32i.n	a2, a1, 8
 400009fb:	0811      	l32i.n	a0, a1, 4
 400009fd:	12c120        	addi	a1, a1, 32
 40000a00:	0df0      	ret.n
-40000a02:	000012        	excw
+40000a02:	0000
 
 40000a04 <remove_head_space>:
 40000a04:	12c1e0        	addi	a1, a1, -32
@@ -1326,21 +1333,21 @@
 40000a1e:	6901      	s32i.n	a6, a1, 0
 40000a20:	5801      	l32i.n	a5, a1, 0
 40000a22:	520500        	l8ui	a5, a5, 0
-40000a25:	26c509        	beqi	a5, 32, 40000a32 <remove_head_space+0x2e>
+40000a25:	26c509        	beqi	a5, 32, 40000a32
 40000a28:	0c98      	movi.n	a8, 9
 40000a2a:	7801      	l32i.n	a7, a1, 0
 40000a2c:	720700        	l8ui	a7, a7, 0
-40000a2f:	879717        	bne	a7, a8, 40000a4a <remove_head_space+0x46>
+40000a2f:	879717        	bne	a7, a8, 40000a4a
 40000a32:	9801      	l32i.n	a9, a1, 0
 40000a34:	1b99      	addi.n	a9, a9, 1
 40000a36:	9901      	s32i.n	a9, a1, 0
 40000a38:	8801      	l32i.n	a8, a1, 0
 40000a3a:	820800        	l8ui	a8, a8, 0
-40000a3d:	26c8f1        	beqi	a8, 32, 40000a32 <remove_head_space+0x2e>
+40000a3d:	26c8f1        	beqi	a8, 32, 40000a32
 40000a40:	0c9b      	movi.n	a11, 9
 40000a42:	a801      	l32i.n	a10, a1, 0
 40000a44:	a20a00        	l8ui	a10, a10, 0
-40000a47:	b71ae7        	beq	a10, a11, 40000a32 <remove_head_space+0x2e>
+40000a47:	b71ae7        	beq	a10, a11, 40000a32
 40000a4a:	0162fe		l32r	a0, 400003d4	; ( 00000014 )
 40000a4d:	0a01      	add.n	a0, a1, a0
 40000a4f:	0800      	l32i.n	a0, a0, 0
@@ -1350,7 +1357,7 @@
 40000a57:	0811      	l32i.n	a0, a1, 4
 40000a59:	12c120        	addi	a1, a1, 32
 40000a5c:	0df0      	ret.n
-40000a5e:	000012        	excw
+40000a5e:	0000
 
 40000a60 <convert_para_str>:
 40000a60:	12c1e0        	addi	a1, a1, -32
@@ -1435,7 +1442,7 @@
 40000b1b:	0821      	l32i.n	a0, a1, 8
 40000b1d:	12c120        	addi	a1, a1, 32
 40000b20:	0df0      	ret.n
-40000b22:	000012        	excw
+40000b22:	0000
 
 40000b24 <conv_str_decimal>:
 40000b24:	12c1d0        	addi	a1, a1, -48
@@ -1995,7 +2002,7 @@
 ; Aha ... here is main()
 ; *** MAIN ***
 
-; a note on memory wait: it is basically a pipeline sync.
+; a note on "memw" (memory wait): it is basically a pipeline sync.
 ; It waits until all loads and stores finish.
 
 40000fec <main>:
@@ -2013,6 +2020,7 @@
 ;   Pull GPIO 0 low (this is the usual pin a jumper manipulates)
 ;   Pull GPIO 2 high
 ;   Pull GPIO 15 low (do we see this below ???)
+; I am skeptical about GPIO 15, I never see it being tested here.
 
 40001001:	c1f0ff		l32r	a12, 40000fc4	; ( 60000200 )
 40001004:	c02000        	memw
@@ -2036,6 +2044,10 @@
 40001031:	522c46        	l32i	a5, a12, 0x118	; read GPIO inputs
 40001034:	505025        	extui	a5, a5, 16, 3
 40001037:	66550f        	bnei	a5, 5, 4000104a	; not 101
+
+; What the heck is SIP?
+;	silicon in package ?
+;	session initialization protocol ?
 
 4000103a:	22a003        	movi	a2, 3		; is 101
 4000103d:	c56304        	call0	4000567c <sip_init_attach>
@@ -2084,8 +2096,14 @@
 ; csum 0x12
 ;
 ; This all comes out at 74880 baud (since the processor is running at 52 Mhz),
-; so you only see garbled characters unless you take special pains to listen
-; at 74880 baud.
+; so you only see garbled characters unless you take special pains
+;  to listen at 74880 baud.
+; If the boot loader runs, it will do auto baud detection and crank up the
+;  baud rate to match an external 115200 or whatever is used.
+;
+; How, you may ask, does esptool talk to this ROM?
+; It turns out that the ROM autodetects baud rate, so esptool can talk at
+; 115200 and the ROM makes adjustments to "get it right"
 ;
 ; This particular call uses the format:
 ;
@@ -2095,40 +2113,40 @@
 
 40001069:	054601        	call0	400024cc <ets_printf>
 
-; 3fffdcd0 holds the user start address.
+; 3fffdcd0 will hold the user start address.
 
 4000106c:	01d3ff		l32r	a0, 40000fb8	; ( 3fffdcd0 )
 4000106f:	f63d02        	bgeui	a13, 3, 40001075
-40001072:	56bd0a        	bnez	a13, 40001121
+40001072:	56bd0a        	bnez	a13, 40001121	; << ** uart loader
 
 40001075:	263d11        	beqi	a13, 3, 4000108a
 40001078:	62cdfc        	addi	a6, a13, -4
 4000107b:	169609        	beqz	a6, 40001118	; wdt reset
 4000107e:	b67d02        	bltui	a13, 7, 40001084
-40001081:	c62a00        	j	40001130
+40001081:	c62a00        	j	40001130	; << unknown reset
 
 40001084:	f65d02        	bgeui	a13, 5, 4000108a
-40001087:	462900        	j	40001130
+40001087:	462900        	j	40001130	; << unknown reset
 
 4000108a:	c02000        	memw
 4000108d:	722c46        	l32i	a7, a12, 0x118
 40001090:	707025        	extui	a7, a7, 16, 3
-40001093:	263711        	beqi	a7, 3, 400010a8
+40001093:	263711        	beqi	a7, 3, 400010a8	; << ** load APP
+
 40001096:	c02000        	memw
 40001099:	822c46        	l32i	a8, a12, 0x118
 4000109c:	922000        	l32i	a9, a0, 0
 4000109f:	808025        	extui	a8, a8, 16, 3
-400010a2:	661818        	bnei	a8, 1, 400010be
-400010a5:	565901        	bnez	a9, 400010be
+400010a2:	661818        	bnei	a8, 1, 400010be	; just run APP again 
+400010a5:	565901        	bnez	a9, 400010be	; just run APP again
 
-; This call seems to be what copies an app out of flash
-; and gets it ready to run.
+; This call is what copies an app out of flash and gets it ready to run.
 ; It returns 0 if everything is good to go.
 ; It returns 1 if there is trouble (read error or bad cksum).
 
-400010a8:	c52500        	call0	40001308 <sub_1308>
+400010a8:	c52500        	call0	40001308 <sub_1308>	; SPI_load()
 
-400010ab:	16f200        	beqz	a2, 400010be
+400010ab:	16f200        	beqz	a2, 400010be		; run APP
 
 ; Some kind of trouble loading the app.
 ;
@@ -2143,8 +2161,9 @@
 400010ba:	06ffff        	j	400010ba	; ** spin !!
 400010bd:	00
 
-; We look to be good to go to run the app.
+; APP code loaded correctly and we are good to go.
 ; set a raft of exception handlers
+; then make the call to run APP code.
 
 400010be:	22a009        	movi	a2, 9
 400010c1:	31c5ff        	l32r	a3, 40000fd8 ( 0x400017e0 )
@@ -2174,9 +2193,12 @@
 
 400010f5:	21b0ff		l32r	a2, 40000fb8	; ( 3fffdcd0 )
 400010f8:	2802      	l32i.n	a2, a2, 0
-400010fa:	162200        	beqz	a2, 40001100
+400010fa:	162200        	beqz	a2, 40001100	; No start !!??
 
+; ********************************************
+;
 ; **** **** This is what branches to user code
+
 400010fd:	c00200        	callx0	a2
 
 ; The user code probably won't return, but it might !!
@@ -2195,6 +2217,10 @@
 40001118:	21b3ff		l32r	a2, 40000fe4	; ( 3fffd6ac )
 4000111b:	101120        	or	a1, a1, a1
 4000111e:	c53a01        	call0	400024cc <ets_printf>
+
+; *******************
+; The following calls the uart loader <<< *****
+; call uart_loader
 
 40001121:	21a5ff		l32r	a2, 40000fb8	; ( 3fffdcd0 )
 40001124:	450800        	call0	400011ac <sub_11ac>
@@ -2228,11 +2254,13 @@
 40001155:	46bcff        	j	4000104a
 
 ; END of main()
+;
+; ****************************************
 
 40001158:	00000000
 4000115c:	00060060	.long 0x60000600
 
-; perfectly good subroutine -- never called ??
+; called from below
 
 40001160:	12c1f0        	addi	a1, a1, -16
 40001163:	0901      	s32i.n	a0, a1, 0
@@ -2248,6 +2276,7 @@
 40001180:	c02000        	memw
 40001183:	026389        	s32i	a0, a3, 0x224
 40001186:	860000        	j	4000118c
+
 40001189:	007000        	waiti	0
 4000118c:	854d04        	call0	40005668 <sip_get_state>
 4000118f:	6622f6        	bnei	a2, 2, 40001189
@@ -2260,6 +2289,9 @@
 400011a0:	00a0ff3f	.long 0x3fffa000
 400011a4:	00200000	.long 0x00002000
 400011a8:	00001040	.long 0x40100000
+
+; This is the main call for the uart loader
+; "uart_loader"
 
 400011ac <sub_11ac>:
 400011ac:	12c1e0        	addi	a1, a1, -32
@@ -2319,9 +2351,9 @@
 40001244:	4811      	l32i.n	a4, a1, 4
 40001246:	051202        	call0	40003368 <UartDwnLdProc>
 40001249:	c60000        	j	40001250
+4000124c:	00
 
-4000124c:	0005f1        	excw
-4000124f:	ff          	.byte 0xff
+4000124d:	05f1ff        	call0	40001160	; above
 40001250:	b22102        	l32i	a11, a1, 8
 40001253:	165b00        	beqz	a11, 4000125c
 40001256:	22a000        	movi	a2, 0
@@ -2340,11 +2372,11 @@
 40001271:	0831      	l32i.n	a0, a1, 12
 40001273:	12c120        	addi	a1, a1, 32
 40001276:	0df0      	ret.n
+40001278:	0000
 
-40001278:	000022        	excw
-4000127b:	210232		l32r	a2, 3ffcda84
-4000127e:	a00005        	extui	a0, a10, 16, 1
-40001281:	6a02      	add.n	a0, a2, a6
+4000127a:	222102        	l32i	a2, a1, 8
+4000127d:	32a000        	movi	a3, 0
+40001280:	056a02        	call0	40003924 <uart_baudrate_detect>
 40001283:	2030f4        	extui	a3, a2, 0, 16
 40001286:	222102        	l32i	a2, a1, 8
 40001289:	c57402        	call0	400039d8 <uart_div_modify>
@@ -2363,15 +2395,17 @@
 400012a7:	05cfff        	call0	40000f98 <ets_isr_mask>
 400012aa:	0801      	l32i.n	a0, a1, 0
 400012ac:	c6e2ff        	j	4000123b
+400012af:	00
 
-400012af:	000539        	excw
-400012b2:	030221        	excw
-400012b5:	035221        	excw
-400012b8:	0142a0		l32r	a0, 3ffe93c0
-400012bb:	00c841        	srli	a12, a0, 8
+400012b0:	053903        	call0	40004644 <spi_flash_attach>
+400012b3:	022103        	l32i	a0, a1, 12
+400012b6:	522101        	l32i	a5, a1, 4
+400012b9:	42a000        	movi	a4, 0
+400012bc:	c841      	l32i.n	a12, a1, 16
 400012be:	4905      	s32i.n	a4, a5, 0
 400012c0:	12c120        	addi	a1, a1, 32
 400012c3:	0df0      	ret.n
+
 400012c5:	85f601        	call0	40003230 <UartConnCheck>
 400012c8:	206074        	extui	a6, a2, 0, 8
 400012cb:	626100        	s32i	a6, a1, 0
@@ -2389,7 +2423,7 @@
 400012e8:	00d7ff3f	.long 0x3fffd700
 400012ec:	34d7ff3f	.long 0x3fffd734
 400012f0:	40d7ff3f	.long 0x3fffd740
-400012f4:	20d7ff3f
+400012f4:	20d7ff3f	.long 0x3fffd720
 400012f8:	70c8ff3f	.long 0x3fffc870
 400012fc:	6cd7ff3f	.long 0x3fffd76c
 40001300:	50d7ff3f	.long 0x3fffd750
@@ -6585,7 +6619,8 @@
 
 40003920:	01080000	.long 0x00000801
 
-; The usual business of the uart base a fe00 and adding 0x200 to offsets
+; The usual business of setting the uart base address to 5ffffe00 and
+;  then adding offsets of 0x200 to get 60000000
 ;
 ;  0x18 is the autobaud register
 
@@ -6669,9 +6704,9 @@
 400039c3:	0801      	l32i.n	a0, a1, 0	; return address
 400039c5:	12c110        	addi	a1, a1, 16	; restore stack
 400039c8:	0df0      	ret.n
-400039ca:	000000        	ill
-400039cd:	000000        	ill
+400039ca:	0000
 
+400039cc:	00000000
 400039d0:	00000600	.long 0x00060000
 400039d4:	fffff9ff	.long 0xfff9ffff
 
@@ -6680,7 +6715,9 @@
 ; uart0 base is at 0x60000000
 ; uart1 base is at 0x60000f00
 ;  So n * 0xf00 gives the offset for one or the other.
-;  Why drop back 0x200 bytes to 0x5ffffe00 is a mystery!
+;  Why drop back 0x200 bytes to 0x5ffffe00?
+;  A mystery to me, but seems to be something this
+;  compiler does with most base registers.
 ;
 ; offset 0x14 is the clock divider (baud = basic/clock / divider)
 ;	this is a 20 bit value in a 32 bit register.
@@ -7005,6 +7042,8 @@
 
 ; -----------------------------------------------------------
 
+;  called once from below
+
 40003c80 <send_packet>:
 40003c80:	12c1e0        	addi	a1, a1, -32
 40003c83:	e931      	s32i.n	a14, a1, 12
@@ -7017,28 +7056,28 @@
 40003c92:	22a0c0        	movi	a2, 192
 40003c95:	85e9ff        	call0	40003b30 <uart_tx_one_char>
 40003c98:	0bdd      	addi.n	a13, a13, -1
-40003c9a:	260d3e        	beqi	a13, -1, 40003cdc <send_packet+0x5c>
+40003c9a:	260d3e        	beqi	a13, -1, 40003cdc
 40003c9d:	f2a0db        	movi	a15, 219
 40003ca0:	e2a0c0        	movi	a14, 192
-40003ca3:	860300        	j	40003cb5 <send_packet+0x35>
+40003ca3:	860300        	j	40003cb5
 40003ca6:	000000        	ill
 40003ca9:	45e8ff        	call0	40003b30 <uart_tx_one_char>
 40003cac:	c2cc01        	addi	a12, a12, 1
 40003caf:	d2cdff        	addi	a13, a13, -1
-40003cb2:	966d02        	bltz	a13, 40003cdc <send_packet+0x5c>
+40003cb2:	966d02        	bltz	a13, 40003cdc
 40003cb5:	220c00        	l8ui	a2, a12, 0
-40003cb8:	e71211        	beq	a2, a14, 40003ccd <send_packet+0x4d>
-40003cbb:	f792ea        	bne	a2, a15, 40003ca9 <send_packet+0x29>
+40003cb8:	e71211        	beq	a2, a14, 40003ccd
+40003cbb:	f792ea        	bne	a2, a15, 40003ca9
 40003cbe:	22a0db        	movi	a2, 219
 40003cc1:	c5e6ff        	call0	40003b30 <uart_tx_one_char>
 40003cc4:	22a0dd        	movi	a2, 221
 40003cc7:	85e6ff        	call0	40003b30 <uart_tx_one_char>
-40003cca:	86f7ff        	j	40003cac <send_packet+0x2c>
+40003cca:	86f7ff        	j	40003cac
 40003ccd:	22a0db        	movi	a2, 219
 40003cd0:	c5e5ff        	call0	40003b30 <uart_tx_one_char>
 40003cd3:	22a0dc        	movi	a2, 220
 40003cd6:	85e5ff        	call0	40003b30 <uart_tx_one_char>
-40003cd9:	c6f3ff        	j	40003cac <send_packet+0x2c>
+40003cd9:	c6f3ff        	j	40003cac
 40003cdc:	22a0c0        	movi	a2, 192
 40003cdf:	05e5ff        	call0	40003b30 <uart_tx_one_char>
 40003ce2:	c811      	l32i.n	a12, a1, 4
@@ -7608,7 +7647,7 @@
 40004268:	306141        	srli	a6, a3, 1
 4000426b:	ac56      	beqz.n	a6, 40004294 <sub_426c+0x28>
 
-; XXX - bogus, was seemingly called from an improperly disassembled section.
+; XXX - no calls found to this yet.
 
 4000426c <sub_426c>:
 4000426c:	56c064        	bnez	a0, 400048bc <SPILock+0x14>
@@ -9226,7 +9265,7 @@
 40005073:	3030f4        	extui	a3, a3, 0, 16
 40005076:	56e3fe        	bnez	a3, 40005068 <lldesc_num2link+0x18>
 40005079:	0df0      	ret.n
-4000507b:	004070        	excw
+4000507b:	00
 
 4000507c <lldesc_set_owner>:
 4000507c:	407004        	extui	a7, a4, 0, 1
@@ -9273,6 +9312,7 @@
 400050f0:	3030f4        	extui	a3, a3, 0, 16
 400050f3:	56a3fc        	bnez	a3, 400050c1 <lldesc_set_owner+0x45>
 400050f6:	0df0      	ret.n
+
 400050f8:	50e0ff3f	.long 0x3fffe050
 
 400050fc <sip_post>:
@@ -9402,7 +9442,7 @@
 4000522c:	8b84      	addi.n	a8, a4, 8
 4000522e:	8939      	s32i.n	a8, a9, 12
 40005230:	86dcff        	j	400051a6 <sip_alloc_to_host_evt+0x26>
-40005233:	0012c1        	mul16u	a1, a2, a0
+40005233:	00
 
 40005234 <sip_to_host_evt_send_done>:
 40005234:	12c1f0        	addi	a1, a1, -16
@@ -9454,7 +9494,7 @@
 400052b7:	0801      	l32i.n	a0, a1, 0
 400052b9:	12c110        	addi	a1, a1, 16
 400052bc:	0df0      	ret.n
-400052be:	000012        	excw
+400052be:	0000
 
 400052c0 <sip_reclaim_tx_data_pkt>:
 400052c0:	12c1f0        	addi	a1, a1, -16
@@ -9504,6 +9544,7 @@
 4000533f:	0801      	l32i.n	a0, a1, 0
 40005341:	12c110        	addi	a1, a1, 16
 40005344:	0df0      	ret.n
+
 40005346:	000000        	ill
 40005349:	000000        	ill
 
@@ -9587,6 +9628,7 @@
 40005420:	5966      	s32i.n	a5, a6, 24
 40005422:	12c110        	addi	a1, a1, 16
 40005425:	0df0      	ret.n
+
 40005427:	000022        	excw
 4000542a:	a01d32        	excw
 4000542d:	a00071        	excw
@@ -9600,7 +9642,7 @@
 40005443:	12c110        	addi	a1, a1, 16
 40005446:	824944        	s8i	a8, a9, 68
 40005449:	0df0      	ret.n
-4000544b:	004139        	excw
+4000544b:	00
 
 4000544c <sip_install_rx_ctrl_cb>:
 4000544c:	4139ff		l32r	a4, 40005130	; ( 3fffdff0 )
@@ -9608,7 +9650,7 @@
 40005452:	203293        	movnez	a3, a2, a2
 40005455:	326414        	s32i	a3, a4, 80
 40005458:	0df0      	ret.n
-4000545a:	000041        	srli	a0, a0, 0
+4000545a:	0000
 
 4000545c <sip_install_rx_data_cb>:
 4000545c:	4135ff		l32r	a4, 40005130	; ( 3fffdff0 )
@@ -9812,8 +9854,8 @@
 4000565c:	2d05      	mov.n	a2, a5
 4000565e:	4525fc        	call0	400018b4 <ets_memcpy>
 40005661:	46a9ff        	j	4000550a <sip_install_rx_data_cb+0xae>
-40005664:	000000        	ill
-40005667:	0021b2        	excw
+
+40005664:	00000000
 
 40005668 <sip_get_state>:
 40005668:	21b2fe		l32r	a2, 40005130	; ( 3fffdff0 )
@@ -9824,9 +9866,16 @@
 40005670:	c4530040	.long 0x400053c4
 40005674:	6c540040	.long 0x4000546c
 40005678:	d0540040	.long 0x400054d0
-4000567c:	31fe
 
 ; Called by main() with a2 set to 0, 1, 2, or 3
+;
+; what the heck is sip, not to mention slc
+;
+; A fellow at Espressif (Angus Gratton) says:
+;
+;  the acronym is "SLC = SDIO/SPI Link Connection"?
+;
+; SLC involves DMA with SDIO and I2S interfaces.
 
 4000567c <sip_init_attach>:
 4000567c:	31feff		l32r	a3, 40005674	; ( 4000546c )
@@ -10006,6 +10055,7 @@
 40005842:	0801      	l32i.n	a0, a1, 0
 40005844:	12c110        	addi	a1, a1, 16
 40005847:	0df0      	ret.n
+
 40005849:	0082a0        	addx4	a8, a2, a0
 4000584c:	018240		l32r	a0, 3ffd5a54
 4000584f:	44c572        	excw
@@ -10050,6 +10100,7 @@
 400058a8:	2122fe		l32r	a2, 40005130	; ( 3fffdff0 )
 400058ab:	0df0      	ret.n
 400058ad:	000000        	ill
+
 400058b0:	b8d8ff3f	.long 0x3fffd8b8
 400058b4:	a4d8ff3f	.long 0x3fffd8a4
 
@@ -10400,6 +10451,7 @@
 40005c11:	0801      	l32i.n	a0, a1, 0
 40005c13:	12c110        	addi	a1, a1, 16
 40005c16:	0df0      	ret.n
+
 40005c18:	d0e1ff3f	.long 0x3fffe1d0
 
 40005c1c <slc_reattach>:
