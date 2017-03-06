@@ -98,25 +98,8 @@
 ; used dynamically for the 1M of mapped flash.
 ;
 ; -----------------------------------------------------------------------
-; Some basics on xtensa assembly:
-;  There are 16 registers a0 to a15
-;  a0 is used for subroutine calls (it holds the return address).
-;  a1 gets used as a stack pointer
-;  a2 gets used to pass a single argument
-;     and it gets used to return a function value
-;  loads and stores are as follows:
-;    s32i at, as, N stores the contents of at to the address in as offset by N*4
-;    l32i at, as, N loads at from the address in as offset by N*4
-;  add is a typical 3 register instruction:
-;    add  ar, as, at  adds as + at and places the result in ar
-;    addi ar, as, N   adds as + N and places the result in ar  N is [-127,128]
-;  bltu is a typical branch instruction:
-;    bltu as, at, addr  branches to addr if as < at
-;    beqz as, addr      branches to addr if as == 0
-; a note on "memw" (memory wait): it is basically a pipeline sync.
-; It waits until all loads and stores finish.
-;
 ; -----------------------------------------------------------------------
+;
 ; Notes on the dport0 registers
 ; These are accessed (as is often done), by a base address 0x200 behind
 ; their actual location, namely 0x3feffe00
@@ -143,8 +126,11 @@
 ;  0x3FF0005C	OTP_MAC3	OTP Memory (Contains vendor portion (bytes 1-3) of MAC address)
 ;
 ; -----------------------------------------------------------------------
-
-; How do things get started?  The reset vector goes to 40000080h.
+;
+; How do things get started?  The reset vector goes to 0x40000080.
+;
+; Early on, it sets the vector base to 0x40000000 (right here!!)
+; Which means there is no way for software to mess with the basic vector table.
 
 40000000 <_Rom_start>:
 40000000:	000000
@@ -198,18 +184,65 @@
 4000004b:	000000
 4000004e:	0000
 
+; Here are the intial values of the interrupt dispatch
+; table as first set up by the ROM
+; The table has 64 entries
+
+;  3fffc000:	4000dc44 4000dbe4 4000dc44 4000dc44
+;  3fffc010:	4000048c 4000dbe0 4000dc44 4000dc44
+;  3fffc020:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc030:	40000590 40000590 40000590 40000590
+;  3fffc040:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc050:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc060:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc070:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc080:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc090:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc0a0:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc0b0:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc0c0:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc0d0:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc0e0:	4000dc44 4000dc44 4000dc44 4000dc44
+;  3fffc0f0:	4000dc44 4000dc44 4000dc44 4000dc44
+;
+;  3fffc100:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc110:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc120:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc130:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc140:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc150:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc160:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc170:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc180:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc190:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc1a0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc1b0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc1c0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc1d0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc1e0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;  3fffc1f0:	4000dbf8 4000dbf8 4000dbf8 4000dbf8
+;
+; 4000dc44 is _xtos_unhandled_exception		(nice return via rfe)
+; 4000dbe4 is _xtos_syscall_handler		(nice return via rfe)
+; 4000048c is _xtos_l1int_handler		(tricky)
+; 4000dbe0 is _xtos_alloca_handler		( stub - just an rfe )
+; 40000590 is _xtos_cause3_handler		(tricky)
+; 4000dbf8 is _xtos_p_none			( stub - just a return )
+
+; Here is the code that handles all interrupts.
 ; Note 3fffdaac holds 3fffc000
+; There is a jump table, initially as shown above
 
 40000050 <_UserExceptionVector>:
-40000050:	12d1ff        	addmi	a1, a1, 0xffffff00
-40000053:	2951      	s32i.n	a2, a1, 20
-40000055:	3961      	s32i.n	a3, a1, 24
-40000057:	3195f6		l32r	a3, 3fffdaac	; ( 3fffc000 )
+40000050:	12d1ff        	addmi	a1, a1, 0xffffff00	; stack adjust -256
+40000053:	2951      	s32i.n	a2, a1, 20		; save a2
+40000055:	3961      	s32i.n	a3, a1, 24		; save a3
+40000057:	3195f6		l32r	a3, 3fffdaac		; ( 3fffc000 )
 4000005a:	20e803        	rsr.exccause	a2
-4000005d:	3032a0        	addx4	a3, a2, a3	; add to base
-40000060:	3803      	l32i.n	a3, a3, 0	; fetch from there
-40000062:	4971      	s32i.n	a4, a1, 28
-40000064:	a00300        	jx	a3		; << JUMP table
+4000005d:	3032a0        	addx4	a3, a2, a3		; add to base
+40000060:	3803      	l32i.n	a3, a3, 0		; fetch from there
+40000062:	4971      	s32i.n	a4, a1, 28		; save a4
+40000064:	a00300        	jx	a3			; << dispatch via JUMP table
 
 40000067:	000000
 4000006a:	000000
@@ -232,27 +265,6 @@
 40000080 <_ResetVector>:
 40000080:	060800        	j	400000a4 <_ResetHandler>
 40000083:	00
-
-; Since the processor has 16 and 24 bit instructions, there is no
-; way to hold 32 bit constants in the instruction.
-; So the compiler dumps them as constants (like right here).
-; Then loads them into registers, typically with  PC relative
-; address in a l32r instruction.
-; Typically they are dumped ahead of where they are referenced.
-; In fact they must be, as the offsets from the l32r instruction
-; are all negative (it one extends the offset).
-
-
-40000084:	00000000	.long 0x00000000
-40000088:	00000040	.long 0x40000000
-4000008c:	1f212222	.long 0x2222211f
-40000090:	000000e0	.long 0xe0000000
-40000094:	f3000040	.long 0x400000f3
-40000098:	28e30040	.long 0x4000e328
-
-4000009c:	000000
-4000009f:	000000
-400000a2:	0000
 
 ; We seem to be done with vectors and it is code from here on out.
 ; Reset jumps immediately to here.
@@ -287,9 +299,32 @@
 ;    -depc is the double exception PC
 ;    -ddr is the debug data register
 
-; the processor starts here,
+; *************************************************************
+; *************************************************************
+; *************************************************************
+;
+; the processor starts here (at 400000a4)
 ;	which calls start(),
 ;	which calls main().
+
+; Since the processor has 16 and 24 bit instructions, there is no
+; way to hold 32 bit constants in the instruction.
+; So the compiler dumps them as constants (like right here).
+; Then loads them into registers, typically with  PC relative
+; address in a l32r instruction.
+; Typically they are dumped ahead of where they are referenced.
+; In fact they must be, as the offsets from the l32r instruction
+; are all negative (it one extends the offset).
+
+40000084:	00000000	.long 0x00000000
+40000088:	00000040	.long 0x40000000
+4000008c:	1f212222	.long 0x2222211f
+40000090:	000000e0	.long 0xe0000000
+40000094:	f3000040	.long 0x400000f3
+40000098:	28e30040	.long 0x4000e328
+
+4000009c:	00000000
+400000a0:	00000000
 
 400000a4 <_ResetHandler>:
 400000a4:	0c00      	movi.n	a0, 0		; a0 = 0
@@ -569,6 +604,7 @@
 400004e3:	d1b1ff		l32r	a13, 400003a8	; ( 3fffc180 )
 400004e6:	f0e313        	wsr.intclear	a15
 400004e9:	d0ccb0        	addx8	a12, a12, a13
+
 400004ec:	d22c1e        	l32i	a13, a12, 120
 400004ef:	f06200        	rsil	a15, 2		; set interrupt level to 2
 400004f2:	f80e      	l32i.n	a15, a14, 0	; read idata[0]
@@ -594,9 +630,10 @@
 40000527:	c22102        	l32i	a12, a1, 8
 4000052a:	d0e413        	wsr.intenable	a13
 4000052d:	d06100        	rsil	a13, 1
-40000530:	019fff		l32r	a0, 400003ac	; ( 4000dc54 )
+40000530:	019fff		l32r	a0, 400003ac	; ( 4000dc54 ) <_xtos_return_from_exc>:
 40000533:	c00313        	wsr.sar	a12
-40000536:	a00000        	jx	a0		; << JUMP table
+40000536:	a00000        	jx	a0		; indirect jump to _xtos_return_from_exc
+
 40000539:	d0ff40        	nsau	a13, a15
 4000053c:	c19bff		l32r	a12, 400003a8	; ( 3fffc180 )
 4000053f:	c0cdb0        	addx8	a12, a13, a12
@@ -641,7 +678,6 @@
 40000590 <_xtos_cause3_handler>:
 40000590:	0c32      	movi.n	a2, 3
 40000592:	860000        	j	40000598 <_xtos_c_wrapper_handler>
-
 40000595:	000000
 
 40000598 <_xtos_c_wrapper_handler>:
@@ -678,8 +714,8 @@
 400005e1:	e821      	l32i.n	a14, a1, 8
 400005e3:	c06100        	rsil	a12, 1
 400005e6:	e00313        	wsr.sar	a14
-400005e9:	0170ff		l32r	a0, 400003ac	; ( 4000dc54 )
-400005ec:	a00000        	jx	a0		; indirect jump
+400005e9:	0170ff		l32r	a0, 400003ac	; ( 4000dc54 ) <_xtos_return_from_exc>:
+400005ec:	a00000        	jx	a0		; indirect jump to: _xtos_return_from_exc
 400005ef:	00
 
 ; never called, but here it is.
@@ -23022,11 +23058,11 @@
 
 4000dbe0 <_xtos_alloca_handler>:
 4000dbe0:	003000        	rfe
-4000dbe3:	0030b1        	sra	a3, a0
+4000dbe3:	00
 
 4000dbe4 <_xtos_syscall_handler>:
 4000dbe4:	30b103        	rsr.epc1	a3
-4000dbe7:	2851      	l32i.n	a2, a1, 20
+4000dbe7:	2851      	l32i.n	a2, a1, 20	; why ?
 4000dbe9:	3b33      	addi.n	a3, a3, 3
 4000dbeb:	30b113        	wsr.epc1	a3
 4000dbee:	3861      	l32i.n	a3, a1, 24
@@ -23036,7 +23072,7 @@
 
 4000dbf8 <_xtos_p_none>:
 4000dbf8:	0df0      	ret.n
-4000dbfa:	000030        	xor	a0, a0, a0
+4000dbfa:	0000
 
 4000dbfc <_xtos_set_intlevel>:
 4000dbfc:	30e603        	rsr.ps	a3
@@ -23048,7 +23084,7 @@
 4000dc0d:	302034        	extui	a2, a3, 0, 4
 4000dc10:	102000        	rsync
 4000dc13:	0df0      	ret.n
-4000dc15:	000000        	ill
+4000dc15:	000000
 
 4000dc18 <_xtos_set_min_intlevel>:
 4000dc18:	30e603        	rsr.ps	a3
@@ -23063,7 +23099,7 @@
 4000dc32:	302034        	extui	a2, a3, 0, 4
 4000dc35:	102000        	rsync
 4000dc38:	0df0      	ret.n
-4000dc3a:	0000f0        	subx8	a0, a0, a0
+4000dc3a:	0000
 
 4000dc3c <_xtos_unhandled_interrupt>:
 4000dc3c:	f04100        	break	1, 15		; breakpoint exception
@@ -23077,6 +23113,11 @@
 4000dc4b:	104100        	break	1, 1		; breakpoint exception
 4000dc4e:	003000        	rfe
 4000dc51:	000000
+
+; Used by the following to return from an exception.
+;	_xtos_l1int_handler
+;	_xtos_cause3_handler>:
+;	_xtos_c_wrapper_handler>:
 
 4000dc54 <_xtos_return_from_exc>:
 4000dc54:	0841      	l32i.n	a0, a1, 16
