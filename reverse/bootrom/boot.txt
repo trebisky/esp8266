@@ -37,10 +37,10 @@
 ;  hand, finding improperly disassmbled sections of code and
 ;  so forth.
 ;
-; I found the original work at:
+; I was first inspired by the work done by "Kongo"
 ;	http://dflund.se/~kongo/esp8266.bin/iram0.txt
-; I began my annotations 1-7-2016 using this, then migrated
-;   to my own disassembly
+; I began studying and annotating what he had done, then
+;	migrated to my own disassembly.
 ;
 ; The ESP8266 bootrom is in some on-chip immutable ROM at
 ;    a base address of 0x40000000
