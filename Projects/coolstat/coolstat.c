@@ -176,7 +176,7 @@ process_input ( void )
     }
 }
 
-#define LEAD_TIME	10
+#define LEAD_TIME	20
 #define LONG_TIME	7
 #define SHORT_TIME	3
 
@@ -193,7 +193,7 @@ process_output ( void )
 	return;
 
     if ( out_state == START ) {
-	out_count = LEAD_TIME - 1;
+	out_count = LEAD_TIME;
 	outbit_count = 0;
 	out_state = HCOUNT;
 	bit_high ( OUT_BIT );
@@ -205,12 +205,12 @@ process_output ( void )
 	    return;
 
 	if ( outbits[outbit_count] == BIT_LONG )
-	    out_count = LONG_TIME - 1;
+	    out_count = LONG_TIME;
 	else
-	    out_count = SHORT_TIME - 1;
+	    out_count = SHORT_TIME;
 	outbit_count++;
 	bit_high ( OUT_BIT );
-	out_state == HCOUNT;
+	out_state = HCOUNT;
 	return;
     }
 
@@ -218,18 +218,18 @@ process_output ( void )
     if ( --out_count > 0 )
 	return;
 
-    if ( outbit_count >- MAX_BITS ) {
+    if ( outbit_count >= MAX_BITS ) {
 	bit_low ( OUT_BIT );
-	out_state == IDLE;
+	out_state = IDLE;
 	return;
     }
 
     if ( outbits[outbit_count] == BIT_LONG )
-	out_count = SHORT_TIME - 1;
+	out_count = SHORT_TIME;
     else
-	out_count = LONG_TIME - 1;
+	out_count = LONG_TIME;
     bit_low ( OUT_BIT );
-    out_state == LCOUNT;
+    out_state = LCOUNT;
 }
 
 static int howmany = 0;
@@ -239,24 +239,29 @@ void
 new_data ( void )
 {
     int i;
+    char ss[5];
+    char *p;
 
     ++howmany;
 
-    if ( (howmany % 8) == 0 )
-	os_printf ( "Got %d -- %d %d %d %d - %d %d %d %d\n", howmany,
-	    inbits[0],
-	    inbits[1],
-	    inbits[2],
-	    inbits[3],
-	    inbits[4],
-	    inbits[5],
-	    inbits[6],
-	    inbits[7] );
+    if ( (howmany % 8) == 0 ) {
+	// os_printf ( "Got %d -- %d %d %d %d - %d %d %d %d\n", howmany,
+	//     inbits[0], inbits[1], inbits[2], inbits[3],
+	//     inbits[4], inbits[5], inbits[6], inbits[7] );
+
+	p = ss;
+	*p++ = inbits[4] == BIT_SHORT ? 'H' : ' ';
+	*p++ = inbits[5] == BIT_SHORT ? 'L' : ' ';
+	*p++ = inbits[6] == BIT_SHORT ? 'P' : ' ';
+	*p++ = inbits[7] == BIT_SHORT ? 'X' : ' ';
+	*p = '\0';
+	os_printf ( "Got %d -- %s\n", howmany, ss );
+    }
 
     for ( i=0; i<MAX_BITS; i++ )
 	outbits[i] = inbits[i];
 
-    // out_state = START;
+    out_state = START;
 }
 
 /* Everything is driven by this interrupt ticking */
@@ -324,13 +329,16 @@ hw_timer_setup ( unsigned int val )
 void user_init ( void )
 {
     uart_div_modify(0, UART_CLK_FREQ / 115200);
+
+    /* Don't need no stinkin' Wifi */
     wifi_set_opmode(NULL_MODE);
 
     // We want to sample 10 times per millisecond
     hw_timer_setup ( 100 );
 
     os_printf("\n");
-    os_printf("SDK version:%s\n", system_get_sdk_version());
+    os_printf("Coolstat filter !!\n");
+    // os_printf("SDK version:%s\n", system_get_sdk_version());
 
     /* remember GPIO 1 and 3 are uart */
     /* GPIO 2 is the boot control pin */
