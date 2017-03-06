@@ -6758,7 +6758,7 @@
 
 40003a10:	00b4c404	.long 0x04c4b400
 
-; Uart_Init
+; Uart_Init ( x )
 ;
 ; in main() the calls are like so:
 ; uartAttach ();
@@ -6767,30 +6767,33 @@
 
 40003a14 <Uart_Init>:
 40003a14:	42aecf        	movi	a4, 0xfffffecf
-40003a17:	12c1f0        	addi	a1, a1, -16
-40003a1a:	c26101        	s32i	a12, a1, 4
-40003a1d:	026100        	s32i	a0, a1, 0
-40003a20:	20c220        	or	a12, a2, a2
+40003a17:	12c1f0        	addi	a1, a1, -16	; stack space
+40003a1a:	c26101        	s32i	a12, a1, 4	; save a12
+40003a1d:	026100        	s32i	a0, a1, 0	; save a0
+40003a20:	20c220        	or	a12, a2, a2	; a12 = a2
 40003a23:	01cef5		l32r	a0, 4000115c	; ( 60000600 )
-40003a26:	16220b        	beqz	a2, 40003adc
+40003a26:	16220b        	beqz	a2, 40003adc	; arg
 
 ; here when called as Uart_Init ( non-zero )
 ;  screws with 0x60000600 + 0x224 ( 0x60000824 )
 ;  this is in the iomux section
+;
+; a4 = fecf = ~0x130
 
 40003a29:	c02000        	memw
-40003a2c:	522089        	l32i	a5, a0, 0x224
-40003a2f:	405510        	and	a5, a5, a4
+40003a2c:	522089        	l32i	a5, a0, 0x224	; IO 824
+40003a2f:	405510        	and	a5, a5, a4	; clear
 40003a32:	c02000        	memw
-40003a35:	526089        	s32i	a5, a0, 0x224
+40003a35:	526089        	s32i	a5, a0, 0x224	; IO 824
 40003a38:	32a130        	movi	a3, 0x130
 40003a3b:	c02000        	memw
-40003a3e:	222089        	l32i	a2, a0, 0x224
-40003a41:	302220        	or	a2, a2, a3
+40003a3e:	222089        	l32i	a2, a0, 0x224	; IO 824
+40003a41:	302220        	or	a2, a2, a3	; set again
 40003a44:	c02000        	memw
-40003a47:	226089        	s32i	a2, a0, 0x224
+40003a47:	226089        	s32i	a2, a0, 0x224	; IO 824
 
 ; code from below joins here.
+; a2 has been copied to a12
 
 40003a4a:	31f6fd		l32r	a3, 40003224	; ( 3fffde10 ) UartDev
 40003a4d:	21f0ff		l32r	a2, 40003a10	; ( 04c4b400 )
@@ -6847,37 +6850,39 @@
 40003adb:	00
 
 ; here when called as Uart_Init ( 0 )
-;  Note that a0 = 60000600
+;  Note that a0 = 0x60000600
+;  Note that a4 = 0xfffffecf
 ;  this screws with 60000818 and 60000838 in the iomux area.
 
-40003adc:	22af7f        	movi	a2, -129
+40003adc:	22af7f        	movi	a2, -129	; 0x7f
 40003adf:	c02000        	memw
-40003ae2:	b22086        	l32i	a11, a0, 0x218
-40003ae5:	20bb10        	and	a11, a11, a2
+40003ae2:	b22086        	l32i	a11, a0, 0x218	; IO 818
+40003ae5:	20bb10        	and	a11, a11, a2	; clear
 40003ae8:	c02000        	memw
-40003aeb:	b26086        	s32i	a11, a0, 0x218
+40003aeb:	b26086        	s32i	a11, a0, 0x218	; IO 818
 40003aee:	c02000        	memw
-40003af1:	a22086        	l32i	a10, a0, 0x218
-40003af4:	40aa10        	and	a10, a10, a4
+40003af1:	a22086        	l32i	a10, a0, 0x218	; IO 818
+40003af4:	40aa10        	and	a10, a10, a4	; clear
 40003af7:	c02000        	memw
-40003afa:	a26086        	s32i	a10, a0, 0x218
+40003afa:	a26086        	s32i	a10, a0, 0x218	; IO 818
 40003afd:	c02000        	memw
-40003b00:	922086        	l32i	a9, a0, 0x218
+40003b00:	922086        	l32i	a9, a0, 0x218	; IO 818
 40003b03:	c02000        	memw
-40003b06:	926086        	s32i	a9, a0, 0x218
+40003b06:	926086        	s32i	a9, a0, 0x218	; IO 818
 40003b09:	c02000        	memw
-40003b0c:	82208e        	l32i	a8, a0, 0x238
-40003b0f:	408810        	and	a8, a8, a4
+
+40003b0c:	82208e        	l32i	a8, a0, 0x238	; IO 838
+40003b0f:	408810        	and	a8, a8, a4	; clear
 40003b12:	c02000        	memw
-40003b15:	82608e        	s32i	a8, a0, 0x238
+40003b15:	82608e        	s32i	a8, a0, 0x238	; IO 838
 40003b18:	72a100        	movi	a7, 0x100
 40003b1b:	c02000        	memw
-40003b1e:	62208e        	l32i	a6, a0, 0x238
-40003b21:	706620        	or	a6, a6, a7
+40003b1e:	62208e        	l32i	a6, a0, 0x238	; IO 838
+40003b21:	706620        	or	a6, a6, a7	; set
 40003b24:	c02000        	memw
-40003b27:	62608e        	s32i	a6, a0, 0x238
+40003b27:	62608e        	s32i	a6, a0, 0x238	; IO 838
 40003b2a:	06c7ff        	j	40003a4a
-40003b2d:	000000        	ill
+40003b2d:	000000
 
 ; uart_tx_one_char() - a2 holds character to be written
 ; uart0 base is at 0x60000000
