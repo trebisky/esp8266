@@ -765,6 +765,16 @@
 4000064f:	00
 
 ; Used only by rand above
+;
+; This is one of the Gcc long math support routines.
+; Apparently the lx106 processor ain't got no hardware multiple or divide.
+;
+; __muldi3 does long = long * long
+; __umulsidi3 does longlong = long * long
+; __divsi3 does int = int / int
+; __divdi3 does long = long / long
+; __udivdi3 does u_long = u_long / u_long
+; __umoddi3 does u_long = u_long % u_long
 
 40000650 <__muldi3>:
 40000650:	12c1d0        	addi	a1, a1, -48
@@ -1807,6 +1817,11 @@
 40000f83:	0df0      	ret.n
 40000f85:	000000
 
+; ets_isr_attach ( int_no, function, xx )
+;  
+; As an example for the Uart == ets_isr_attach ( 5, uart_rx_intr_handler, 3fffde28 )
+;
+
 40000f88 <ets_isr_attach>:
 40000f88:	12c1f0        	addi	a1, a1, -16
 40000f8b:	0901      	s32i.n	a0, a1, 0
@@ -1817,7 +1832,10 @@
 40000f97:	00
 
 ; ets_isr_mask ( mask )
+;
 ;  simply calls _xtos_ints_off ( mask ) - could be a macro or alias
+;
+; mask is 1 << int_no
 
 40000f98 <ets_isr_mask>:
 40000f98:	12c1f0        	addi	a1, a1, -16
@@ -2083,7 +2101,7 @@
 
 ; *******************
 ; The following calls the uart loader <<< *****
-; call uart_loader
+; call uart_loader (sub_11ac)
 
 40001121:	21a5ff		l32r	a2, 40000fb8	; ( 3fffdcd0 )
 40001124:	450800        	call0	400011ac <sub_11ac>
@@ -2161,6 +2179,7 @@
 ; argument is a pointer where we are expected to return something
 ; (the something seems to be an address)
 
+400011ac <uart_loader>:
 400011ac <sub_11ac>:
 400011ac:	12c1e0        	addi	a1, a1, -32	; stack space
 400011af:	0931      	s32i.n	a0, a1, 12	; save return
@@ -2276,7 +2295,7 @@
 4000129e:	85d0ff        	call0	40000fa8 <ets_isr_unmask>
 400012a1:	3801      	l32i.n	a3, a1, 0
 400012a3:	9ce3      	beqz.n	a3, 400012c5
-400012a5:	2c02      	movi.n	a2, 32
+400012a5:	2c02      	movi.n	a2, 32		; 0x20
 400012a7:	05cfff        	call0	40000f98 <ets_isr_mask>
 400012aa:	0801      	l32i.n	a0, a1, 0
 400012ac:	c6e2ff        	j	4000123b
@@ -4510,10 +4529,10 @@
 40002703:	4971      	s32i.n	a4, a1, 28
 40002705:	0931      	s32i.n	a0, a1, 12
 40002707:	09a9      	s32i.n	a0, a9, 40
-40002709:	07e223        	bbsi	a2, 0, 40002730 <dtm_set_params+0x54>
+40002709:	07e223        	bbsi	a2, 0, 40002730
 4000270c:	2d00      	mov.n	a2, a0
 4000270e:	2989      	s32i.n	a2, a9, 32
-40002710:	17ed48        	bbsi	a13, 1, 4000275c <dtm_set_params+0x80>
+40002710:	17ed48        	bbsi	a13, 1, 4000275c
 40002713:	0881      	l32i.n	a0, a1, 32
 40002715:	d8a1      	l32i.n	a13, a1, 40
 40002717:	0c07      	movi.n	a7, 0
@@ -4527,9 +4546,10 @@
 40002728:	69d9      	s32i.n	a6, a9, 52
 4000272a:	12c130        	addi	a1, a1, 48
 4000272d:	0df0      	ret.n
-4000272f:	00c5ec        	excw
-40002732:	fdc5      	excw
-40002734:	bb0b      	addi.n	a0, a11, 11
+4000272f:	00
+
+40002730:	c5ecfd        	call0	40000600 <rand>
+40002733:	c5bb0b        	call0	4000e2f0 <__floatsidf>
 40002736:	226101        	s32i	a2, a1, 4
 40002739:	326100        	s32i	a3, a1, 0
 4000273c:	2831      	l32i.n	a2, a1, 12
@@ -4544,7 +4564,8 @@
 40002750:	c5190a        	call0	4000c8f0 <__muldf3>
 40002753:	c55a0a        	call0	4000cd00 <__fixunsdfsi>
 40002756:	91d0ff		l32r	a9, 40002698	; ( 3fffdd64 )
-40002759:	46ecff        	j	4000270e <dtm_set_params+0x32>
+40002759:	46ecff        	j	4000270e
+
 4000275c:	05eafd        	call0	40000600 <rand>
 4000275f:	05b90b        	call0	4000e2f0 <__floatsidf>
 40002762:	20d220        	or	a13, a2, a2
@@ -4580,7 +4601,7 @@
 400027a4:	31bdff		l32r	a3, 40002698	; ( 3fffdd64 )
 400027a7:	2963      	s32i.n	a2, a3, 24
 400027a9:	0df0      	ret.n
-400027ab:	0031bb        	excw
+400027ab:	00
 
 400027ac <save_tsf_us>:
 400027ac:	31bbff		l32r	a3, 40002698	; ( 3fffdd64 )
@@ -5495,7 +5516,7 @@
 40002fb0:	cd02      	mov.n	a12, a2
 40002fb2:	022300        	l32i	a0, a3, 0
 40002fb5:	40d420        	or	a13, a4, a4
-40002fb8:	662008        	bnei	a0, 2, 40002fc4 <ets_wdt_enable+0x24>
+40002fb8:	662008        	bnei	a0, 2, 40002fc4
 40002fbb:	22a100        	movi	a2, 0x100
 40002fbe:	85fdfd        	call0	40000f98 <ets_isr_mask>
 40002fc1:	31dbff		l32r	a3, 40002f30	; ( 3fffc708 )
@@ -5509,10 +5530,10 @@
 40002fd6:	c02000        	memw
 40002fd9:	5260c0        	s32i	a5, a0, 0x300
 40002fdc:	0b4c      	addi.n	a4, a12, -1
-40002fde:	16a40b        	beqz	a4, 4000309c <ets_wdt_enable+0xfc>
-40002fe1:	262c25        	beqi	a12, 2, 4000300a <ets_wdt_enable+0x6a>
-40002fe4:	264c22        	beqi	a12, 4, 4000300a <ets_wdt_enable+0x6a>
-40002fe7:	263c75        	beqi	a12, 3, 40003060 <ets_wdt_enable+0xc0>
+40002fde:	16a40b        	beqz	a4, 4000309c
+40002fe1:	262c25        	beqi	a12, 2, 4000300a
+40002fe4:	264c22        	beqi	a12, 4, 4000300a
+40002fe7:	263c75        	beqi	a12, 3, 40003060
 40002fea:	0c18      	movi.n	a8, 1
 40002fec:	c02000        	memw
 40002fef:	7220c0        	l32i	a7, a0, 0x300
@@ -5526,6 +5547,7 @@
 40003003:	0801      	l32i.n	a0, a1, 0
 40003005:	12c110        	addi	a1, a1, 16
 40003008:	0df0      	ret.n
+
 4000300a:	92a038        	movi	a9, 56
 4000300d:	c02000        	memw
 40003010:	a153f8		l32r	a10, 4000115c	; ( 60000600 )
@@ -5538,7 +5560,7 @@
 40003025:	2260c1        	s32i	a2, a0, 0x304
 40003028:	c02000        	memw
 4000302b:	2260c2        	s32i	a2, a0, 0x308
-4000302e:	662cb8        	bnei	a12, 2, 40002fea <ets_wdt_enable+0x4a>
+4000302e:	662cb8        	bnei	a12, 2, 40002fea
 40003031:	22a100        	movi	a2, 0x100
 40003034:	05f7fd        	call0	40000fa8 <ets_isr_unmask>
 40003037:	02a001        	movi	a0, 1
@@ -5556,12 +5578,13 @@
 40003057:	c811      	l32i.n	a12, a1, 4
 40003059:	12c110        	addi	a1, a1, 16
 4000305c:	0df0      	ret.n
-4000305e:	0000c0        	sub	a0, a0, a0
-40003061:	200031        	srai	a0, a2, 16
-40003064:	3e          	.byte 0x3e
-40003065:	f83c      	l32i.n	a15, a12, 12
-40003067:	c22263        	l32i	a12, a2, 0x18c
-4000306a:	c02d0d        	excw
+4000305e:	0000
+
+40003060:	c02000        	memw
+40003063:	313ef8        	l32r	a3, 4000115c	; ( 60000600 )
+40003066:	3cc2      	movi.n	a2, 60
+40003068:	2263c0        	s32i	a2, a3, 0x300
+4000306b:	2d0d      	mov.n	a2, a13
 4000306d:	45eaff        	call0	40002f14 <sub_2f14>
 40003070:	31b0ff		l32r	a3, 40002f30	; ( 3fffc708 )
 40003073:	c02000        	memw
@@ -5943,7 +5966,7 @@
 
 ; good return, return 0
 
-400033f1:	22a020        	movi	a2, 32
+400033f1:	22a020        	movi	a2, 32		; 0x20
 400033f4:	05bafd        	call0	40000f98 <ets_isr_mask>
 400033f7:	22a000        	movi	a2, 0		; a2 = 0
 400033fa:	c2210b        	l32i	a12, a1, 44
@@ -5956,7 +5979,7 @@
 
 ; bad return, return 1
 
-4000340a:	22a020        	movi	a2, 32
+4000340a:	22a020        	movi	a2, 32		; 0x20
 4000340d:	85b8fd        	call0	40000f98 <ets_isr_mask>
 40003410:	22a001        	movi	a2, 1
 40003413:	c2210b        	l32i	a12, a1, 44
@@ -6111,7 +6134,7 @@
 
 ; all done -- return 1
 
-40003518:	22a020        	movi	a2, 32
+40003518:	22a020        	movi	a2, 32		; 0x20
 4000351b:	c5a7fd        	call0	40000f98 <ets_isr_mask>
 4000351e:	22a001        	movi	a2, 1
 40003521:	c2210b        	l32i	a12, a1, 44
@@ -6550,13 +6573,17 @@
 4000387d:	79d2      	s32i.n	a7, a2, 52
 
 ; now do some interrupt setup.
+; interrupt 5 gets 1<<5 = 0x20 for mask
 
+; disable uart interrupt
 4000387f:	22a020        	movi	a2, 32		; a2 = 0x20
 40003882:	4571fd        	call0	40000f98 <ets_isr_mask>
+
 40003885:	0c52      	movi.n	a2, 5		; a2 = 5
-40003887:	31ebff		l32r	a3, 40003834	; ( 40003bbc )
+40003887:	31ebff		l32r	a3, 40003834	; ( 40003bbc = uart_rx_intr_handler )
 4000388a:	41ebff		l32r	a4, 40003838	; ( 3fffde28 )
 4000388d:	856ffd        	call0	40000f88 <ets_isr_attach>
+
 40003890:	0801      	l32i.n	a0, a1, 0	restore return
 40003892:	12c110        	addi	a1, a1, 16	; restore stack
 40003895:	0df0      	ret.n
@@ -6776,7 +6803,7 @@
 
 ; here when called as Uart_Init ( non-zero )
 ;  screws with 0x60000600 + 0x224 ( 0x60000824 )
-;  this is in the iomux section
+;  this is in the iomux section -- IOMUX_SD_DATA1
 ;
 ; a4 = fecf = ~0x130
 
@@ -6785,6 +6812,7 @@
 40003a2f:	405510        	and	a5, a5, a4	; clear
 40003a32:	c02000        	memw
 40003a35:	526089        	s32i	a5, a0, 0x224	; IO 824
+
 40003a38:	32a130        	movi	a3, 0x130
 40003a3b:	c02000        	memw
 40003a3e:	222089        	l32i	a2, a0, 0x224	; IO 824
@@ -6853,6 +6881,8 @@
 ;  Note that a0 = 0x60000600
 ;  Note that a4 = 0xfffffecf
 ;  this screws with 60000818 and 60000838 in the iomux area.
+; 60000818 is IOMUX_U0TXD
+; 60000838 is IOMUX_GPIO2
 
 40003adc:	22af7f        	movi	a2, -129	; 0x7f
 40003adf:	c02000        	memw
@@ -8849,8 +8879,10 @@
 40004c61:	f941      	s32i.n	a15, a1, 16
 40004c63:	0901      	s32i.n	a0, a1, 0	; save return
 
+; GPIO is interrupt 4 (mask 0x10)
+
 40004c65:	0532fc        	call0	40000f88 <ets_isr_attach>
-40004c68:	1c02      	movi.n	a2, 16
+40004c68:	1c02      	movi.n	a2, 16		; 0x10
 40004c6a:	c532fc        	call0	40000f98 <ets_isr_mask>
 
 ; set all pins as inputs
@@ -20118,34 +20150,43 @@
 4000bd23:	0df0      	ret.n
 4000bd25:	000000        	ill
 
+; a2 - int number (0-14)
+; a3 - function
+; a4 - arg
+;  -- always returns 0
+
 4000bd28 <_xtos_set_interrupt_handler_arg>:
-4000bd28:	960203        	bltz	a2, 4000bd5c <_xtos_set_interrupt_handler_arg+0x34>
+4000bd28:	960203        	bltz	a2, 4000bd5c
 4000bd2b:	0ce5      	movi.n	a5, 14
-4000bd2d:	27252b        	blt	a5, a2, 4000bd5c <_xtos_set_interrupt_handler_arg+0x34>
+4000bd2d:	27252b        	blt	a5, a2, 4000bd5c
 4000bd30:	61add1		l32r	a6, 400003e4	; ( 3fffd650 )
-4000bd33:	d08211        	slli	a8, a2, 3
+4000bd33:	d08211        	slli	a8, a2, 3	; n*8
 4000bd36:	6a62      	add.n	a6, a2, a6
 4000bd38:	620600        	l8ui	a6, a6, 0
 4000bd3b:	71abd1		l32r	a7, 400003e8	; ( 3fffc208 )
-4000bd3e:	f6361a        	bgeui	a6, 3, 4000bd5c <_xtos_set_interrupt_handler_arg+0x34>
+4000bd3e:	f6361a        	bgeui	a6, 3, 4000bd5c
 4000bd41:	8077c0        	sub	a7, a7, a8
 4000bd44:	81aad1		l32r	a8, 400003ec	; ( 4000dc3c )
 4000bd47:	62271c        	l32i	a6, a7, 112
-4000bd4a:	dc23      	bnez.n	a3, 4000bd60 <_xtos_set_interrupt_handler_arg+0x38>
+4000bd4a:	dc23      	bnez.n	a3, 4000bd60
 4000bd4c:	82671c        	s32i	a8, a7, 112
 4000bd4f:	22671d        	s32i	a2, a7, 116
 4000bd52:	8096c0        	sub	a9, a6, a8
 4000bd55:	0c02      	movi.n	a2, 0
 4000bd57:	902693        	movnez	a2, a6, a9
 4000bd5a:	0df0      	ret.n
-4000bd5c:	0c02      	movi.n	a2, 0
+
+4000bd5c:	0c02      	movi.n	a2, 0		; return 0
 4000bd5e:	0df0      	ret.n
+
 4000bd60:	32671c        	s32i	a3, a7, 112
 4000bd63:	42671d        	s32i	a4, a7, 116
 4000bd66:	80a6c0        	sub	a10, a6, a8
 4000bd69:	0c02      	movi.n	a2, 0
 4000bd6b:	a02693        	movnez	a2, a6, a10
 4000bd6e:	0df0      	ret.n
+
+; call the above with 0 argument
 
 4000bd70 <_xtos_set_interrupt_handler>:
 4000bd70:	4d02      	mov.n	a4, a2
@@ -20155,7 +20196,7 @@
 4000bd7a:	0801      	l32i.n	a0, a1, 0
 4000bd7c:	12c110        	addi	a1, a1, 16
 4000bd7f:	0df0      	ret.n
-4000bd81:	000000        	ill
+4000bd81:	000000
 
 ; alias for ets_isr_unmask ( mask )
 ; mask is in a2
@@ -21779,6 +21820,7 @@
 4000ce30:	200c02        	excw
 4000ce33:	0df0      	ret.n
 4000ce35:	000000        	ill
+
 4000ce38:	1624ff        	beqz	a4, 4000ce2e <__extendsfdf2+0x32>
 4000ce3b:	70f440        	nsau	a7, a4
 4000ce3e:	72c7f8        	addi	a7, a7, -8
@@ -21795,6 +21837,7 @@
 4000ce5d:	000000        	ill
 
 ; gcc long division
+; long = long / long
 
 4000ce60 <__divdi3>:
 4000ce60:	8d04      	mov.n	a8, a4
@@ -22228,6 +22271,8 @@
 4000d30c:	86e8fe        	j	4000ceb2 <__divdi3+0x52>
 4000d30f:	008d02        	excw
 
+; does u_long = u_long / u_long
+
 4000d310 <__udivdi3>:
 4000d310:	8d02      	mov.n	a8, a2
 4000d312:	62a0c0        	movi	a6, 192
@@ -22646,6 +22691,8 @@
 4000d769:	02211e        	l32i	a0, a1, 120
 4000d76c:	4a11      	add.n	a1, a1, a4
 4000d76e:	0df0      	ret.n
+
+; does u_long = u_long % u_long
 
 4000d770 <__umoddi3>:
 4000d770:	62a0b0        	movi	a6, 176
@@ -23148,6 +23195,8 @@
 4000dc82:	12d101        	addmi	a1, a1, 0x100
 4000dc85:	003000        	rfe
 
+; does int = int / int
+
 4000dc88 <__divsi3>:
 4000dc88:	307230        	xor	a7, a2, a3
 4000dc8b:	206160        	abs	a6, a2
@@ -23194,7 +23243,9 @@
 4000dcec:	0c02      	movi.n	a2, 0
 4000dcee:	0df0      	ret.n
 
-
+; Multiply
+;
+; __umulsidi3 does longlong = long * long
 ; Used many places.
 
 4000dcf0 <__umulsidi3>:
@@ -23752,68 +23803,86 @@
 4000e218:	0df0      	ret.n
 4000e21a:	0df0      	ret.n
 
+; unsigned int = unsigned int / unsigned int
+
 4000e21c <__udivsi3>:
-4000e21c:	b62330        	bltui	a3, 2, 4000e250 <__udivsi3+0x34>
+4000e21c:	b62330        	bltui	a3, 2, 4000e250
 4000e21f:	6d02      	mov.n	a6, a2
 4000e221:	50f640        	nsau	a5, a6
 4000e224:	40f340        	nsau	a4, a3
-4000e227:	47b529        	bgeu	a5, a4, 4000e254 <__udivsi3+0x38>
+4000e227:	47b529        	bgeu	a5, a4, 4000e254
 4000e22a:	5044c0        	sub	a4, a4, a5
 4000e22d:	001440        	ssl	a4
 4000e230:	0033a1        	sll	a3, a3
 4000e233:	0c02      	movi.n	a2, 0
-4000e235:	373604        	bltu	a6, a3, 4000e23d <__udivsi3+0x21>
+4000e235:	373604        	bltu	a6, a3, 4000e23d
 4000e238:	3066c0        	sub	a6, a6, a3
 4000e23b:	1b22      	addi.n	a2, a2, 1
 4000e23d:	f02211        	slli	a2, a2, 1
 4000e240:	303141        	srli	a3, a3, 1
 4000e243:	0b44      	addi.n	a4, a4, -1
-4000e245:	56c4fe        	bnez	a4, 4000e235 <__udivsi3+0x19>
-4000e248:	373601        	bltu	a6, a3, 4000e24d <__udivsi3+0x31>
+4000e245:	56c4fe        	bnez	a4, 4000e235
+4000e248:	373601        	bltu	a6, a3, 4000e24d
 4000e24b:	1b22      	addi.n	a2, a2, 1
 4000e24d:	0df0      	ret.n
-4000e24f:	008c93        	movnez	a8, a12, a0
+4000e24f:	00
+
+4000e250:	8c93      	beqz.n	a3, 4000e25d
 4000e252:	0df0      	ret.n
-4000e254:	37360c        	bltu	a6, a3, 4000e264 <__udivsi3+0x48>
+
+4000e254:	37360c        	bltu	a6, a3, 4000e264
 4000e257:	0c12      	movi.n	a2, 1
 4000e259:	0df0      	ret.n
-4000e25b:	000000        	ill
-4000e25e:	000044        	extui	a0, a0, 0, 5
-4000e261:	4956      	s32i.n	a4, a6, 20
-4000e263:	300c02        	excw
+4000e25b:	0000
+
+; We actually branch here !
+4000e25d:	000000        	ill
+4000e260:	44495630		; DIV0
+
+4000e264:	0c02      	movi.n	a2, 0
 4000e266:	0df0      	ret.n
 
+; unsigned int = unsigned int % unsigned int
+
 4000e268 <__umodsi3>:
-4000e268:	b62328        	bltui	a3, 2, 4000e294 <__umodsi3+0x2c>
+4000e268:	b62328        	bltui	a3, 2, 4000e294
 4000e26b:	50f240        	nsau	a5, a2
 4000e26e:	40f340        	nsau	a4, a3
-4000e271:	47b517        	bgeu	a5, a4, 4000e28c <__umodsi3+0x24>
+4000e271:	47b517        	bgeu	a5, a4, 4000e28c
 4000e274:	5044c0        	sub	a4, a4, a5
 4000e277:	001440        	ssl	a4
 4000e27a:	0033a1        	sll	a3, a3
-4000e27d:	373202        	bltu	a2, a3, 4000e283 <__umodsi3+0x1b>
+4000e27d:	373202        	bltu	a2, a3, 4000e283
 4000e280:	3022c0        	sub	a2, a2, a3
 4000e283:	303141        	srli	a3, a3, 1
 4000e286:	42c4ff        	addi	a4, a4, -1
-4000e289:	5604ff        	bnez	a4, 4000e27d <__umodsi3+0x15>
-4000e28c:	373202        	bltu	a2, a3, 4000e292 <__umodsi3+0x2a>
+4000e289:	5604ff        	bnez	a4, 4000e27d
+4000e28c:	373202        	bltu	a2, a3, 4000e292
 4000e28f:	3022c0        	sub	a2, a2, a3
 4000e292:	0df0      	ret.n
+
 4000e294:	cc53      	bnez.n	a3, 4000e29d <__umodsi3+0x35>
+
+; We actually fall through to here !
 4000e296:	000000        	ill
-4000e299:	444956        	excw
-4000e29c:	300c02        	excw
+4000e299:	44495630		; DIV0
+
+4000e29d:	0c02      	movi.n	a2, 0
 4000e29f:	0df0      	ret.n
 4000e2a1:	000000        	ill
 
+; unsigned integer  -> single-precision conversion
+
 4000e2a4 <__floatunsisf>:
-4000e2a4:	bc62      	beqz.n	a2, 4000e2de <__floatsisf+0x32>
+4000e2a4:	bc62      	beqz.n	a2, 4000e2de
 4000e2a6:	0c07      	movi.n	a7, 0
-4000e2a8:	060200        	j	4000e2b4 <__floatsisf+0x8>
-4000e2ab:	00ace2        	excw
+4000e2a8:	060200        	j	4000e2b4
+4000e2ab:	00
+
+; integer -> single-precision conversion
 
 4000e2ac <__floatsisf>:
-4000e2ac:	ace2      	beqz.n	a2, 4000e2de <__floatsisf+0x32>
+4000e2ac:	ace2      	beqz.n	a2, 4000e2de
 4000e2ae:	207f05        	extui	a7, a2, 31, 1
 4000e2b1:	202160        	abs	a2, a2
 4000e2b4:	40f240        	nsau	a4, a2
@@ -23827,23 +23896,28 @@
 4000e2cc:	5a22      	add.n	a2, a2, a5
 4000e2ce:	107701        	slli	a7, a7, 31
 4000e2d1:	702220        	or	a2, a2, a7
-4000e2d4:	d66600        	bgez	a6, 4000e2de <__floatsisf+0x32>
+4000e2d4:	d66600        	bgez	a6, 4000e2de
 4000e2d7:	1b22      	addi.n	a2, a2, 1
 4000e2d9:	f06611        	slli	a6, a6, 1
-4000e2dc:	8c06      	beqz.n	a6, 4000e2e0 <__floatsisf+0x34>
+4000e2dc:	8c06      	beqz.n	a6, 4000e2e0
 4000e2de:	0df0      	ret.n
+
 4000e2e0:	202141        	srli	a2, a2, 1
 4000e2e3:	f02211        	slli	a2, a2, 1
 4000e2e6:	0df0      	ret.n
 
+; unsigned integer to double-precision conversion
+
 4000e2e8 <__floatunsidf>:
-4000e2e8:	ace2      	beqz.n	a2, 4000e31a <__floatsidf+0x2a>
+4000e2e8:	ace2      	beqz.n	a2, 4000e31a
 4000e2ea:	0c07      	movi.n	a7, 0
-4000e2ec:	060200        	j	4000e2f8 <__floatsidf+0x8>
-4000e2ef:	00ac62        	excw
+4000e2ec:	060200        	j	4000e2f8
+4000e2ef:	00
+
+; integer -> double-precision conversion
 
 4000e2f0 <__floatsidf>:
-4000e2f0:	ac62      	beqz.n	a2, 4000e31a <__floatsidf+0x2a>
+4000e2f0:	ac62      	beqz.n	a2, 4000e31a
 4000e2f2:	207f05        	extui	a7, a2, 31, 1
 4000e2f5:	202160        	abs	a2, a2
 4000e2f8:	40f240        	nsau	a4, a2
@@ -23858,9 +23932,10 @@
 4000e312:	107701        	slli	a7, a7, 31
 4000e315:	703320        	or	a3, a3, a7
 4000e318:	0df0      	ret.n
+
 4000e31a:	0c03      	movi.n	a3, 0
 4000e31c:	0df0      	ret.n
-4000e31e:	00000c        	excw
+4000e31e:	0000
 
 4000e320 <xthal_spill_registers_into_stack_nw>:
 4000e320:	0c02      	movi.n	a2, 0
