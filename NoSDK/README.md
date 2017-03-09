@@ -3,10 +3,13 @@ of the bootrom.  Essentially this is bare metal programming on the ESP8266.
 
 This yields extremely small executables that load in a fraction of a second.
 
-Clearly this would not work for anything that needed wireless networking,
-but if you wanted to just use the ESP8266 as a little controller, it could
-be just the thing!  This deserves more attention.
+Clearly this will not work for anything that needed wireless networking,
+but if you just want to just use the ESP8266 as a little controller,
+it is just the thing!
 
 1. hello -- a very small simple first program that prints a message
-2. first -- a variety of "bare metal" experiments
-1. baud -- Linux utility to set unusual baud rates
+2. uart -- a bare metal uart driver
+3. misc -- a variety of "bare metal" experiments
+4. baud -- Linux utility to set unusual baud rates
+5. uart-sdk1 -- old uart experiments with SDK
+6. uart-sdk2 -- old uart experiments with SDK

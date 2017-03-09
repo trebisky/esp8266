@@ -60,7 +60,7 @@ LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
 .PHONY: all flash clean info term
 
-TARGET	= first
+TARGET	= misc
 
 all: $(TARGET)
 
@@ -68,9 +68,9 @@ all: $(TARGET)
 	$(vecho) "CC $<"
 	$(Q) $(CC) $(INCLUDES) $(CFLAGS)  -c $<
 
-#first: first.o
+#misc: misc.o
 #	$(vecho) "LD $@"
-#	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) first.o -Wl,--end-group -o $@
+#	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) misc.o -Wl,--end-group -o $@
 
 # linker flags
 #XLDFLAGS		= -nostdlib -Wl,--no-check-sections -u user_init -Wl,-static
@@ -82,8 +82,8 @@ all: $(TARGET)
 XLIBS		= gcc
 XLIBS		:= $(addprefix -l,$(XLIBS))
 
-first: first.o
-	$(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(XLIBS) first.o -Wl,--end-group -o $@
+misc: misc.o
+	$(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(XLIBS) misc.o -Wl,--end-group -o $@
 
 # This is important -- without the right options it works sometimes,
 # but other times screws up.
@@ -111,10 +111,10 @@ bootrom.bin:
 #	xtensa-lx106-elf-objdump -D -b binary -mxtensa bootrom.bin >bootrom.dis
 
 dis:
-	xtensa-lx106-elf-objdump -D -mxtensa first.o >first.dis
+	xtensa-lx106-elf-objdump -D -mxtensa misc.o >misc.dis
 
 syms:
-	xtensa-lx106-elf-nm first | sort >first.syms
+	xtensa-lx106-elf-nm misc | sort >misc.syms
 
 term:
 	picocom -b 115200 $(PORT)

@@ -15,7 +15,8 @@ endif
 
 # The new python job
 ESPTOOL		= esptool
-PORT		= /dev/ttyUSB1
+PORT		= /dev/ttyUSB0
+#PORT		= /dev/ttyUSB1
 
 # base directory of the ESP8266 SDK package, absolute
 ##SDK_BASE	?= /opt/Espressif/sdk/

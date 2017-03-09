@@ -1,4 +1,7 @@
 /* ESP8266 bare metal experiments
+ * 
+ * This actually links with the full SDK
+ *
  * Tom Trebisky  12-28-2015
  */
 
@@ -36,6 +39,8 @@ tiny_start ( void )
     n = strlen ( stuff );
 
     uart_div_modify ( 0, (80*1000*1000) / 115200 );
+
+    /* This works - pure SDK */
     os_printf_plus ( "\n\n" );
     os_printf_plus ( "Hello 1\n" );
 
@@ -44,6 +49,7 @@ tiny_start ( void )
     uart_init ();
     uart_baud ( 115200 );
 
+    /* And so does this - my driver */
     os_printf_plus ( "Hello 2\n" );
 
     /* The real SDK runs a watchdog and
