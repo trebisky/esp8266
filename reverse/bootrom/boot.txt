@@ -5068,40 +5068,61 @@
 40002bf5:	0df0      	ret.n
 40002bf7:	00
 
+; *********************** start timer stuff *********************8
+
+; called from one place (just below)
+; writes arg to 60000 630
+
 40002bf8 <sub_2bf8>:
-40002bf8:	3159f9		l32r	a3, 4000115c	; ( 60000600 )
+40002bf8:	3159f9		l32r	a3, 4000115c	; ( 60000600 )  iobase
 40002bfb:	c02000        	memw
-40002bfe:	29c3      	s32i.n	a2, a3, 48
+40002bfe:	29c3      	s32i.n	a2, a3, 48	; iobase + 0x30
 40002c00:	0df0      	ret.n
 40002c02:	0000
 
+; -------------
+
 40002c04 <sub_2c04>:
-40002c04:	12c1f0        	addi	a1, a1, -16
-40002c07:	0901      	s32i.n	a0, a1, 0
-40002c09:	4154f9		l32r	a4, 4000115c	; ( 60000600 )
+40002c04:	12c1f0        	addi	a1, a1, -16	; stack
+40002c07:	0901      	s32i.n	a0, a1, 0	; save
+
+40002c09:	4154f9		l32r	a4, 4000115c	; ( 60000600 )  iobase
 40002c0c:	c02000        	memw
-40002c0f:	422409        	l32i	a4, a4, 36
+40002c0f:	422409        	l32i	a4, a4, 36	; read iobase = 0x32
 40002c12:	4002c0        	sub	a0, a2, a4
 40002c15:	32c0d8        	addi	a3, a0, -40
-40002c18:	e61311        	bgei	a3, 1, 40002c2d <sub_2c04+0x29>
-40002c1b:	a61019        	blti	a0, 1, 40002c38 <sub_2c04+0x34>
+40002c18:	e61311        	bgei	a3, 1, 40002c2d
+40002c1b:	a61019        	blti	a0, 1, 40002c38
 40002c1e:	22c22c        	addi	a2, a2, 44
+
 40002c21:	45fdff        	call0	40002bf8 <sub_2bf8>
 40002c24:	0801      	l32i.n	a0, a1, 0
 40002c26:	12c110        	addi	a1, a1, 16
 40002c29:	0df0      	ret.n
-40002c2b:	000085        	extui	a0, a0, 16, 9
-40002c2e:	fcff      	bnez.n	a15, 40002c71 <timer_insert+0xd>
+40002c2b:	0000
+
+40002c2d:	85fcff        	call0	40002bf8 <sub_2bf8>
 40002c30:	0801      	l32i.n	a0, a1, 0
 40002c32:	12c110        	addi	a1, a1, 16
 40002c35:	0df0      	ret.n
-40002c37:	0022c4        	extui	a2, a0, 2, 13
-40002c3a:	28c5      	l32i.n	a2, a5, 48
-40002c3c:	fbff      	addi.n	a15, a15, 15
+40002c37:	00
+
+40002c38:	22c428        	addi	a2, a4, 40
+40002c3b:	c5fbff        	call0	40002bf8 <sub_2bf8>
 40002c3e:	0801      	l32i.n	a0, a1, 0
 40002c40:	12c110        	addi	a1, a1, 16
 40002c43:	0df0      	ret.n
-40002c45:	000000        	ill
+40002c45:	000000
+
+; ets_timer_setfn ( p, a, b )
+; simply initializes a structure
+;  (presumably a timer management structure)
+; "p" points to the structure
+; p + 0 = -1
+; p + 4 = 0
+; p + 8 = 0
+; p + 12 = a
+; p + 16 = b
 
 40002c48 <ets_timer_setfn>:
 40002c48:	3932      	s32i.n	a3, a2, 12
@@ -5112,6 +5133,7 @@
 40002c52:	6922      	s32i.n	a6, a2, 8
 40002c54:	5902      	s32i.n	a5, a2, 0
 40002c56:	0df0      	ret.n
+
 40002c58:	b0ddff3f	.long 0x3fffddb0
 40002c5c:	b8d6ff3f	.long 0x3fffd6b8
 40002c60:	78d8ff3f	.long 0x3fffd878
@@ -5161,69 +5183,102 @@
 40002cbc:	ce300000	.long 0x000030ce
 40002cc0:	b4c40400	.long 0x0004c4b4
 
+; ets_timer_arm
+; Called with 3 arguments like so:
+;
+; call ets_timer_arm ( &wdt_timer, rate, 1 );
+;
+; The first argument is a pointer to a timer management object
+; as set up by timer_setfn, maybe with a call like this:
+;
+; call timer_setfn ( &wdt_timer, wdt_isr, 0 );
+; 
+;  note that timer_setfn sets the first field to -1,
+;   which makes the thing palatable to this routine
+
+
+
 40002cc4 <ets_timer_arm>:
-40002cc4:	12c1f0        	addi	a1, a1, -16
-40002cc7:	c26101        	s32i	a12, a1, 4
-40002cca:	026100        	s32i	a0, a1, 0
-40002ccd:	20c220        	or	a12, a2, a2
-40002cd0:	2d03      	mov.n	a2, a3
-40002cd2:	080c      	l32i.n	a0, a12, 0
-40002cd4:	3d04      	mov.n	a3, a4
-40002cd6:	26000e        	beqi	a0, -1, 40002ce8 <ets_timer_arm+0x24>
+40002cc4:	12c1f0        	addi	a1, a1, -16	; stack
+40002cc7:	c26101        	s32i	a12, a1, 4	; save
+40002cca:	026100        	s32i	a0, a1, 0	; save
+
+40002ccd:	20c220        	or	a12, a2, a2	; timer object
+40002cd0:	2d03      	mov.n	a2, a3		; rate
+40002cd2:	080c      	l32i.n	a0, a12, 0	; first field in object
+40002cd4:	3d04      	mov.n	a3, a4		; option
+40002cd6:	26000e        	beqi	a0, -1, 40002ce8
+
+; Here if first entry in control structure is NOT -1
+; (this is a "panic" situation).
 
 ; Format: "%s %s "
+
 40002cd9:	21e0ff		l32r	a2, 40002c5c	; ( 3fffd6b8 )
 40002cdc:	31e1ff		l32r	a3, 40002c60	; ( 3fffd878 )
 40002cdf:	42a0b9        	movi	a4, 185
 40002ce2:	857eff        	call0	400024cc <ets_printf>
-40002ce5:	06ffff        	j	40002ce5 <ets_timer_arm+0x21>
+40002ce5:	06ffff        	j	40002ce5	; spin !!!
 
-40002ce8:	16c204        	beqz	a2, 40002d38 <ets_timer_arm+0x74>
-40002ceb:	41f4ff		l32r	a4, 40002cbc	; ( 000030ce )
-40002cee:	3921      	s32i.n	a3, a1, 8
-40002cf0:	27b431        	bgeu	a4, a2, 40002d25 <ets_timer_arm+0x61>
-40002cf3:	200014        	extui	a0, a2, 0, 2
-40002cf6:	52a4e2        	movi	a5, 0x4e2
-40002cf9:	204241        	srli	a4, a2, 2
-40002cfc:	504482        	mull	a4, a4, a5
-40002cff:	52a139        	movi	a5, 0x139
-40002d02:	5000c1        	mul16u	a0, a0, a5
-40002d05:	4a00      	add.n	a0, a0, a4
-40002d07:	162300        	beqz	a3, 40002d0d <ets_timer_arm+0x49>
-40002d0a:	026c02        	s32i	a0, a12, 8
+40002ce8:	16c204        	beqz	a2, 40002d38	; is rate == 0 ?
+40002ceb:	41f4ff		l32r	a4, 40002cbc	; ( 000030ce ) = 12494
+40002cee:	3921      	s32i.n	a3, a1, 8	; save a3 on stack
+40002cf0:	27b431        	bgeu	a4, a2, 40002d25
+
+40002cf3:	200014        	extui	a0, a2, 0, 2	; last 2 bits of rate
+40002cf6:	52a4e2        	movi	a5, 0x4e2	; a5 = 1250
+40002cf9:	204241        	srli	a4, a2, 2	; a4 = a2 / 4
+40002cfc:	504482        	mull	a4, a4, a5	; a4 *= 1250
+40002cff:	52a139        	movi	a5, 0x139	; a5 = 313
+40002d02:	5000c1        	mul16u	a0, a0, a5	; a0 *= 313
+40002d05:	4a00      	add.n	a0, a0, a4	; a0 += a4
+
+; starting with x = a2
+; the above does: y = x%4 * 313 + x/4 * 1250
+; or we can end up here (from below) with a0 = y = 0
+
+40002d07:	162300        	beqz	a3, 40002d0d
+40002d0a:	026c02        	s32i	a0, a12, 8	; save result to timer_object + 8
 40002d0d:	3d0c      	mov.n	a3, a12
-40002d0f:	2113f9		l32r	a2, 4000115c	; ( 60000600 )
+40002d0f:	2113f9		l32r	a2, 4000115c	; ( 60000600 )  iobase
 40002d12:	c02000        	memw
-40002d15:	2892      	l32i.n	a2, a2, 36
-40002d17:	2a20      	add.n	a2, a0, a2
+40002d15:	2892      	l32i.n	a2, a2, 36	; iobase + 0x24 (0x624) TIMER_FRC2_COUNT
+40002d17:	2a20      	add.n	a2, a0, a2	; add "y" from above
 40002d19:	85f4ff        	call0	40002c64 <timer_insert>
-40002d1c:	c811      	l32i.n	a12, a1, 4
-40002d1e:	0801      	l32i.n	a0, a1, 0
-40002d20:	12c110        	addi	a1, a1, 16
+
+40002d1c:	c811      	l32i.n	a12, a1, 4	; restore
+40002d1e:	0801      	l32i.n	a0, a1, 0	; restore
+40002d20:	12c110        	addi	a1, a1, 16	; stack
 40002d23:	0df0      	ret.n
-40002d25:	41e6ff		l32r	a4, 40002cc0	; ( 0004c4b4 )
-40002d28:	32a3e8        	movi	a3, 0x3e8
-40002d2b:	402282        	mull	a2, a2, a4
-40002d2e:	c54e0b        	call0	4000e21c <__udivsi3>
+
+40002d25:	41e6ff		l32r	a4, 40002cc0	; ( 0004c4b4 ) = 312500
+40002d28:	32a3e8        	movi	a3, 0x3e8	; a3 = 1000
+40002d2b:	402282        	mull	a2, a2, a4	; a2 *= 312400
+40002d2e:	c54e0b        	call0	4000e21c <__udivsi3>	; a2 = a2 / 1000
 40002d31:	3821      	l32i.n	a3, a1, 8
 40002d33:	1b02      	addi.n	a0, a2, 1
-40002d35:	86f3ff        	j	40002d07 <ets_timer_arm+0x43>
-40002d38:	0c00      	movi.n	a0, 0
-40002d3a:	46f2ff        	j	40002d07 <ets_timer_arm+0x43>
-40002d3d:	000000        	ill
+40002d35:	86f3ff        	j	40002d07
+
+40002d38:	0c00      	movi.n	a0, 0		; here when rate == 0
+40002d3a:	46f2ff        	j	40002d07
+40002d3d:	000000
+
+; called with a pointer to ....
 
 40002d40 <ets_timer_disarm>:
 40002d40:	71c6ff		l32r	a7, 40002c58	; ( 3fffddb0 )
 40002d43:	5807      	l32i.n	a5, a7, 0
 40002d45:	0c06      	movi.n	a6, 0
-40002d47:	acb5      	beqz.n	a5, 40002d76 <ets_timer_disarm+0x36>
-40002d49:	571209        	beq	a2, a5, 40002d56 <ets_timer_disarm+0x16>
+40002d47:	acb5      	beqz.n	a5, 40002d76
+
+40002d49:	571209        	beq	a2, a5, 40002d56
 40002d4c:	6d05      	mov.n	a6, a5
 40002d4e:	5805      	l32i.n	a5, a5, 0
-40002d50:	5655ff        	bnez	a5, 40002d49 <ets_timer_disarm+0x9>
-40002d53:	c60700        	j	40002d76 <ets_timer_disarm+0x36>
-40002d56:	9cc5      	beqz.n	a5, 40002d76 <ets_timer_disarm+0x36>
-40002d58:	8cc6      	beqz.n	a6, 40002d68 <ets_timer_disarm+0x28>
+40002d50:	5655ff        	bnez	a5, 40002d49
+40002d53:	c60700        	j	40002d76
+
+40002d56:	9cc5      	beqz.n	a5, 40002d76
+40002d58:	8cc6      	beqz.n	a6, 40002d68
 40002d5a:	0c03      	movi.n	a3, 0
 40002d5c:	7cf4      	movi.n	a4, -1
 40002d5e:	7805      	l32i.n	a7, a5, 0
@@ -5231,6 +5286,7 @@
 40002d62:	4902      	s32i.n	a4, a2, 0
 40002d64:	3922      	s32i.n	a3, a2, 8
 40002d66:	0df0      	ret.n
+
 40002d68:	0c08      	movi.n	a8, 0
 40002d6a:	7cf9      	movi.n	a9, -1
 40002d6c:	a805      	l32i.n	a10, a5, 0
@@ -5238,6 +5294,7 @@
 40002d70:	9902      	s32i.n	a9, a2, 0
 40002d72:	8922      	s32i.n	a8, a2, 8
 40002d74:	0df0      	ret.n
+
 40002d76:	0c0b      	movi.n	a11, 0
 40002d78:	7cf3      	movi.n	a3, -1
 40002d7a:	3902      	s32i.n	a3, a2, 0
@@ -5439,266 +5496,366 @@
 40002f11:	0df0      	ret.n
 40002f13:	002632        	excw
 
+; called by WDT routines below
+; It just maps its argument to a return value
+;
+; 3 --> 11
+; 6 --> 12
+; 12 --> 13
+; else 0
+; 
+; call this wdt_map(arg)
+
 40002f14 <sub_2f14>:
 40002f14:	26320e        	beqi	a2, 3, 40002f26
 40002f17:	26620f        	beqi	a2, 6, 40002f2a
 
 40002f1a:	42c2f4        	addi	a4, a2, -12	; a4 = a2 - 12
 40002f1d:	0cd3      	movi.n	a3, 13		; a3 = 13
+
 40002f1f:	0c02      	movi.n	a2, 0		; a2 = 0
 40002f21:	402383        	moveqz	a2, a3, a4	; a2 = a3 if a4 == 0
 40002f24:	0df0      	ret.n
+
 40002f26:	0cb2      	movi.n	a2, 11	; return 11
 40002f28:	0df0      	ret.n
+
 40002f2a:	0cc2      	movi.n	a2, 12	; return 12
 40002f2c:	0df0      	ret.n
 40002f2e:	0000
 
-40002f30:	08c7ff3f	.long 0x3fffc708
+; The following points to a 3 word object  wdt_info
+; +0 = mode
+; +4 = A
+; +8 = B
+
+; Watchdog timer registers:
+;
+; +300 = 60000900 = WD_CTRL
+; +304 = 60000904 = WD_R1
+; +308 = 60000908 = WD_R2
+; +30C = 6000090C = WD_x  (apparently never used)
+; +310 = 60000910 = WD_y
+; +314 = 60000914 = WD_FEED
+; +318 = 60000918 = WD_z
+
+40002f30:	08c7ff3f	.long 0x3fffc708	; wdt_info
 
 40002f34 <ets_wdt_get_mode>:
-40002f34:	21ffff		l32r	a2, 40002f30	; ( 3fffc708 )
-40002f37:	2802      	l32i.n	a2, a2, 0
+40002f34:	21ffff		l32r	a2, 40002f30	; ( 3fffc708 )	wdt_info
+40002f37:	2802      	l32i.n	a2, a2, 0	; return wdt_info.mode
 40002f39:	0df0      	ret.n
 40002f3b:	00
+
+; called from wrapper below, used as an ISR.
+; wdt_xxx ( arg )
 
 40002f3c <sub_2f3c>:
 40002f3c:	12c1f0        	addi	a1, a1, -16
 40002f3f:	0901      	s32i.n	a0, a1, 0
 40002f41:	05ffff        	call0	40002f34 <ets_wdt_get_mode>
-40002f44:	42a073        	movi	a4, 115
-40002f47:	0185f8		l32r	a0, 4000115c	; ( 60000600 )
-40002f4a:	261212        	beqi	a2, 1, 40002f60
-40002f4d:	662208        	bnei	a2, 2, 40002f59
+40002f44:	42a073        	movi	a4, 115		; 0x73
+40002f47:	0185f8		l32r	a0, 4000115c	; ( 60000600 )	iobase
+
+40002f4a:	261212        	beqi	a2, 1, 40002f60	; arg == 1
+40002f4d:	662208        	bnei	a2, 2, 40002f59	; arg != 2
+
+; arg == 0 ??
 40002f50:	c02000        	memw
-40002f53:	2220c4        	l32i	a2, a0, 0x310
-40002f56:	26121a        	beqi	a2, 1, 40002f74 <sub_2f3c+0x38>
-40002f59:	0801      	l32i.n	a0, a1, 0
+40002f53:	2220c4        	l32i	a2, a0, 0x310	; WD_y
+40002f56:	26121a        	beqi	a2, 1, 40002f74
+
+40002f59:	0801      	l32i.n	a0, a1, 0	; return
 40002f5b:	12c110        	addi	a1, a1, 16
 40002f5e:	0df0      	ret.n
 
+; arg == 1
 40002f60:	c02000        	memw
-40002f63:	4260c5        	s32i	a4, a0, 0x314
+40002f63:	4260c5        	s32i	a4, a0, 0x314	; WD_FEED = 0x73
 40002f66:	c02000        	memw
-40002f69:	3220c4        	l32i	a3, a0, 0x310
+40002f69:	3220c4        	l32i	a3, a0, 0x310	; WD_y
 40002f6c:	0801      	l32i.n	a0, a1, 0
 40002f6e:	12c110        	addi	a1, a1, 16
 40002f71:	0df0      	ret.n
 40002f73:	00
 
+; here when WD_y == 1
 40002f74:	c02000        	memw
-40002f77:	4260c6        	s32i	a4, a0, 0x318
+40002f77:	4260c6        	s32i	a4, a0, 0x318	; WD_z = 0x73
 40002f7a:	c02000        	memw
-40002f7d:	4260c5        	s32i	a4, a0, 0x314
+40002f7d:	4260c5        	s32i	a4, a0, 0x314	; WD_FEED = 0x73
 40002f80:	0801      	l32i.n	a0, a1, 0
 40002f82:	12c110        	addi	a1, a1, 16
 40002f85:	0df0      	ret.n
 
-40002f87:	0012c1        	mul16u	a1, a2, a0
-40002f8a:	f00901        	slli	a0, a9, 17
+; wdt_isr ()
+;   subroutine, wrapper on above
+;   used in two places
+;   -- handed to  ets_timer_setfn () in ets_wdt_enable ( 1, y, z )
+;   -- handed to  ets_isr_attach ( 8, wdt_isr, 0 ) in ets_wdt_init()
+;
+; Note that the WDT interrupt is 8 ( with mask 0x100 )
+
+40002f88:	12c1f0        	addi	a1, a1, -16
+40002f8b:	0901      	s32i.n	a0, a1, 0
 40002f8d:	c5faff        	call0	40002f3c <sub_2f3c>
 40002f90:	0801      	l32i.n	a0, a1, 0
 40002f92:	12c110        	addi	a1, a1, 16
 40002f95:	0df0      	ret.n
 40002f97:	00
 
-40002f98:	882f0040	.long 0x40002f88
-40002f9c:	e0ddff3f	.long 0x3fffdde0
+; wdt_timer is a pointer to a 20 byte timer management structure
+
+40002f98:	882f0040	.long 0x40002f88	; wdt_isr ()
+40002f9c:	e0ddff3f	.long 0x3fffdde0	; wdt_timer
+
+; ets_wdt_enable ( mode, y, z )
 
 40002fa0 <ets_wdt_enable>:
-40002fa0:	12c1f0        	addi	a1, a1, -16
-40002fa3:	d921      	s32i.n	a13, a1, 8
-40002fa5:	0901      	s32i.n	a0, a1, 0
-40002fa7:	e931      	s32i.n	a14, a1, 12
-40002fa9:	c911      	s32i.n	a12, a1, 4
-40002fab:	ed03      	mov.n	a14, a3
-40002fad:	31e0ff		l32r	a3, 40002f30	; ( 3fffc708 )
-40002fb0:	cd02      	mov.n	a12, a2
-40002fb2:	022300        	l32i	a0, a3, 0
-40002fb5:	40d420        	or	a13, a4, a4
-40002fb8:	662008        	bnei	a0, 2, 40002fc4
-40002fbb:	22a100        	movi	a2, 0x100
-40002fbe:	85fdfd        	call0	40000f98 <ets_isr_mask>
-40002fc1:	31dbff		l32r	a3, 40002f30	; ( 3fffc708 )
-40002fc4:	d923      	s32i.n	a13, a3, 8
-40002fc6:	e913      	s32i.n	a14, a3, 4
+40002fa0:	12c1f0        	addi	a1, a1, -16	; stack
+40002fa3:	d921      	s32i.n	a13, a1, 8	; save
+40002fa5:	0901      	s32i.n	a0, a1, 0	; save
+40002fa7:	e931      	s32i.n	a14, a1, 12	; save
+40002fa9:	c911      	s32i.n	a12, a1, 4	; save
+
+40002fab:	ed03      	mov.n	a14, a3		; Y
+40002fad:	31e0ff		l32r	a3, 40002f30	; ( 3fffc708 )  wdt_info
+40002fb0:	cd02      	mov.n	a12, a2		; mode
+40002fb2:	022300        	l32i	a0, a3, 0	; wdt_info.mode
+40002fb5:	40d420        	or	a13, a4, a4	; Z
+40002fb8:	662008        	bnei	a0, 2, 40002fc4	; Z != 2
+
+40002fbb:	22a100        	movi	a2, 0x100	; ets_isr_mask ( 0x100 )
+40002fbe:	85fdfd        	call0	40000f98 <ets_isr_mask>	; disable interrupts
+40002fc1:	31dbff		l32r	a3, 40002f30	; ( 3fffc708 )  wdt_info
+
+; The last 2 arguments just get saved in wdt_info
+40002fc4:	d923      	s32i.n	a13, a3, 8	; wdt_info.B = Z
+40002fc6:	e913      	s32i.n	a14, a3, 4	; wdt_info.A = Y
+
+; The a14 value may be the rate in some form.
+; (it gets divided by 1024 for mode 1 and passed to ets_timer_arm() )
+
 40002fc8:	7ce6      	movi.n	a6, -2
 40002fca:	0164f8		l32r	a0, 4000115c	; ( 60000600 )
 40002fcd:	c02000        	memw
-40002fd0:	5220c0        	l32i	a5, a0, 0x300
+40002fd0:	5220c0        	l32i	a5, a0, 0x300	; WD_CTRL
 40002fd3:	605510        	and	a5, a5, a6
 40002fd6:	c02000        	memw
-40002fd9:	5260c0        	s32i	a5, a0, 0x300
-40002fdc:	0b4c      	addi.n	a4, a12, -1
-40002fde:	16a40b        	beqz	a4, 4000309c
-40002fe1:	262c25        	beqi	a12, 2, 4000300a
-40002fe4:	264c22        	beqi	a12, 4, 4000300a
-40002fe7:	263c75        	beqi	a12, 3, 40003060
-40002fea:	0c18      	movi.n	a8, 1
+40002fd9:	5260c0        	s32i	a5, a0, 0x300	; WD_CTRL
+
+40002fdc:	0b4c      	addi.n	a4, a12, -1	; mode is in a12
+40002fde:	16a40b        	beqz	a4, 4000309c		; mode == 1
+40002fe1:	262c25        	beqi	a12, 2, 4000300a	; mode == 2
+40002fe4:	264c22        	beqi	a12, 4, 4000300a	; mode == 4
+40002fe7:	263c75        	beqi	a12, 3, 40003060	; mode == 3
+
+; mode == 0 (and everything else) falls through
+40002fea:	0c18      	movi.n	a8, 1		; a8 = 1
 40002fec:	c02000        	memw
-40002fef:	7220c0        	l32i	a7, a0, 0x300
-40002ff2:	807720        	or	a7, a7, a8
+40002fef:	7220c0        	l32i	a7, a0, 0x300	; WD_CTRL
+40002ff2:	807720        	or	a7, a7, a8	; a7 |= 1
 40002ff5:	c02000        	memw
-40002ff8:	d821      	l32i.n	a13, a1, 8
-40002ffa:	e831      	l32i.n	a14, a1, 12
-40002ffc:	c903      	s32i.n	a12, a3, 0
-40002ffe:	7260c0        	s32i	a7, a0, 0x300
-40003001:	c811      	l32i.n	a12, a1, 4
-40003003:	0801      	l32i.n	a0, a1, 0
-40003005:	12c110        	addi	a1, a1, 16
+
+40002ff8:	d821      	l32i.n	a13, a1, 8	; restore
+40002ffa:	e831      	l32i.n	a14, a1, 12	; restore
+40002ffc:	c903      	s32i.n	a12, a3, 0	; wdt_info.mode = mode
+40002ffe:	7260c0        	s32i	a7, a0, 0x300	; WD_CTRL
+40003001:	c811      	l32i.n	a12, a1, 4	; restore
+40003003:	0801      	l32i.n	a0, a1, 0	; restore
+40003005:	12c110        	addi	a1, a1, 16	; restore
 40003008:	0df0      	ret.n
 
-4000300a:	92a038        	movi	a9, 56
+; mode == 2 or 4
+4000300a:	92a038        	movi	a9, 56		; a9 = 0x38
 4000300d:	c02000        	memw
-40003010:	a153f8		l32r	a10, 4000115c	; ( 60000600 )
+40003010:	a153f8		l32r	a10, 4000115c	; ( 60000600 )  iobase
 40003013:	e02e20        	or	a2, a14, a14
-40003016:	926ac0        	s32i	a9, a10, 0x300
-40003019:	85efff        	call0	40002f14 <sub_2f14>
-4000301c:	31c5ff		l32r	a3, 40002f30	; ( 3fffc708 )
+40003016:	926ac0        	s32i	a9, a10, 0x300	; WD_CTRL = 0x38
+
+40003019:	85efff        	call0	40002f14 <sub_2f14>	; wdt_map ( a2 )
+
+4000301c:	31c5ff		l32r	a3, 40002f30	; ( 3fffc708 )  wdt_info (never used?)
 4000301f:	c02000        	memw
-40003022:	014ef8		l32r	a0, 4000115c	; ( 60000600 )
-40003025:	2260c1        	s32i	a2, a0, 0x304
+40003022:	014ef8		l32r	a0, 4000115c	; ( 60000600 )  iobase
+40003025:	2260c1        	s32i	a2, a0, 0x304	; WD_R1
 40003028:	c02000        	memw
-4000302b:	2260c2        	s32i	a2, a0, 0x308
-4000302e:	662cb8        	bnei	a12, 2, 40002fea
+4000302b:	2260c2        	s32i	a2, a0, 0x308	; WD_R2
+4000302e:	662cb8        	bnei	a12, 2, 40002fea	; mode != 2
+
 40003031:	22a100        	movi	a2, 0x100
-40003034:	05f7fd        	call0	40000fa8 <ets_isr_unmask>
+40003034:	05f7fd        	call0	40000fa8 <ets_isr_unmask>	; enable interrupts !!
 40003037:	02a001        	movi	a0, 1
 4000303a:	c02000        	memw
 4000303d:	e147f8		l32r	a14, 4000115c	; ( 60000600 )
-40003040:	d22ec0        	l32i	a13, a14, 0x300
+40003040:	d22ec0        	l32i	a13, a14, 0x300	; WD_CTRL
 40003043:	00dd20        	or	a13, a13, a0
 40003046:	c02000        	memw
 40003049:	0801      	l32i.n	a0, a1, 0
-4000304b:	d26ec0        	s32i	a13, a14, 0x300
-4000304e:	b1b8ff		l32r	a11, 40002f30	; ( 3fffc708 )
+4000304b:	d26ec0        	s32i	a13, a14, 0x300	; WD_CTRL
+4000304e:	b1b8ff		l32r	a11, 40002f30	; ( 3fffc708 )  wdt_info
 40003051:	d821      	l32i.n	a13, a1, 8
-40003053:	c90b      	s32i.n	a12, a11, 0
+40003053:	c90b      	s32i.n	a12, a11, 0	; wdt_info.mode = mode
 40003055:	e831      	l32i.n	a14, a1, 12
 40003057:	c811      	l32i.n	a12, a1, 4
 40003059:	12c110        	addi	a1, a1, 16
 4000305c:	0df0      	ret.n
 4000305e:	0000
 
+; mode == 3
 40003060:	c02000        	memw
 40003063:	313ef8        	l32r	a3, 4000115c	; ( 60000600 )
 40003066:	3cc2      	movi.n	a2, 60
-40003068:	2263c0        	s32i	a2, a3, 0x300
+40003068:	2263c0        	s32i	a2, a3, 0x300	; WD_CTRL
 4000306b:	2d0d      	mov.n	a2, a13
-4000306d:	45eaff        	call0	40002f14 <sub_2f14>
-40003070:	31b0ff		l32r	a3, 40002f30	; ( 3fffc708 )
+
+4000306d:	45eaff        	call0	40002f14 <sub_2f14>	; wdt_map ( a2 )
+
+40003070:	31b0ff		l32r	a3, 40002f30	; ( 3fffc708 )  wdt_info
 40003073:	c02000        	memw
 40003076:	0139f8		l32r	a0, 4000115c	; ( 60000600 )
-40003079:	2260c1        	s32i	a2, a0, 0x304
+40003079:	2260c1        	s32i	a2, a0, 0x304	; WD_R1
 4000307c:	0c18      	movi.n	a8, 1
 4000307e:	c02000        	memw
-40003081:	7220c0        	l32i	a7, a0, 0x300
+40003081:	7220c0        	l32i	a7, a0, 0x300	; WD_CTRL
 40003084:	807720        	or	a7, a7, a8
 40003087:	c02000        	memw
 4000308a:	d821      	l32i.n	a13, a1, 8
 4000308c:	e831      	l32i.n	a14, a1, 12
-4000308e:	c903      	s32i.n	a12, a3, 0
-40003090:	7260c0        	s32i	a7, a0, 0x300
+4000308e:	c903      	s32i.n	a12, a3, 0	; wdt_info.mode = mode
+40003090:	7260c0        	s32i	a7, a0, 0x300	; WD_CTRL
 40003093:	c811      	l32i.n	a12, a1, 4
 40003095:	0801      	l32i.n	a0, a1, 0
 40003097:	12c110        	addi	a1, a1, 16
 4000309a:	0df0      	ret.n
-4000309c:	31bfff		l32r	a3, 40002f98	; ( 40002f88 )
-4000309f:	21bfff		l32r	a2, 40002f9c	; ( 3fffdde0 )
+
+; mode == 1
+4000309c:	31bfff		l32r	a3, 40002f98	; ( 40002f88 )	wdt_isr
+4000309f:	21bfff		l32r	a2, 40002f9c	; ( 3fffdde0 )	wdt_timer
 400030a2:	42a000        	movi	a4, 0
+
+; call timer_setfn ( &wdt_timer, wdt_isr, 0 );
+
 400030a5:	05baff        	call0	40002c48 <ets_timer_setfn>
-400030a8:	21bdff		l32r	a2, 40002f9c	; ( 3fffdde0 )
-400030ab:	e03a41        	srli	a3, a14, 10
+
+400030a8:	21bdff		l32r	a2, 40002f9c	; ( 3fffdde0 )	wdt_timer
+400030ab:	e03a41        	srli	a3, a14, 10	; a3 = a14 / 2^10 (i.e. 1024)
 400030ae:	42a001        	movi	a4, 1
+
+; call ets_timer_arm ( &wdt_timer, rate/1024, 1 );
+
 400030b1:	05c1ff        	call0	40002cc4 <ets_timer_arm>
+
 400030b4:	2d0d      	mov.n	a2, a13
 400030b6:	c02000        	memw
 400030b9:	e128f8		l32r	a14, 4000115c	; ( 60000600 )
 400030bc:	3cc4      	movi.n	a4, 60
-400030be:	426ec0        	s32i	a4, a14, 0x300
-400030c1:	05e5ff        	call0	40002f14 <sub_2f14>
+400030be:	426ec0        	s32i	a4, a14, 0x300	; WD_CTRL
+
+400030c1:	05e5ff        	call0	40002f14 <sub_2f14>	; wdt_map ( a2 )
+
 400030c4:	c02000        	memw
-400030c7:	226ec1        	s32i	a2, a14, 0x304
+400030c7:	226ec1        	s32i	a2, a14, 0x304	; WD_R1
 400030ca:	0c17      	movi.n	a7, 1
 400030cc:	c02000        	memw
-400030cf:	622ec0        	l32i	a6, a14, 0x300
+400030cf:	622ec0        	l32i	a6, a14, 0x300	; WD_CTRL
 400030d2:	706620        	or	a6, a6, a7
 400030d5:	c02000        	memw
 400030d8:	0801      	l32i.n	a0, a1, 0
 400030da:	d821      	l32i.n	a13, a1, 8
-400030dc:	5195ff		l32r	a5, 40002f30	; ( 3fffc708 )
-400030df:	626ec0        	s32i	a6, a14, 0x300
-400030e2:	c905      	s32i.n	a12, a5, 0
+400030dc:	5195ff		l32r	a5, 40002f30	; ( 3fffc708 )  wdt_info
+400030df:	626ec0        	s32i	a6, a14, 0x300	; WD_CTRL
+400030e2:	c905      	s32i.n	a12, a5, 0	; wdt_info.mode = mode
 400030e4:	e831      	l32i.n	a14, a1, 12
 400030e6:	c811      	l32i.n	a12, a1, 4
 400030e8:	12c110        	addi	a1, a1, 16
 400030eb:	0df0      	ret.n
-400030ed:	000000        	ill
+400030ed:	000000
+
+; Not called in bootrom
+; sets wdt_info.mode = 0;
+; returns old value of wdt_info.mode
 
 400030f0 <ets_wdt_disable>:
-400030f0:	7ce6      	movi.n	a6, -2
-400030f2:	12c1f0        	addi	a1, a1, -16
-400030f5:	0901      	s32i.n	a0, a1, 0
-400030f7:	c911      	s32i.n	a12, a1, 4
-400030f9:	218dff		l32r	a2, 40002f30	; ( 3fffc708 )
-400030fc:	4118f8		l32r	a4, 4000115c	; ( 60000600 )
-400030ff:	c802      	l32i.n	a12, a2, 0
+400030f0:	7ce6      	movi.n	a6, -2		; a6 = -2 = 0xfff..ffe
+400030f2:	12c1f0        	addi	a1, a1, -16	; stack
+400030f5:	0901      	s32i.n	a0, a1, 0	; save
+400030f7:	c911      	s32i.n	a12, a1, 4	; save
+
+400030f9:	218dff		l32r	a2, 40002f30	; ( 3fffc708 )  wdt_info
+400030fc:	4118f8		l32r	a4, 4000115c	; ( 60000600 )  io_base
+400030ff:	c802      	l32i.n	a12, a2, 0	; wdt_info.mode
 40003101:	c02000        	memw
-40003104:	5224c0        	l32i	a5, a4, 0x300
+40003104:	5224c0        	l32i	a5, a4, 0x300	; WD_CTRL
 40003107:	605510        	and	a5, a5, a6
 4000310a:	c02000        	memw
-4000310d:	5264c0        	s32i	a5, a4, 0x300
-40003110:	32a073        	movi	a3, 115
+4000310d:	5264c0        	s32i	a5, a4, 0x300	; WD_CTRL
+40003110:	32a073        	movi	a3, 115		; 0x73
 40003113:	c02000        	memw
-40003116:	3264c5        	s32i	a3, a4, 0x314
+40003116:	3264c5        	s32i	a3, a4, 0x314	; WD_FEED = 0x73
 40003119:	0c00      	movi.n	a0, 0
-4000311b:	0902      	s32i.n	a0, a2, 0
-4000311d:	261c0f        	beqi	a12, 1, 40003130 <ets_wdt_disable+0x40>
-40003120:	262c20        	beqi	a12, 2, 40003144 <ets_wdt_disable+0x54>
-40003123:	2d0c      	mov.n	a2, a12
+4000311b:	0902      	s32i.n	a0, a2, 0	; wdt_info.mode = 0
+
+4000311d:	261c0f        	beqi	a12, 1, 40003130	; mode == 1
+40003120:	262c20        	beqi	a12, 2, 40003144	; mode == 2
+
+40003123:	2d0c      	mov.n	a2, a12		; return mode
 40003125:	0801      	l32i.n	a0, a1, 0
 40003127:	c811      	l32i.n	a12, a1, 4
 40003129:	12c110        	addi	a1, a1, 16
 4000312c:	0df0      	ret.n
-4000312e:	000021        	srai	a0, a0, 0
-40003131:	9bff      	addi.n	a15, a15, 9
+4000312e:	0000
+
+40003130:	219bff        	l32r	a2, 40002f9c ; ( 3fffdde0 )	; wdt_timer
 40003133:	c5c0ff        	call0	40002d40 <ets_timer_disarm>
-40003136:	c02c20        	or	a2, a12, a12
+
+40003136:	c02c20        	or	a2, a12, a12	; return mode
 40003139:	022100        	l32i	a0, a1, 0
 4000313c:	c22101        	l32i	a12, a1, 4
 4000313f:	12c110        	addi	a1, a1, 16
 40003142:	0df0      	ret.n
+
 40003144:	22a100        	movi	a2, 0x100
-40003147:	05e5fd        	call0	40000f98 <ets_isr_mask>
-4000314a:	c02c20        	or	a2, a12, a12
+40003147:	05e5fd        	call0	40000f98 <ets_isr_mask>		; disable interrupts
+4000314a:	c02c20        	or	a2, a12, a12	; return mode
 4000314d:	022100        	l32i	a0, a1, 0
 40003150:	c22101        	l32i	a12, a1, 4
 40003153:	12c110        	addi	a1, a1, 16
 40003156:	0df0      	ret.n
 
+; ets_wdt_restore ( mode )
+; note that if mode == 0 this just returns.
+; otherwise calls ets_wdt_enable ( mode, Y, Z )
+
+; Not called in bootrom
 40003158 <ets_wdt_restore>:
-40003158:	12c1f0        	addi	a1, a1, -16
-4000315b:	0901      	s32i.n	a0, a1, 0
-4000315d:	8c82      	beqz.n	a2, 40003169 <ets_wdt_restore+0x11>
-4000315f:	4174ff		l32r	a4, 40002f30	; ( 3fffc708 )
-40003162:	3814      	l32i.n	a3, a4, 4
-40003164:	4824      	l32i.n	a4, a4, 8
+40003158:	12c1f0        	addi	a1, a1, -16	; save
+4000315b:	0901      	s32i.n	a0, a1, 0	; save
+4000315d:	8c82      	beqz.n	a2, 40003169
+4000315f:	4174ff		l32r	a4, 40002f30	; ( 3fffc708 )  wdt_info
+40003162:	3814      	l32i.n	a3, a4, 4	; Y
+40003164:	4824      	l32i.n	a4, a4, 8	; Z
 40003166:	85e3ff        	call0	40002fa0 <ets_wdt_enable>
-40003169:	0801      	l32i.n	a0, a1, 0
-4000316b:	12c110        	addi	a1, a1, 16
+40003169:	0801      	l32i.n	a0, a1, 0	; restore
+4000316b:	12c110        	addi	a1, a1, 16	; restore
 4000316e:	0df0      	ret.n
 
+; ets_wdt_init ( void )
+; Not called in bootrom
+
 40003170 <ets_wdt_init>:
-40003170:	12c1f0        	addi	a1, a1, -16
-40003173:	026100        	s32i	a0, a1, 0
-40003176:	32affe        	movi	a3, -2
-40003179:	21f8f7		l32r	a2, 4000115c	; ( 60000600 )
+40003170:	12c1f0        	addi	a1, a1, -16	; stack
+40003173:	026100        	s32i	a0, a1, 0	; save
+40003176:	32affe        	movi	a3, -2		; a3 = fffffffe
+40003179:	21f8f7		l32r	a2, 4000115c	; ( 60000600 )	iobase
 4000317c:	c02000        	memw
-4000317f:	0222c0        	l32i	a0, a2, 0x300
-40003182:	300010        	and	a0, a0, a3
+4000317f:	0222c0        	l32i	a0, a2, 0x300	; WD_CTRL
+40003182:	300010        	and	a0, a0, a3	; clear last bit
 40003185:	c02000        	memw
-40003188:	3184ff		l32r	a3, 40002f98	; ( 40002f88 )
-4000318b:	0262c0        	s32i	a0, a2, 0x300
+40003188:	3184ff		l32r	a3, 40002f98	; ( 40002f88 ) wdt_isr()
+4000318b:	0262c0        	s32i	a0, a2, 0x300	; WD_CTRL
+
+; call ets_isr_attach ( 8, wdt_isr, 0 )
 4000318e:	42a000        	movi	a4, 0
 40003191:	0c82      	movi.n	a2, 8
 40003193:	45dffd        	call0	40000f88 <ets_isr_attach>
@@ -5712,10 +5869,12 @@
 400031a4:	c02000        	memw
 400031a7:	426581        	s32i	a4, a5, 0x204	; INTC_EDGE_EN
 
-400031aa:	0801      	l32i.n	a0, a1, 0
-400031ac:	12c110        	addi	a1, a1, 16
+400031aa:	0801      	l32i.n	a0, a1, 0	; restore
+400031ac:	12c110        	addi	a1, a1, 16	; stack
 400031af:	0df0      	ret.n
 400031b1:	000000
+
+; **************************** END of wdt section
 
 400031b4 <roundup2>:
 400031b4:	304060        	neg	a4, a3

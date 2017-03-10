@@ -3,7 +3,7 @@ of the bootrom.  Essentially this is bare metal programming on the ESP8266.
 
 This yields extremely small executables that load in a fraction of a second.
 
-Clearly this will not work for anything that needed wireless networking,
+Clearly this will not work for anything that needs wireless networking,
 but if you just want to just use the ESP8266 as a little controller,
 it is just the thing!
 
