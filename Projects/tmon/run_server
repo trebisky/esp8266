@@ -1,3 +1,5 @@
 #!/bin/sh
 
 nohup ./tserver >>logs/temp_log14 &
+
+tail -f logs/temp_log14

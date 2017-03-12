@@ -15,7 +15,12 @@ endif
 
 # The new python job
 ESPTOOL		= esptool
-PORT		= /dev/ttyUSB0
+
+# The Sparkfun ATMega8U2 comes up like this.
+PORT		= /dev/ttyACM0
+
+# MY Adafruit FTDI friend comes up like this.
+#PORT		= /dev/ttyUSB0
 #PORT		= /dev/ttyUSB1
 
 # base directory of the ESP8266 SDK package, absolute
