@@ -119,6 +119,10 @@ struct mux {
  */
 int state = 1;	/* 1 is high is off */
 
+/* Here we do gpio output "the right way".
+ * None of this nonsense of setting all the enable and
+ * disable registers every time we do anything.
+ */
 void
 timer_isr ( char *msg )
 {
@@ -168,9 +172,11 @@ led_setup ( void )
 	struct gpio *gp = GPIO_BASE;
 	struct mux *mp = MUX_BASE;
 
-	// PIN_FUNC_SELECT ( PERIPHS_IO_MUX_GPIO2_U, 0 );
 	// Just clear func bits to set zero
 	mp->gpio2 &= ~FUNC_MASK;
+
+	// MODE is 0, so this does nothing.
+	// mp->gpio2 |= funk(MODE);
 
 	gp->ena_set = LED_MASK;
 
@@ -179,6 +185,7 @@ led_setup ( void )
 
 /* 1 second In microseconds */
 // #define TIMER_RATE	1000000
+
 /* half second */
 #define TIMER_RATE	500000
 

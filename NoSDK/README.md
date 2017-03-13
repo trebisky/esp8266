@@ -10,7 +10,7 @@ it is just the thing!
 1. hello -- a very small simple first program that prints a message
 2. uart  -- a bare metal uart driver
 2. timer -- bare metal timer interrupts
-2. timer_blink -- user timer to blink LED
+2. timer_blink -- user timer to blink LED (576 bytes)
 3. misc -- a variety of "bare metal" experiments
 4. baud -- Linux utility to set unusual baud rates
 5. uart-sdk1 -- old uart experiments with SDK
