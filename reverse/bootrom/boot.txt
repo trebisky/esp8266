@@ -5070,8 +5070,16 @@
 
 ; *********************** start timer stuff *********************8
 
-; called from one place (just below)
+; called from sub_2c04 in 3 places (just below)
 ; writes arg to 60000 630
+; This is the Timer 2 "alarm" register aka TIMER_FRC2_ALARM
+; There are two timers with registers like so.
+; One is at 60000600, Two is at 60000620
+; +0 = load
+; +4 = count
+; +8 = control
+; +c = intack
+; +10 = alarm (only timer 2 has this)
 
 40002bf8 <sub_2bf8>:
 40002bf8:	3159f9		l32r	a3, 4000115c	; ( 60000600 )  iobase
@@ -5081,6 +5089,10 @@
 40002c02:	0000
 
 ; -------------
+; called from 2 places
+;  -- from timer_insert (just below)
+; it fiddles around and then calls the above routine to load
+; a value into the Timer 2 alarm register
 
 40002c04 <sub_2c04>:
 40002c04:	12c1f0        	addi	a1, a1, -16	; stack
@@ -5088,26 +5100,26 @@
 
 40002c09:	4154f9		l32r	a4, 4000115c	; ( 60000600 )  iobase
 40002c0c:	c02000        	memw
-40002c0f:	422409        	l32i	a4, a4, 36	; read iobase = 0x32
-40002c12:	4002c0        	sub	a0, a2, a4
-40002c15:	32c0d8        	addi	a3, a0, -40
-40002c18:	e61311        	bgei	a3, 1, 40002c2d
-40002c1b:	a61019        	blti	a0, 1, 40002c38
-40002c1e:	22c22c        	addi	a2, a2, 44
+40002c0f:	422409        	l32i	a4, a4, 36	; read 624 = Timer 2 count
+40002c12:	4002c0        	sub	a0, a2, a4	; a0 = arg - count
+40002c15:	32c0d8        	addi	a3, a0, -40	; a3 = arg - count - 40
+40002c18:	e61311        	bgei	a3, 1, 40002c2d	; arg > (count+40)
+40002c1b:	a61019        	blti	a0, 1, 40002c38	; arg < count
 
+40002c1e:	22c22c        	addi	a2, a2, 44	; bump count by 44
 40002c21:	45fdff        	call0	40002bf8 <sub_2bf8>
 40002c24:	0801      	l32i.n	a0, a1, 0
 40002c26:	12c110        	addi	a1, a1, 16
 40002c29:	0df0      	ret.n
 40002c2b:	0000
 
-40002c2d:	85fcff        	call0	40002bf8 <sub_2bf8>
+40002c2d:	85fcff        	call0	40002bf8 <sub_2bf8>	; use count as is
 40002c30:	0801      	l32i.n	a0, a1, 0
 40002c32:	12c110        	addi	a1, a1, 16
 40002c35:	0df0      	ret.n
 40002c37:	00
 
-40002c38:	22c428        	addi	a2, a4, 40
+40002c38:	22c428        	addi	a2, a4, 40	; bump count by 40
 40002c3b:	c5fbff        	call0	40002bf8 <sub_2bf8>
 40002c3e:	0801      	l32i.n	a0, a1, 0
 40002c40:	12c110        	addi	a1, a1, 16
@@ -5134,59 +5146,66 @@
 40002c54:	5902      	s32i.n	a5, a2, 0
 40002c56:	0df0      	ret.n
 
+; timer_insert ( arg )
+; Called from 2 places
+
 40002c58:	b0ddff3f	.long 0x3fffddb0
 40002c5c:	b8d6ff3f	.long 0x3fffd6b8
 40002c60:	78d8ff3f	.long 0x3fffd878
 
 40002c64 <timer_insert>:
 40002c64:	51fdff		l32r	a5, 40002c58	; ( 3fffddb0 )
-40002c67:	12c1f0        	addi	a1, a1, -16
-40002c6a:	c911      	s32i.n	a12, a1, 4
-40002c6c:	0901      	s32i.n	a0, a1, 0
+40002c67:	12c1f0        	addi	a1, a1, -16	; stack
+40002c6a:	c911      	s32i.n	a12, a1, 4	; save
+40002c6c:	0901      	s32i.n	a0, a1, 0	; save
+
 40002c6e:	0805      	l32i.n	a0, a5, 0
 40002c70:	cd03      	mov.n	a12, a3
-40002c72:	bca0      	beqz.n	a0, 40002cb0 <timer_insert+0x4c>
+40002c72:	bca0      	beqz.n	a0, 40002cb0
 40002c74:	0c03      	movi.n	a3, 0
+
 40002c76:	4810      	l32i.n	a4, a0, 4
 40002c78:	4042c0        	sub	a4, a2, a4
-40002c7b:	a61407        	blti	a4, 1, 40002c86 <timer_insert+0x22>
+40002c7b:	a61407        	blti	a4, 1, 40002c86
 40002c7e:	3d00      	mov.n	a3, a0
 40002c80:	022000        	l32i	a0, a0, 0
-40002c83:	56f0fe        	bnez	a0, 40002c76 <timer_insert+0x12>
+40002c83:	56f0fe        	bnez	a0, 40002c76
+
 40002c86:	026c00        	s32i	a0, a12, 0
 40002c89:	226c01        	s32i	a2, a12, 4
-40002c8c:	164302        	beqz	a3, 40002cb4 <timer_insert+0x50>
+40002c8c:	164302        	beqz	a3, 40002cb4
 40002c8f:	c903      	s32i.n	a12, a3, 0
-40002c91:	580c      	l32i.n	a5, a12, 0
-40002c93:	0801      	l32i.n	a0, a1, 0
-40002c95:	c7950f        	bne	a5, a12, 40002ca8 <timer_insert+0x44>
 
+40002c91:	580c      	l32i.n	a5, a12, 0
+40002c93:	0801      	l32i.n	a0, a1, 0	; restore return
+40002c95:	c7950f        	bne	a5, a12, 40002ca8
+
+; Trouble
 ; Format: "%s %s "
 40002c98:	21f1ff		l32r	a2, 40002c5c	; ( 3fffd6b8 )
 40002c9b:	31f1ff		l32r	a3, 40002c60	; ( 3fffd878 )
 40002c9e:	42a0ad        	movi	a4, 173
 40002ca1:	8582ff        	call0	400024cc <ets_printf>
-40002ca4:	06ffff        	j	40002ca4 <timer_insert+0x40>
+40002ca4:	06ffff        	j	40002ca4	; *** spin !!!
 40002ca7:	00
 
-40002ca8:	c811      	l32i.n	a12, a1, 4
-40002caa:	12c110        	addi	a1, a1, 16
+40002ca8:	c811      	l32i.n	a12, a1, 4	; restore
+40002caa:	12c110        	addi	a1, a1, 16	; stack
 40002cad:	0df0      	ret.n
 40002caf:	00
 
 40002cb0:	0903      	s32i.n	a0, a3, 0
 40002cb2:	2913      	s32i.n	a2, a3, 4
 40002cb4:	c905      	s32i.n	a12, a5, 0
-40002cb6:	c5f4ff        	call0	40002c04 <sub_2c04>
-40002cb9:	06f5ff        	j	40002c91 <timer_insert+0x2d>
-
-40002cbc:	ce300000	.long 0x000030ce
-40002cc0:	b4c40400	.long 0x0004c4b4
+40002cb6:	c5f4ff        	call0	40002c04 <sub_2c04>	; fiddle timer 2 alarm
+40002cb9:	06f5ff        	j	40002c91
 
 ; ets_timer_arm
 ; Called with 3 arguments like so:
 ;
 ; call ets_timer_arm ( &wdt_timer, rate, 1 );
+;  i.e.
+; call ets_timer_arm ( &object, rate, mode );
 ;
 ; The first argument is a pointer to a timer management object
 ; as set up by timer_setfn, maybe with a call like this:
@@ -5194,9 +5213,10 @@
 ; call timer_setfn ( &wdt_timer, wdt_isr, 0 );
 ; 
 ;  note that timer_setfn sets the first field to -1,
-;   which makes the thing palatable to this routine
+;   which makes the object palatable to this routine
 
-
+40002cbc:	ce300000	.long 0x000030ce
+40002cc0:	b4c40400	.long 0x0004c4b4
 
 40002cc4 <ets_timer_arm>:
 40002cc4:	12c1f0        	addi	a1, a1, -16	; stack
@@ -5206,7 +5226,7 @@
 40002ccd:	20c220        	or	a12, a2, a2	; timer object
 40002cd0:	2d03      	mov.n	a2, a3		; rate
 40002cd2:	080c      	l32i.n	a0, a12, 0	; first field in object
-40002cd4:	3d04      	mov.n	a3, a4		; option
+40002cd4:	3d04      	mov.n	a3, a4		; mode
 40002cd6:	26000e        	beqi	a0, -1, 40002ce8
 
 ; Here if first entry in control structure is NOT -1
@@ -5220,10 +5240,17 @@
 40002ce2:	857eff        	call0	400024cc <ets_printf>
 40002ce5:	06ffff        	j	40002ce5	; spin !!!
 
+; Here when we are satified with the timer object
+
 40002ce8:	16c204        	beqz	a2, 40002d38	; is rate == 0 ?
 40002ceb:	41f4ff		l32r	a4, 40002cbc	; ( 000030ce ) = 12494
-40002cee:	3921      	s32i.n	a3, a1, 8	; save a3 on stack
+40002cee:	3921      	s32i.n	a3, a1, 8	; save a3 (mode) on stack
 40002cf0:	27b431        	bgeu	a4, a2, 40002d25
+
+; Here when requested rate is large (greater than 12494)
+; The goal with these gyrations is to avoid overflow
+;  when multiplying the rate by 312500
+; the following does: y = x%4 * 313 + x/4 * 1250
 
 40002cf3:	200014        	extui	a0, a2, 0, 2	; last 2 bits of rate
 40002cf6:	52a4e2        	movi	a5, 0x4e2	; a5 = 1250
@@ -5233,17 +5260,17 @@
 40002d02:	5000c1        	mul16u	a0, a0, a5	; a0 *= 313
 40002d05:	4a00      	add.n	a0, a0, a4	; a0 += a4
 
-; starting with x = a2
-; the above does: y = x%4 * 313 + x/4 * 1250
-; or we can end up here (from below) with a0 = y = 0
+; One way or the other, we end up here with a0 being the value we
+; want to load into the timer register
 
-40002d07:	162300        	beqz	a3, 40002d0d
+40002d07:	162300        	beqz	a3, 40002d0d	; test mode
 40002d0a:	026c02        	s32i	a0, a12, 8	; save result to timer_object + 8
+
 40002d0d:	3d0c      	mov.n	a3, a12
 40002d0f:	2113f9		l32r	a2, 4000115c	; ( 60000600 )  iobase
 40002d12:	c02000        	memw
-40002d15:	2892      	l32i.n	a2, a2, 36	; iobase + 0x24 (0x624) TIMER_FRC2_COUNT
-40002d17:	2a20      	add.n	a2, a0, a2	; add "y" from above
+40002d15:	2892      	l32i.n	a2, a2, 36	; read from iobase + 0x24 (0x624) TIMER_FRC2_COUNT
+40002d17:	2a20      	add.n	a2, a0, a2	; add our load value from above
 40002d19:	85f4ff        	call0	40002c64 <timer_insert>
 
 40002d1c:	c811      	l32i.n	a12, a1, 4	; restore
@@ -5251,12 +5278,17 @@
 40002d20:	12c110        	addi	a1, a1, 16	; stack
 40002d23:	0df0      	ret.n
 
+; Here when rate is small (less than 12494)
+;  we ask for rate "r"
+;  set a0 = 1 + (r*312500)/1000
+; Note that 80000000 / 256 = 312500
+
 40002d25:	41e6ff		l32r	a4, 40002cc0	; ( 0004c4b4 ) = 312500
 40002d28:	32a3e8        	movi	a3, 0x3e8	; a3 = 1000
-40002d2b:	402282        	mull	a2, a2, a4	; a2 *= 312400
+40002d2b:	402282        	mull	a2, a2, a4	; a2 *= 312500
 40002d2e:	c54e0b        	call0	4000e21c <__udivsi3>	; a2 = a2 / 1000
-40002d31:	3821      	l32i.n	a3, a1, 8
-40002d33:	1b02      	addi.n	a0, a2, 1
+40002d31:	3821      	l32i.n	a3, a1, 8	; restore "mode"
+40002d33:	1b02      	addi.n	a0, a2, 1	; a0 = 1 + a2
 40002d35:	86f3ff        	j	40002d07
 
 40002d38:	0c00      	movi.n	a0, 0		; here when rate == 0
@@ -5339,7 +5371,7 @@
 40002dc7:	a61227        	blti	a2, 1, 40002df2
 40002dca:	8c3c      	beqz.n	a12, 40002dd1
 40002dcc:	281c      	l32i.n	a2, a12, 4
-40002dce:	45e3ff        	call0	40002c04 <sub_2c04>
+40002dce:	45e3ff        	call0	40002c04 <sub_2c04>	; fiddle timer 2 alarm
 40002dd1:	c811      	l32i.n	a12, a1, 4
 40002dd3:	d821      	l32i.n	a13, a1, 8
 40002dd5:	e831      	l32i.n	a14, a1, 12
@@ -5367,14 +5399,14 @@
 40002e06:	c00000        	callx0	a0
 40002e09:	580c      	l32i.n	a5, a12, 0
 40002e0b:	082c      	l32i.n	a0, a12, 8
-40002e0d:	6605cf        	bnei	a5, -1, 40002de0 <ets_timer_handler_isr+0x38>
-40002e10:	16c0fc        	beqz	a0, 40002de0 <ets_timer_handler_isr+0x38>
+40002e0d:	6605cf        	bnei	a5, -1, 40002de0
+40002e10:	16c0fc        	beqz	a0, 40002de0
 40002e13:	281c      	l32i.n	a2, a12, 4
 40002e15:	3d0c      	mov.n	a3, a12
 40002e17:	002280        	add	a2, a2, a0
 40002e1a:	226c01        	s32i	a2, a12, 4
 40002e1d:	45e4ff        	call0	40002c64 <timer_insert>
-40002e20:	06efff        	j	40002de0 <ets_timer_handler_isr+0x38>
+40002e20:	06efff        	j	40002de0
 
 40002e23:	0022a0        	addx4	a2, a2, a0
 40002e26:	1f          	.byte 0x1f
