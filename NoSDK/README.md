@@ -11,6 +11,7 @@ it is just the thing!
 2. uart  -- a bare metal uart driver
 2. timer -- bare metal timer interrupts
 2. timer_blink -- user timer to blink LED (576 bytes)
+2. rtc -- GPIO via the rtc (aka gpio 16) and fast timer experiments
 3. misc -- a variety of "bare metal" experiments
 4. baud -- Linux utility to set unusual baud rates
 5. uart-sdk1 -- old uart experiments with SDK
