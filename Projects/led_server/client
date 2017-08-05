@@ -1,0 +1,126 @@
+#!/usr/bin/ruby
+# MMTsocket.rb
+
+require 'socket'
+require 'timeout'
+
+class MMTsocket
+	attr_reader	:status
+
+	@@timeout = 1.5
+
+	def initialize ( host, port, timeout=nil )
+	    @sock = nil
+	    @status = nil
+
+	    timeout = @@timeout unless timeout
+	    # I can only call it a ruby bug, but sometimes this
+	    # gets:
+	    #     /usr/lib/ruby/1.8/timeout.rb:60:in `timeout': execution expired
+	    #     from /mmt/scripts/MMTsocket.rb:136:in `initialize
+	    # we could trap the string "execution expired", but we certainly
+	    # should not need to ....
+
+	#    begin
+	#	if timeout > 0
+	#	    timeout ( timeout ) {
+	#		@sock = TCPSocket.open( host, port )
+	#	    }
+	#	else
+	#	    @sock = TCPSocket.open( host, port )
+	#	end
+	#    rescue Timeout::Error
+	#	@status = "Timeout"
+	#    rescue Errno::ECONNREFUSED
+	#	@status = "Refusing connection"
+	#    rescue => why
+	#	@status = "Error: #{why}"
+	#    end
+
+	    begin
+		@sock = TCPSocket.open( host, port )
+	    rescue Errno::ECONNREFUSED
+		@status = "Refusing connection"
+	    rescue => why
+		@status = "Error: #{why}"
+	    end
+
+	end
+
+	def MMTsocket.bellcmd ( cmd )
+	    c = MMTsocket.new "esp_bell", 1013
+	    return nil if c.status
+	    c.send( cmd )
+	    rv = c.check()
+	    c.done
+	    rv = nil if rv == "OK"
+	    rv
+	end
+	def ident ( id="MMT" )
+	    send( "@ident #{id}" )
+	    check()
+	end
+	def done ()
+	    @sock.close if @sock
+	end
+	def show ()
+	    each { |x| print x }
+	end
+	def showit ( what )
+	    send( what )
+	    show()
+	end
+	def version()
+	    showit( "version" )
+	end
+	def readline ()
+	    return nil unless @sock
+	    @sock.readline().chomp
+	end
+	def check ()
+	    return "IES" unless @sock
+	    @sock.readline().chomp
+	end
+	def each ()
+	    return unless @sock
+	    loop do
+		begin
+		    x = @sock.readline()
+		rescue EOFError
+		    break
+		end
+		break if x =~ /^.EOF/
+		yield x
+	    end
+	end
+	def dump ()	# XXX ??
+	    each { |data|
+		print data.length, data
+	    }
+	end
+	def tags ( what="all" )
+	    send( what )
+	    r = Array.new
+	    each { |l| r << l.chomp.split[0] }
+	    r
+	end
+	def values ( what="all" )
+	    send( what )
+	    r = Hash.new
+	    each { |l|
+	    	(t,v) = l.chomp.split(' ',2)
+		r[t] = v
+	    }
+	    r
+	end
+	def send ( msg )
+	    return unless @sock
+	    @sock.print( msg + "\n" )
+	end
+end
+
+net = MMTsocket.new "esp_bell", 1013
+net.send "fish"
+net.done
+
+# THE END
