@@ -1,14 +1,18 @@
 /* ESP8266 sdk experiments
  *
- * Bell project.
+ * This is a simple TCP server that handles requests to turn
+ * on and off the two on-board LEDs on a NodeMCU devel board.
+ * One of GPIO-2, the other on GPIO-16 (which actually isn't a GPIO).
  *
- * The idea here is to have the ESP8266 run a server that
+ * This is a stepping stone to my "Bell project"
+ *
+ * The idea will be to have the ESP8266 run a server that
  * listens for commands to ring a bell.
  * I plan to use this to announce events in my workshop,
  * such as visitors pushing the doorbell in the main house,
- * arrival of mail, and other such things.
+ * arrival of USPS mail, and other such things.
  *
- * IP address gets set in set_ip_static ();
+ * The IP address gets set in set_ip_static ();
  *  This is esp_bell - 192.168.0.41
  *
  * I am developing this on a NodeMCU board.
@@ -48,19 +52,20 @@ static char *pass = "Your ad here";
 /* My ssid and password are in here */
 #include "secret.h"
 
-void show_ip ( void );
-
 /* ------------------------------- */
 /* ------------------------------- */
 
 static char blue_state;
 static char red_state;
+static char bell_state;
 
 /* BIT2 blinks the little blue LED on my NodeMCU board
  * (which is labelled "D4" on the silkscreen)
  * This is the blue LED on the ESP-12E board.
  */
 #define BLUE_LED_BIT		BIT2
+
+#define BELL_BIT		BIT0	/* NodeMCU D3 */
 
 static void
 blue_on ( void )
@@ -76,6 +81,23 @@ blue_off ( void )
     blue_state = 0;
 }
 
+/* This pulls low (I see 0.15 volts on DVM) */
+static void
+bell_on ( void )
+{
+    gpio_output_set(0, BELL_BIT, BELL_BIT, 0);
+    bell_state = 1;
+}
+
+/* This pulls high (I see 3.3 volts on DVM) */
+static void
+bell_off ( void )
+{
+    gpio_output_set(BELL_BIT, 0, BELL_BIT, 0);
+    bell_state = 0;
+}
+
+#ifdef notdef
 static void
 flip_blue ( void )
 {
@@ -87,18 +109,21 @@ flip_blue ( void )
 	// os_printf("set low\n");
     }
 }
+#endif
 
 static void
 red_on ( void )
 {
-    WRITE_PERI_REG(RTC_GPIO_OUT, (READ_PERI_REG(RTC_GPIO_OUT) & (uint32)0xfffffffe) | 0 );
+    // WRITE_PERI_REG(RTC_GPIO_OUT, (READ_PERI_REG(RTC_GPIO_OUT) & (uint32)0xfffffffe) | 0 );
+    WRITE_PERI_REG(RTC_GPIO_OUT, (READ_PERI_REG(RTC_GPIO_OUT) & ~1));
     red_state = 1;
 }
 
 static void
 red_off ( void )
 {
-    WRITE_PERI_REG(RTC_GPIO_OUT, (READ_PERI_REG(RTC_GPIO_OUT) & (uint32)0xfffffffe) | 1 );
+    // WRITE_PERI_REG(RTC_GPIO_OUT, (READ_PERI_REG(RTC_GPIO_OUT) & (uint32)0xfffffffe) | 1 );
+    WRITE_PERI_REG(RTC_GPIO_OUT, (READ_PERI_REG(RTC_GPIO_OUT) | 1 ));
     red_state = 0;
 }
 
@@ -113,8 +138,11 @@ led_init ( void )
 #define FUNC_F		FUNC_GPIO2
     // PIN_FUNC_SELECT ( FUNC_MUX, FUNC_F );
     PIN_FUNC_SELECT ( PERIPHS_IO_MUX_GPIO2_U, 0 );
-
     blue_off ();
+
+    // Also set up bit 0 (GPIO) for bell output */
+    PIN_FUNC_SELECT ( PERIPHS_IO_MUX_GPIO0_U, 0 );
+    bell_off ();
 
     /* The red LED is on GPIO 16, which is not really a GPIO, but the rtc unit */
     WRITE_PERI_REG(PAD_XPD_DCDC_CONF,
@@ -175,9 +203,9 @@ my_reply ( void *arg, char *reply )
 static void
 my_status ( void *arg )
 {
-    char buf[16];
+    char buf[24];
 
-    os_sprintf ( buf, "blue-%d red-%d\n", blue_state, red_state );
+    os_sprintf ( buf, "blue-%d red-%d bell-%d\n", blue_state, red_state, bell_state );
     espconn_send ( arg, buf, strlen(buf) );
 }
 
@@ -201,6 +229,12 @@ do_cmd ( void *arg, char *buf )
 	my_reply ( arg, "OK" );
     } else if ( strcmp ( buf, "r_off" ) == 0 ) {
 	red_off ();
+	my_reply ( arg, "OK" );
+    } else if ( strcmp ( buf, "bell_on" ) == 0 ) {
+	bell_on ();
+	my_reply ( arg, "OK" );
+    } else if ( strcmp ( buf, "bell_off" ) == 0 ) {
+	bell_off ();
 	my_reply ( arg, "OK" );
     } else
 	my_reply ( arg, "ERR" );
