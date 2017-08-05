@@ -16,5 +16,6 @@ These are not well named, but this list may help.
 9. espdht - first cut at a DHT-22 driver with Wifi access
 
 10. tmon - my outdoor temperature monitor with an RHT03 (DH22 clone)
-10. coolstat - my coolstat motor status hack
+11. coolstat - my coolstat motor status hack
+12. led_server - TCP server to control LEDs
 
