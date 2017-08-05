@@ -120,7 +120,13 @@ class MMTsocket
 end
 
 net = MMTsocket.new "esp_bell", 1013
-net.send "fish"
+net.send "b_on"
+sleep ( 1.0 )
+net.send "b_off"
+sleep ( 1.0 )
+net.send "r_on"
+sleep ( 1.0 )
+net.send "r_off"
 net.done
 
 # THE END

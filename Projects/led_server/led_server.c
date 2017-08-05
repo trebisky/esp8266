@@ -38,12 +38,7 @@
 #include "espconn.h"
 #include "mem.h"
 
-#define SERVER
 #define SERVER_PORT	1013
-
-/* For Client mode stuff */
-#define TEST_PORT 13	/* daytime */
-#define DATA_PORT 2001	/* on trona */
 
 #ifdef notdef
 static char *ssid = "polecat";
@@ -53,38 +48,13 @@ static char *pass = "Your ad here";
 /* My ssid and password are in here */
 #include "secret.h"
 
-/* Usually we finish in 0.2 seconds,
- * so allowing 0.5 seconds should be adequate
- * When we first power up, connecting to the
- * wireless can take quite a while, typically
- * about 5.3 seconds.
- */
-#define WATCHDOG_INIT	10000
-#define WATCHDOG_TCP	500
-
 void show_ip ( void );
-void next_time ( void );
-void harvest_data ( void );
-void set_watchdog ( int );
-
-unsigned long xthal_get_ccount ( void );
 
 /* ------------------------------- */
 /* ------------------------------- */
 
 static char blue_state;
 static char red_state;
-
-void ICACHE_FLASH_ATTR
-gpio16_output_conf(void)
-{
-}
-
-void ICACHE_FLASH_ATTR
-gpio16_output_set(uint8 value)
-{
-}
-
 
 /* BIT2 blinks the little blue LED on my NodeMCU board
  * (which is labelled "D4" on the silkscreen)
@@ -180,35 +150,6 @@ ip2str ( char *buf, unsigned char *p )
     return buf;
 }
 
-#ifdef notdef
-/* Could require up to 16 bytes */
-char *
-ip2str_i ( char *buf, unsigned int ip )
-{
-    int n1, n2, n3, n4;
-
-    n1 = ip & 0xff;
-    ip >>= 8;
-    n2 = ip & 0xff;
-    ip >>= 8;
-    n3 = ip & 0xff;
-    ip >>= 8;
-    n4 = ip & 0xff;
-    os_sprintf ( buf, "%d.%d.%d.%d", n1, n2, n3, n4 );
-    return buf;
-}
-#endif
-
-/* 192.168.0.5 is trona */
-void
-load_ip ( unsigned char *ip )
-{
-    ip[0] = 192;
-    ip[1] = 168;
-    ip[2] = 0;
-    ip[3] = 5;
-}
-
 void
 show_ip ( void )
 {
@@ -220,36 +161,6 @@ show_ip ( void )
     // os_printf ( "IP: %s\n", ip2str_i ( buf, info.ip.addr ) );
     os_printf ( "IP: %s\n", ip2str ( buf, (char *) &info.ip.addr ) );
 }
-
-#ifdef DNS
-static struct espconn dns_conn;
-static ip_addr_t dns_ip;
-
-static void ICACHE_FLASH_ATTR
-dns_result ( const char *name, ip_addr_t *ip, void *arg )
-{
-    char buf[16];
-
-    if ( ip == NULL ) {
-	os_printf ( "Lookup failed\n" );
-	return;
-    }
-
-    os_printf ( "Lookup: %s -- %s\n", name, ip2str ( buf, (char *) &ip->addr ));
-}
-
-void
-dns_lookup ( char *name )
-{
-    espconn_gethostbyname ( &dns_conn, name, &dns_ip, dns_result );
-}
-#endif
-
-#ifdef SERVER
-
-/*
- * Sets up a TCP server on port 1013
- */
 
 static void
 my_reply ( void *arg, char *reply )
@@ -412,177 +323,6 @@ setup_server ( void )
 
     os_printf ( "Server ready\n" );
 }
-#endif /* SERVER */
-
-/* Not in use */
-#ifdef CLIENT
-/* ------------------------------- */
-/* CLIENT stuff starts */
-/* ------------------------------- */
-
-int dht_hum;
-int dht_tc;
-int dht_status;
-
-unsigned long start_time;
-
-/* rare, and I don't care */
-void ICACHE_FLASH_ATTR
-tcp_reconnect_cb ( void *arg, sint8 err )
-{
-    os_printf ( "TCP reconnect\n" );
-}
-
-/* Called when a client connection gets closed by the other end */
-void ICACHE_FLASH_ATTR
-tcp_disconnect_cb ( void *arg )
-{
-    os_printf ( "TCP disconnect\n" );
-}
-
-int dht_count;
-char dht_msg[64];
-
-/* Callback for when data is received */
-/* Data received when using telnet ends with cr-lf pair */
-/* Does nothing in this code */
-void ICACHE_FLASH_ATTR
-tcp_receive_data ( void *arg, char *buf, unsigned short len )
-{
-    os_printf ( "TCP receive data: %d bytes\n", len );
-
-    // os_memcpy ( x_msg, buf, len );
-    // x_len = len;
-
-    // espconn_send ( arg, x_msg, x_len );
-    os_printf ( "TCP sending %d bytes\n", dht_count );
-    espconn_send ( arg, dht_msg, dht_count );
-}
-
-/* Call back for when data being sent is finished being sent */
-/* not needed unless we are waiting to send more */
-void ICACHE_FLASH_ATTR
-tcp_send_data ( void *arg )
-{
-    os_printf ( "TCP send data (done)\n" );
-    next_time ();
-}
-
-void ICACHE_FLASH_ATTR
-send_temps ( void *arg )
-{
-    int dht_tf;
-    int time;
-    int div;
-
-    // harvest_data ();
-
-    /* Calculate elapsed time in hundredths of seconds */
-    /* system_get_cpu_freq() returns 80 in typical cases */
-    div = system_get_cpu_freq() * (1000 * 1000 / 100 );
-    time = xthal_get_ccount () - start_time;
-    time /= div;
-
-    if ( ! dht_status ) {
-	dht_count = os_sprintf ( dht_msg, "%d %d BAD BAD BAD\n", time, 0 );
-	os_printf ( "TCP sending %d bytes\n", dht_count );
-	espconn_send ( arg, dht_msg, dht_count );
-	return;
-    }
-
-    dht_tf = 320 + (dht_tc * 9) / 5;
-
-    // os_printf ( "humidity = %d\n", dht_hum );
-    // os_printf ( "temperature (C) = %d\n", dht_tc );
-    // os_printf ( "temperature (F) = %d\n", dht_tf );
-
-    dht_count = os_sprintf ( dht_msg, "%d %d %d %d %d\n", time, 0, dht_hum, dht_tc, dht_tf );
-    os_printf ( "TCP sending %d bytes\n", dht_count );
-    espconn_send ( arg, dht_msg, dht_count );
-}
- 
-void ICACHE_FLASH_ATTR
-tcp_connect_cb ( void *arg )
-{
-    struct espconn *conn = (struct espconn *)arg;
-    char buf[16];
-
-    os_printf ( "TCP connect\n" );
-    os_printf ( "  remote ip: %s\n", ip2str ( buf, conn->proto.tcp->remote_ip ) );
-    os_printf ( "  remote port: %d\n", conn->proto.tcp->remote_port );
-
-    espconn_regist_recvcb( conn, tcp_receive_data );
-    espconn_regist_sentcb( conn, tcp_send_data );
-
-    send_temps ( arg );
-}
-
-/* I never see this get called for a client */
-void ICACHE_FLASH_ATTR
-tcp_client_rcv ( void *arg, char *data, unsigned short len )
-{
-    os_printf ( "TCP rcv\n" );
-
-    /* daytime service returns 26 bytes.
-     * last two bytes are \r\n.
-     * There is no null terminator
-     */
-    //os_printf ( "Last character: %02x %02x\n", data[len-2], data[len-1] );
-    //data[len-2] = '\0';
-    //os_printf ( "%s\n", data );
-}
-
-/* I never see this get called for a client */
-void ICACHE_FLASH_ATTR
-tcp_client_sent ( void *arg )
-{
-    os_printf ( "TCP sent\n" );
-}
-
-struct espconn client_conn;
-
-void
-start_client ( void )
-{
-    esp_tcp *tp;
-    char buf[16];
-    struct espconn *c;
-
-    c = &client_conn;
-    os_bzero ( c, sizeof(struct espconn) );
-
-    c->type=ESPCONN_TCP;
-    c->state=ESPCONN_NONE;
-
-    tp = (esp_tcp *) os_zalloc ( sizeof(esp_tcp) );
-    c->proto.tcp = tp;
-
-    tp->local_port = espconn_port();
-    tp->remote_port = DATA_PORT;
-    load_ip ( tp->remote_ip );
-
-    espconn_regist_connectcb ( c, tcp_connect_cb );
-    espconn_regist_disconcb ( c, tcp_disconnect_cb);
-    espconn_regist_reconcb ( c, tcp_reconnect_cb );
-    espconn_regist_recvcb ( c, tcp_client_rcv );
-    espconn_regist_sentcb ( c, tcp_client_sent );
-
-    os_printf ( "Connecting to port %d ", tp->remote_port );
-    os_printf ( "local port %d ", tp->local_port );
-    os_printf ( "at %s\n", ip2str ( buf, (char *) tp->remote_ip ) );
-
-    /* Do this here so if there is a long delay getting
-     * a wireless connection on the first startupt, this
-     * will ensure the DHT chip is ready to go.
-     */
-    harvest_data ();
-
-    /* TCP connect should be fast */
-    // set_watchdog ( WATCHDOG_TCP );
-
-    espconn_connect ( c );
-}
-#endif /* CLIENT */
 
 void
 wifi_event ( System_Event_t *e )
@@ -592,9 +332,7 @@ wifi_event ( System_Event_t *e )
     if ( event == EVENT_STAMODE_GOT_IP ) {
 	os_printf ( "WIFI Event, got IP\n" );
 	show_ip ();
-	// start_timer ();
 	setup_server ();
-	// start_client ();
     } else if ( event == EVENT_STAMODE_CONNECTED ) {
 	os_printf ( "WIFI Event, connected\n" );
     } else if ( event == EVENT_STAMODE_DISCONNECTED ) {
@@ -603,62 +341,6 @@ wifi_event ( System_Event_t *e )
 	os_printf ( "Unknown event %d !\n", event );
     }
 }
-
-/* --------------------------------------------- */
-/* --------------------------------------------- */
-
-/* Not in use */
-#ifdef TIMER
-
-static os_timer_t timer1;
-
-/* The timer runs collecting data continuously at 2 Hz */
-void
-timer_func1 ( void *arg )
-{
-    harvest_data ();
-}
-
-void
-start_timer ( void )
-{
-    os_timer_disarm ( &timer1 );
-    os_timer_setfn ( &timer1, timer_func1, NULL );
-    os_timer_arm ( &timer1, DELAY, 1 );
-}
-#endif
-
-#define DELAY	2000
-
-// #define DHT_GPIO	14	/* D5 */	
-// #define DHT_GPIO	5	/* D1 */	
-// #define DHT_GPIO	4	/* D2 */	
-#define DHT_GPIO	12	/* D6 */	
-
-#ifdef notdef
-void
-harvest_data ( void )
-{
-
-#ifdef notdef
-    unsigned short v33;
-    unsigned short adc;
-
-    v33 = readvdd33 ();
-    adc = system_adc_read ();
-
-    //os_printf ( "Vdd33 = %d\n", v33 );
-    //os_printf ( "ADC = %d\n", adc );
-#endif
-
-    //dht_status = dht_sensor ( DHT_GPIO, &dht_tc, &dht_hum );
-
-    if ( ! dht_status )
-	os_printf ( "No data from DHT\n" );
-    else
-	os_printf ( "Got data from DHT\n" );
-}
-#endif
 
 void
 set_ip_static ( void )
@@ -676,55 +358,10 @@ set_ip_static ( void )
     wifi_set_ip_info(STATION_IF, &info);
 }
 
-/* Not in use */
-#ifdef SLEEP
-/* delay in seconds.
- * can be as large as 4931 seconds.
- */
-#define INTERVAL	60
-
-void
-next_time ( void )
-{
-    unsigned long time;
-
-    time = xthal_get_ccount () - start_time;
-
-    os_printf( "sleeping after %ld\n", time );
-    system_deep_sleep ( INTERVAL * 1000 * 1000 );
-}
-#endif /* SLEEP */
-
-#ifdef notdef
-#define TIMER_REPEAT	1
-#define TIMER_ONCE	0
-
-static os_timer_t dog;
-
-void
-run_watchdog ( void *arg )
-{
-    os_printf ( "Watchdog triggered\n" );
-    // next_time ();
-}
-
-void
-set_watchdog ( int delay )
-{
-    os_timer_disarm ( &dog );
-    os_timer_setfn ( &dog, run_watchdog, NULL );
-    os_timer_arm ( &dog, delay, TIMER_ONCE );
-}
-#endif
-
 void
 user_init ( void )
 {
     struct station_config conf;
-    // unsigned long time;
-
-    // start_time = xthal_get_ccount ();
-    // set_watchdog ( WATCHDOG_INIT );
 
     // This is used to setup the serial communication
     uart_div_modify(0, UART_CLK_FREQ / 115200);
