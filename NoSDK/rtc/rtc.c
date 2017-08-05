@@ -257,8 +257,11 @@ call_user_start ( void )
     ets_delay_us ( 1000 * 500 );
 
     rtc_gpio_output ();
+
+    timer_setup ( 500 * 1000 );		/* blink NodeMCU dev board LED at 1 Hz */
+
     // timer_setup ( TIMER_RATE );	/* see 5 nice khz */
-    timer_load ( 260 );		/* see nice 100 khz */
+    // timer_load ( 260 );		/* see nice 100 khz */
 
     /* This interrupts at 400 khz (every 2.5 microseconds).
      * It almost works.
