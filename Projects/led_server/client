@@ -119,14 +119,22 @@ class MMTsocket
 	end
 end
 
+if ARGV.size < 1
+    print "Sorry\n"
+    exit
+end
+
+msg = ARGV[0]
+
 net = MMTsocket.new "esp_bell", 1013
-net.send "b_on"
-sleep ( 1.0 )
-net.send "b_off"
-sleep ( 1.0 )
-net.send "r_on"
-sleep ( 1.0 )
-net.send "r_off"
+#net.send "b_on"
+#sleep ( 1.0 )
+#net.send "b_off"
+#sleep ( 1.0 )
+#net.send "r_on"
+#sleep ( 1.0 )
+#net.send "r_off"
+net.send msg
 net.done
 
 # THE END

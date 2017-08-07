@@ -83,15 +83,16 @@ blue_off ( void )
 
 /* This pulls low (I see 0.15 volts on DVM) */
 static void
-bell_on ( void )
+bell_off ( void )
 {
     gpio_output_set(0, BELL_BIT, BELL_BIT, 0);
     bell_state = 1;
 }
 
 /* This pulls high (I see 3.3 volts on DVM) */
+/* This drives my Opto-22 240D45 SSR just fine */
 static void
-bell_off ( void )
+bell_on ( void )
 {
     gpio_output_set(BELL_BIT, 0, BELL_BIT, 0);
     bell_state = 0;
