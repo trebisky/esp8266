@@ -1,0 +1,4 @@
+bell
+*.o
+*.gz
+secret.h
