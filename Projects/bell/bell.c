@@ -47,13 +47,31 @@ static char blue_state;
 static char red_state;
 static char bell_state;
 
+static os_timer_t timer1;
+
 /* BIT2 blinks the little blue LED on my NodeMCU board
  * (which is labelled "D4" on the silkscreen)
  * This is the blue LED on the ESP-12E board.
  */
 #define BLUE_LED_BIT		BIT2
 
-#define BELL_BIT		BIT0	/* NodeMCU D3 */
+/* Some care is required to pick the bit to control
+ *    the SSR that rings the bell.
+ * GPIO-0 is a bad choice because it controls BOOT behavior.
+ * GPIO-2 and GPIO-15 are also involved in BOOT
+ * GPIO-2 and GPIO-16 have LED's hung on them.
+ * GPIO-1 and GPIO-3 are used for the console uart.
+ * GPIO 6 through 11 connect to the SD (flash) chip.
+ * It turns out there are only 5 bits without issues:
+ *    4, 5, 12, 13, 14
+ */
+
+#define BELL_BIT		BIT4	/* NodeMCU D2 */
+// #define BELL_BIT		BIT5	/* NodeMCU D1 */
+// #define BELL_BIT		BIT12	/* NodeMCU D6 */
+// #define BELL_BIT		BIT13	/* NodeMCU D7 */
+// #define BELL_BIT		BIT14	/* NodeMCU D5 */
+// #define BELL_BIT		BIT0	/* NodeMCU D3 -- BAD, tangles with boot */
 
 static void
 blue_on ( void )
@@ -84,6 +102,26 @@ bell_on ( void )
 {
     gpio_output_set(BELL_BIT, 0, BELL_BIT, 0);
     bell_state = 0;
+}
+
+void
+timer_func1 ( void *arg )
+{
+    os_printf("timer\n");
+    bell_off ();
+}
+
+#define TIMER_REPEAT    1
+#define TIMER_ONCE      0
+
+static void
+ring_bell ( void )
+{
+    bell_on ();
+    /* This gets called with a delay in milliseconds.
+     * The final argument is a repeat flag
+     */
+    os_timer_arm ( &timer1, 500, TIMER_ONCE );
 }
 
 #ifdef notdef
@@ -120,8 +158,6 @@ red_off ( void )
 static void
 led_init ( void )
 {
-    /* remember GPIO 1 and 3 are uart */
-
     /* Setup "bit 2" for output (this is the LED) */
 #define FUNC_MUX	PERIPHS_IO_MUX_GPIO2_U
 #define FUNC_F		FUNC_GPIO2
@@ -225,6 +261,9 @@ do_cmd ( void *arg, char *buf )
     } else if ( strcmp ( buf, "bell_off" ) == 0 ) {
 	bell_off ();
 	my_reply ( arg, "OK" );
+    } else if ( strcmp ( buf, "bell" ) == 0 ) {
+        ring_bell ();
+        my_reply ( arg, "OK" );
     } else
 	my_reply ( arg, "ERR" );
 	    
@@ -413,6 +452,9 @@ user_init ( void )
 
     /* set a callback for wifi events */
     wifi_set_event_handler_cb ( wifi_event );
+
+    os_timer_disarm ( &timer1 );
+    os_timer_setfn ( &timer1, timer_func1, NULL );
 
     /* once we fall off the end, it is all about event handlers */
 }
