@@ -45,7 +45,7 @@ static char *pass = "Your ad here";
 
 static char blue_state;
 static char red_state;
-static char bell_state;
+static char bell_gpio_state;
 
 static os_timer_t timer1;
 
@@ -67,11 +67,15 @@ static os_timer_t timer1;
  */
 
 #define BELL_BIT		BIT4	/* NodeMCU D2 */
+#define BELL_MUX		PERIPHS_IO_MUX_GPIO4_U
 // #define BELL_BIT		BIT5	/* NodeMCU D1 */
 // #define BELL_BIT		BIT12	/* NodeMCU D6 */
 // #define BELL_BIT		BIT13	/* NodeMCU D7 */
 // #define BELL_BIT		BIT14	/* NodeMCU D5 */
 // #define BELL_BIT		BIT0	/* NodeMCU D3 -- BAD, tangles with boot */
+
+/* GPIO-4 stays low during reset and boot up, so we get no spurious "rings"
+ */
 
 static void
 blue_on ( void )
@@ -92,7 +96,7 @@ static void
 bell_off ( void )
 {
     gpio_output_set(0, BELL_BIT, BELL_BIT, 0);
-    bell_state = 1;
+    bell_gpio_state = 1;
 }
 
 /* This pulls high (I see 3.3 volts on DVM) */
@@ -101,42 +105,63 @@ static void
 bell_on ( void )
 {
     gpio_output_set(BELL_BIT, 0, BELL_BIT, 0);
-    bell_state = 0;
+    bell_gpio_state = 0;
 }
+
+#define ST_IDLE		0
+#define ST_RING		1
+#define ST_DELAY	2
+
+#define TIMER_REPEAT    1
+#define TIMER_ONCE      0
+
+// #define RING_DELAY	500	/* works, but too long */
+// #define RING_DELAY	100	/* works fine */
+// #define RING_DELAY	50	/* works fine */
+#define RING_DELAY	40	/* works great */
+// #define RING_DELAY	25	/* works, but weak */
+// #define RING_DELAY	10	/* does not work */
+
+#define PAUSE_DELAY	500
+
+static int bell_count;
+static int bell_state;
 
 void
 timer_func1 ( void *arg )
 {
     os_printf("timer\n");
-    bell_off ();
-}
 
-#define TIMER_REPEAT    1
-#define TIMER_ONCE      0
+    if ( bell_state == ST_RING ) {
+	bell_off ();
+	bell_count--;
+	if ( bell_count < 1 ) {
+	    bell_state = ST_IDLE;
+	    return;
+	}
+	bell_state = ST_DELAY;
+	os_timer_arm ( &timer1, PAUSE_DELAY, TIMER_ONCE );
+	return;
+    }
+    /* Otherwise ST_DELAY */
+    bell_state = ST_RING;
+    bell_on ();
+    os_timer_arm ( &timer1, RING_DELAY, TIMER_ONCE );
+}
 
 static void
 ring_bell ( void )
 {
-    bell_on ();
-    /* This gets called with a delay in milliseconds.
-     * The final argument is a repeat flag
-     */
-    os_timer_arm ( &timer1, 500, TIMER_ONCE );
-}
+    if ( bell_state != ST_IDLE )
+	return;
 
-#ifdef notdef
-static void
-flip_blue ( void )
-{
-    if (GPIO_REG_READ(GPIO_OUT_ADDRESS) & BLUE_LED_BIT) {
-	gpio_output_set(0, BLUE_LED_BIT, BLUE_LED_BIT, 0);
-	// os_printf("set high\n");
-    } else {
-	gpio_output_set(BLUE_LED_BIT, 0, BLUE_LED_BIT, 0);
-	// os_printf("set low\n");
-    }
+    bell_on ();
+    bell_count = 2;
+    bell_state = ST_RING;
+
+    /* delay in milliseconds.  */
+    os_timer_arm ( &timer1, RING_DELAY, TIMER_ONCE );
 }
-#endif
 
 static void
 red_on ( void )
@@ -165,9 +190,10 @@ led_init ( void )
     PIN_FUNC_SELECT ( PERIPHS_IO_MUX_GPIO2_U, 0 );
     blue_off ();
 
-    // Also set up bit 0 (GPIO) for bell output */
-    PIN_FUNC_SELECT ( PERIPHS_IO_MUX_GPIO0_U, 0 );
+    PIN_FUNC_SELECT ( BELL_MUX, 0 );
     bell_off ();
+    bell_state = ST_IDLE;
+    bell_count = 0;
 
     /* The red LED is on GPIO 16, which is not really a GPIO, but the rtc unit */
     WRITE_PERI_REG(PAD_XPD_DCDC_CONF,
