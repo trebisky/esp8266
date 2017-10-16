@@ -1,6 +1,16 @@
 #!/usr/bin/ruby
 # MMTsocket.rb
 
+# Test my workshop bell gadget
+# ./client xyz sends "xyz"
+#
+# bell rings the bell
+# bell_on and bell_off turn on/off the bell control GPIO
+#  (avoid this if the SSR and bell are actually connected).
+#
+# b_on and b_off turn on/off the blue LED
+# r_on and r_off turn on/off the red LED
+
 require 'socket'
 require 'timeout'
 

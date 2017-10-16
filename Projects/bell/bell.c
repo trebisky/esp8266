@@ -19,7 +19,22 @@
  * The IP address gets set in set_ip_static ();
  *  This is esp_bell - 192.168.0.41
  *
+ * Placed in service 10-15-2017
+ * not that I worked on this for 2 months,
+ * after doing the proof of concept on the breadboard, it sat around
+ * until I spent an afternoon mounting everything and adding an
+ * extra AC outlet for it in my workshop.
+ *
+ * I use an Opto-22 240D45 SSR in lieu of a little relay.
+ *  This is massive overkill.  My bell is 110 volts and
+ *  pulls less than an amp for a fraction of a second.
+ * I had a bunch of these laying around, so why not.
+ * 3.3 volt logic drives it without a problem.
+ * A datasheet for a similar device says that no heatsink is
+ *  required for loads under 5 Amps.
+ *
  * Tom Trebisky  8-7-2017
+ *
  */
 
 #include "ets_sys.h"
