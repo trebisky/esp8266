@@ -1,0 +1,6 @@
+hello
+*.o
+*.gz
+secret.h
+*.bin
+baud
