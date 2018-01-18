@@ -8,6 +8,7 @@ but if you just want to just use the ESP8266 as a little controller,
 it is just the thing!
 
 1. hello -- a very small simple first program that prints a message
+1. hello_cpu -- the above with code added to bump cpu to 80 Mhz
 2. uart  -- a bare metal uart driver
 2. timer -- bare metal timer interrupts
 2. timer_blink -- user timer to blink LED (576 bytes)

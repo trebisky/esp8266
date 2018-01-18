@@ -1,0 +1,421 @@
+
+hello.o:     file format elf32-xtensa-le
+
+
+Disassembly of section .text:
+
+00000000 <call_user_start-0x1c>:
+   0:	07a120        	excw
+   3:	000000        	ill
+   6:	040000        	extui	a0, a0, 0, 1
+	...
+
+0000001c <call_user_start>:
+  1c:	f0c112        	addi	a1, a1, -16
+  1f:	c3a132        	movi	a3, 0x1c3
+  22:	020c      	movi.n	a2, 0
+  24:	3109      	s32i.n	a0, a1, 12
+  26:	fff901        	l32r	a0, c <call_user_start-0x10>
+  29:	0000c0        	callx0	a0
+  2c:	fff521        	l32r	a2, 0 <call_user_start-0x1c>
+  2f:	fff801        	l32r	a0, 10 <call_user_start-0xc>
+  32:	0000c0        	callx0	a0
+  35:	fff321        	l32r	a2, 4 <call_user_start-0x18>
+  38:	fff701        	l32r	a0, 14 <call_user_start-0x8>
+  3b:	0000c0        	callx0	a0
+  3e:	fff221        	l32r	a2, 8 <call_user_start-0x14>
+  41:	fff501        	l32r	a0, 18 <call_user_start-0x4>
+  44:	0000c0        	callx0	a0
+  47:	3108      	l32i.n	a0, a1, 12
+  49:	10c112        	addi	a1, a1, 16
+  4c:	f00d      	ret.n
+
+Disassembly of section .rodata.str1.4:
+
+00000000 <.rodata.str1.4>:
+   0:	000a      	add.n	a0, a0, a0
+   2:	450000        	extui	a0, a0, 16, 5
+   5:	207461        	l32r	a6, fffc81d8 <call_user_start+0xfffc81bc>
+   8:	6e6f64        	excw
+   b:	737475        	excw
+   e:	000a21        	l32r	a2, fffc0038 <call_user_start+0xfffc001c>
+
+Disassembly of section .debug_frame:
+
+00000000 <.debug_frame>:
+   0:	000c      	movi.n	a0, 0
+   2:	ff0000        	excw
+   5:	ff          	.byte 0xff
+   6:	ff          	.byte 0xff
+   7:	ff          	.byte 0xff
+   8:	010003        	excw
+   b:	007c      	movi.n	a0, -16
+   d:	010c      	movi.n	a1, 0
+   f:	001c00        	excw
+  12:	000000        	ill
+  15:	000000        	ill
+  18:	001c      	movi.n	a0, 16
+  1a:	320000        	excw
+  1d:	000000        	ill
+  20:	000304        	excw
+  23:	0e0000        	excw
+  26:	070410        	excw
+  29:	000000        	ill
+  2c:	000180        	ret
+	...
+
+Disassembly of section .debug_info:
+
+00000000 <.debug_info>:
+   0:	00fc      	bnez.n	a0, 34 <.debug_info+0x34>
+   2:	040000        	extui	a0, a0, 0, 1
+   5:	000000        	ill
+   8:	040000        	extui	a0, a0, 0, 1
+   b:	003101        	l32r	a0, fffc00d0 <call_user_start+0xfffc00b4>
+   e:	010000        	slli	a0, a0, 32
+  11:	000082        	l8ui	a8, a0, 0
+	...
+  1c:	004e00        	break	14, 0
+  1f:	000000        	ill
+  22:	000000        	ill
+  25:	002102        	l32i	a0, a1, 0
+  28:	010000        	slli	a0, a0, 32
+  2b:	001c11        	l32r	a1, fffc009c <call_user_start+0xfffc0080>
+  2e:	320000        	excw
+  31:	000000        	ill
+  34:	c99c01        	l32r	a0, ffff26a4 <call_user_start+0xffff2688>
+  37:	000000        	ill
+  3a:	009703        	excw
+  3d:	010000        	slli	a0, a0, 32
+  40:	00c913        	excw
+  43:	4b0000        	excw
+  46:	000000        	ill
+  49:	030004        	excw
+  4c:	008a      	add.n	a0, a0, a8
+  4e:	010000        	slli	a0, a0, 32
+  51:	00c914        	excw
+  54:	5c0000        	excw
+  57:	000000        	ill
+  5a:	030004        	excw
+  5d:	0000a7        	bnone	a0, a10, 61 <.debug_info+0x61>
+  60:	160100        	excw
+  63:	00c9      	s32i.n	a12, a0, 0
+  65:	6d0000        	excw
+  68:	000000        	ill
+  6b:	050004        	excw
+  6e:	002c      	movi.n	a0, 32
+  70:	d00000        	subx2	a0, a0, a0
+  73:	000000        	ill
+  76:	000087        	bnone	a0, a8, 7a <.debug_info+0x7a>
+  79:	010600        	slli	a0, a6, 32
+  7c:	0a0353        	excw
+  7f:	0601c3        	excw
+  82:	015201        	l32r	a0, fffc05cc <call_user_start+0xfffc05b0>
+  85:	050030        	extui	a0, a3, 16, 1
+  88:	000035        	excw
+  8b:	00e100        	excw
+  8e:	9e0000        	excw
+  91:	000000        	ill
+  94:	520106        	j	1489c <call_user_start+0x14880>
+  97:	200c05        	call0	20158 <call_user_start+0x2013c>
+  9a:	0007a1        	l32r	a10, fffc00b8 <call_user_start+0xfffc009c>
+  9d:	3e0500        	excw
+  a0:	000000        	ill
+  a3:	0000f2        	l8ui	a15, a0, 0
+  a6:	00b500        	excw
+  a9:	060000        	excw
+  ac:	055201        	l32r	a0, fffc15f4 <call_user_start+0xfffc15d8>
+  af:	000003        	excw
+  b2:	000000        	ill
+  b5:	004707        	ball	a7, a0, b9 <.debug_info+0xb9>
+  b8:	f20000        	excw
+  bb:	000000        	ill
+  be:	520106        	j	148c6 <call_user_start+0x148aa>
+  c1:	040305        	call0	40f4 <call_user_start+0x40d8>
+  c4:	000000        	ill
+  c7:	080000        	excw
+  ca:	690504        	excw
+  cd:	6e          	.byte 0x6e
+  ce:	030074        	excw
+  d1:	000097        	bnone	a0, a9, d5 <.debug_info+0xd5>
+  d4:	130100        	excw
+  d7:	00c9      	s32i.n	a12, a0, 0
+  d9:	e10000        	excw
+  dc:	000000        	ill
+  df:	030004        	excw
+  e2:	008a      	add.n	a0, a0, a8
+  e4:	010000        	slli	a0, a0, 32
+  e7:	00c914        	excw
+  ea:	f20000        	excw
+  ed:	000000        	ill
+  f0:	090004        	excw
+  f3:	0000a7        	bnone	a0, a10, f7 <.debug_info+0xf7>
+  f6:	160100        	excw
+  f9:	00c9      	s32i.n	a12, a0, 0
+  fb:	040000        	extui	a0, a0, 0, 1
+	...
+
+Disassembly of section .debug_abbrev:
+
+00000000 <.debug_abbrev>:
+   0:	011101        	l32r	a0, fffc0444 <call_user_start+0xfffc0428>
+   3:	130e25        	excw
+   6:	030b      	addi.n	a0, a3, -1
+   8:	0e          	.byte 0xe
+   9:	0e1b      	addi.n	a0, a14, 1
+   b:	120111        	l32r	a1, fffc4810 <call_user_start+0xfffc47f4>
+   e:	171006        	j	5c52 <call_user_start+0x5c36>
+  11:	020000        	excw
+  14:	2e          	.byte 0x2e
+  15:	193f01        	l32r	a0, fffc6514 <call_user_start+0xfffc64f8>
+  18:	3a0e03        	excw
+  1b:	3b0b      	addi.n	a3, a11, -1
+  1d:	270b      	addi.n	a2, a7, -1
+  1f:	1119      	s32i.n	a1, a1, 4
+  21:	061201        	l32r	a0, fffc186c <call_user_start+0xfffc1850>
+  24:	971840        	excw
+  27:	011942        	l16ui	a4, a9, 2
+  2a:	000013        	excw
+  2d:	012e03        	excw
+  30:	3f          	.byte 0x3f
+  31:	0319      	s32i.n	a1, a3, 0
+  33:	0e          	.byte 0xe
+  34:	0b3a      	add.n	a0, a11, a3
+  36:	0b3b      	addi.n	a0, a11, 3
+  38:	1349      	s32i.n	a4, a3, 4
+  3a:	193c      	movi.n	a9, 49
+  3c:	001301        	l32r	a0, fffc0088 <call_user_start+0xfffc006c>
+  3f:	180400        	excw
+  42:	000000        	ill
+  45:	828905        	call0	fff828d8 <call_user_start+0xfff828bc>
+  48:	110101        	l32r	a0, fffc444c <call_user_start+0xfffc4430>
+  4b:	133101        	l32r	a0, fffc4d10 <call_user_start+0xfffc4cf4>
+  4e:	001301        	l32r	a0, fffc009c <call_user_start+0xfffc0080>
+  51:	8a0600        	excw
+  54:	000182        	l8ui	a8, a1, 0
+  57:	911802        	l16ui	a0, a8, 0x122
+  5a:	001842        	l16ui	a4, a8, 0
+  5d:	890700        	excw
+  60:	010182        	l8ui	a8, a1, 1
+  63:	310111        	l32r	a1, fffcc468 <call_user_start+0xfffcc44c>
+  66:	000013        	excw
+  69:	2408      	l32i.n	a0, a4, 8
+  6b:	0b0b00        	excw
+  6e:	3e          	.byte 0x3e
+  6f:	030b      	addi.n	a0, a3, -1
+  71:	0008      	l32i.n	a0, a0, 0
+  73:	2e0900        	excw
+  76:	193f01        	l32r	a0, fffc6574 <call_user_start+0xfffc6558>
+  79:	3a0e03        	excw
+  7c:	3b0b      	addi.n	a3, a11, -1
+  7e:	490b      	addi.n	a4, a9, -1
+  80:	193c13        	excw
+  83:	000000        	ill
+
+Disassembly of section .debug_aranges:
+
+00000000 <.debug_aranges>:
+   0:	001c      	movi.n	a0, 16
+   2:	020000        	excw
+   5:	000000        	ill
+   8:	040000        	extui	a0, a0, 0, 1
+	...
+  13:	004e00        	break	14, 0
+	...
+
+Disassembly of section .debug_line:
+
+00000000 <.debug_line>:
+   0:	5e          	.byte 0x5e
+   1:	000000        	ill
+   4:	1e0002        	l8ui	a0, a0, 30
+   7:	000000        	ill
+   a:	fb0101        	l32r	a0, ffffec10 <call_user_start+0xffffebf4>
+   d:	0e          	.byte 0xe
+   e:	000d      	mov.n	a0, a0
+  10:	010101        	l32r	a0, fffc0414 <call_user_start+0xfffc03f8>
+  13:	000001        	l32r	a0, fffc0014 <call_user_start+0xfffbfff8>
+  16:	000100        	excw
+  19:	000100        	excw
+  1c:	6568      	l32i.n	a6, a5, 24
+  1e:	6c6c      	movi.n	a12, -26
+  20:	6f          	.byte 0x6f
+  21:	2e          	.byte 0x2e
+  22:	000063        	excw
+  25:	000000        	ill
+  28:	020500        	excw
+  2b:	001c      	movi.n	a0, 16
+  2d:	030000        	excw
+  30:	030111        	l32r	a1, fffc0c34 <call_user_start+0xfffc0c18>
+  33:	030901        	l32r	a0, fffc0c58 <call_user_start+0xfffc0c3c>
+  36:	030100        	excw
+  39:	7f          	.byte 0x7f
+  3a:	0509      	s32i.n	a0, a5, 0
+  3c:	030100        	excw
+  3f:	020901        	l32r	a0, fffc0864 <call_user_start+0xfffc0848>
+  42:	030100        	excw
+  45:	060901        	l32r	a0, fffc186c <call_user_start+0xfffc1850>
+  48:	030100        	excw
+  4b:	090902        	l8ui	a0, a9, 9
+  4e:	030100        	excw
+  51:	090901        	l32r	a0, fffc2478 <call_user_start+0xfffc245c>
+  54:	030100        	excw
+  57:	090901        	l32r	a0, fffc247c <call_user_start+0xfffc2460>
+  5a:	090100        	excw
+  5d:	000007        	bnone	a0, a0, 61 <.debug_line+0x61>
+  60:	01          	.byte 0x1
+  61:	01          	.byte 0x1
+
+Disassembly of section .debug_str:
+
+00000000 <.debug_str>:
+   0:	2f          	.byte 0x2f
+   1:	2f3175        	excw
+   4:	6f7250        	excw
+   7:	656a      	add.n	a6, a5, a6
+   9:	737463        	excw
+   c:	2f          	.byte 0x2f
+   d:	505345        	call0	50544 <call_user_start+0x50528>
+  10:	3238      	l32i.n	a3, a2, 12
+  12:	2f3636        	excw
+  15:	4e          	.byte 0x4e
+  16:	6f          	.byte 0x6f
+  17:	4b4453        	excw
+  1a:	2f          	.byte 0x2f
+  1b:	6568      	l32i.n	a6, a5, 24
+  1d:	6c6c      	movi.n	a12, -26
+  1f:	6f          	.byte 0x6f
+  20:	616300        	excw
+  23:	6c6c      	movi.n	a12, -26
+  25:	5f          	.byte 0x5f
+  26:	657375        	excw
+  29:	735f72        	s16i	a7, a15, 230
+  2c:	726174        	excw
+  2f:	470074        	excw
+  32:	4e          	.byte 0x4e
+  33:	432055        	excw
+  36:	2e3420        	excw
+  39:	2e38      	l32i.n	a3, a14, 8
+  3b:	2d2032        	l32i	a3, a0, 180
+  3e:	6c6d      	excw
+  40:	6f          	.byte 0x6f
+  41:	6e          	.byte 0x6e
+  42:	616367        	bbci	a3, 6, a7 <.debug_str+0xa7>
+  45:	6c6c      	movi.n	a12, -26
+  47:	2d2073        	excw
+  4a:	746d      	excw
+  4c:	747865        	excw
+  4f:	732d      	excw
+  51:	746365        	excw
+  54:	6f69      	s32i.n	a6, a15, 24
+  56:	6e          	.byte 0x6e
+  57:	6c2d      	excw
+  59:	7469      	s32i.n	a6, a4, 28
+  5b:	617265        	excw
+  5e:	736c      	movi.n	a3, -25
+  60:	672d20        	excw
+  63:	4f2d20        	excw
+  66:	2d2073        	excw
+  69:	4f          	.byte 0x4f
+  6a:	2d2032        	l32i	a3, a0, 180
+  6d:	6f6e66        	bnei	a14, 6, e0 <call_user_start+0xc4>
+  70:	692d      	excw
+  72:	6e          	.byte 0x6e
+  73:	696c      	movi.n	a9, -26
+  75:	6e          	.byte 0x6e
+  76:	662d65        	excw
+  79:	636e75        	excw
+  7c:	6f6974        	excw
+  7f:	6e          	.byte 0x6e
+  80:	680073        	excw
+  83:	6c6c65        	excw
+  86:	6f          	.byte 0x6f
+  87:	2e          	.byte 0x2e
+  88:	650063        	excw
+  8b:	5f7374        	excw
+  8e:	6c6564        	excw
+  91:	5f7961        	l32r	a6, fffd7e78 <call_user_start+0xfffd7e5c>
+  94:	007375        	excw
+  97:	726175        	excw
+  9a:	645f74        	excw
+  9d:	7669      	s32i.n	a6, a6, 28
+  9f:	5f          	.byte 0x5f
+  a0:	6f6d      	excw
+  a2:	666964        	excw
+  a5:	0079      	s32i.n	a7, a0, 0
+  a7:	737465        	excw
+  aa:	5f          	.byte 0x5f
+  ab:	697270        	excw
+  ae:	6e          	.byte 0x6e
+  af:	006674        	excw
+
+Disassembly of section .comment:
+
+00000000 <.comment>:
+   0:	434700        	excw
+   3:	203a43        	excw
+   6:	6328      	l32i.n	a2, a3, 24
+   8:	736f72        	s32i	a7, a15, 0x1cc
+   b:	6f7473        	excw
+   e:	6f          	.byte 0x6f
+   f:	2d6c      	movi.n	a13, -30
+  11:	4e          	.byte 0x4e
+  12:	312047        	blt	a0, a4, 47 <call_user_start+0x2b>
+  15:	2e          	.byte 0x2e
+  16:	2e3032        	excw
+  19:	202930        	or	a2, a9, a3
+  1c:	382e34        	excw
+  1f:	2e          	.byte 0x2e
+  20:	32          	.byte 0x32
+	...
+
+Disassembly of section .xtensa.info:
+
+00000000 <.xtensa.info>:
+   0:	000c      	movi.n	a0, 0
+   2:	200000        	or	a0, a0, a0
+   5:	000000        	ill
+   8:	000001        	l32r	a0, fffc0008 <call_user_start+0xfffbffec>
+   b:	745800        	extui	a5, a0, 8, 8
+   e:	736e65        	excw
+  11:	495f61        	l32r	a6, fffd2590 <call_user_start+0xfffd2574>
+  14:	6e          	.byte 0x6e
+  15:	006f66        	bnei	a15, 6, 19 <.xtensa.info+0x19>
+  18:	455355        	excw
+  1b:	5f          	.byte 0x5f
+  1c:	534241        	l32r	a4, fffd4d24 <call_user_start+0xfffd4d08>
+  1f:	4f          	.byte 0x4f
+  20:	554c      	movi.n	a5, 69
+  22:	5f4554        	excw
+  25:	494c      	movi.n	a9, 68
+  27:	524554        	excw
+  2a:	534c41        	l32r	a4, fffd4d5c <call_user_start+0xfffd4d40>
+  2d:	303d      	excw
+  2f:	410a      	add.n	a4, a1, a0
+  31:	3d4942        	s8i	a4, a9, 61
+  34:	000a31        	l32r	a3, fffc005c <call_user_start+0xfffc0040>
+	...
+
+Disassembly of section .xt.lit:
+
+00000000 <.xt.lit>:
+   0:	000000        	ill
+   3:	001c00        	excw
+	...
+
+Disassembly of section .xt.prop:
+
+00000000 <.xt.prop>:
+   0:	000000        	ill
+   3:	001c00        	excw
+   6:	010000        	slli	a0, a0, 32
+   9:	0028      	l32i.n	a2, a0, 0
+   b:	001c00        	excw
+   e:	320000        	excw
+  11:	000000        	ill
+  14:	000002        	l8ui	a0, a0, 0
+  17:	004e00        	break	14, 0
+  1a:	000000        	ill
+  1d:	000000        	ill
+  20:	0008      	l32i.n	a0, a0, 0
+	...
