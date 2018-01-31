@@ -7715,22 +7715,24 @@
 4000407c:	0df0      	ret.n
 4000407e:	0000
 
-40004080 <sub_4080>:
+40004080 <esp_spi_erase_chip>:
 40004080:	12c1f0        	addi	a1, a1, -16
 40004083:	c911      	s32i.n	a12, a1, 4
 40004085:	0901      	s32i.n	a0, a1, 0
 40004087:	cd02      	mov.n	a12, a2
 40004089:	054000        	call0	4000448c <Wait_SPI_Idle>
-4000408c:	31e2f0		l32r	a3, 40000414	; ( 00400000 )
+4000408c:	31e2f0		l32r	a3, 40000414	; ( 00400000 -- SPI_FLASH_CE "chip erase") 
 4000408f:	01cdf3		l32r	a0, 40000fc4	; ( 60000200 -- GPIO base )
 40004092:	c02000        	memw
-40004095:	3900      	s32i.n	a3, a0, 0
+40004095:	3900      	s32i.n	a3, a0, 0	; SPI_CMD = SPI_FLASH_CE
 40004097:	c02000        	memw
 4000409a:	222000        	l32i	a2, a0, 0
-4000409d:	167200        	beqz	a2, 400040a8 <sub_4080+0x28>
+4000409d:	167200        	beqz	a2, 400040a8	; if already finished...
+
 400040a0:	c02000        	memw
-400040a3:	4800      	l32i.n	a4, a0, 0
-400040a5:	5674ff        	bnez	a4, 400040a0 <sub_4080+0x20>
+400040a3:	4800      	l32i.n	a4, a0, 0	
+400040a5:	5674ff        	bnez	a4, 400040a0	; wait while the command is running
+
 400040a8:	c02c20        	or	a2, a12, a12
 400040ab:	053e00        	call0	4000448c <Wait_SPI_Idle>
 400040ae:	22a000        	movi	a2, 0
@@ -7738,43 +7740,47 @@
 400040b4:	0801      	l32i.n	a0, a1, 0
 400040b6:	12c110        	addi	a1, a1, 16
 400040b9:	0df0      	ret.n
+
 400040bb:	00
 400040bc:	00000001	.long 0x01000000
-400040c0:	12
 
-400040c0 <sub_40c0>:
+400040c0 <esp_spi_erase_sector>:
 400040c0:	12c1f0        	addi	a1, a1, -16
 400040c3:	2901      	s32i.n	a2, a1, 0
 400040c5:	c921      	s32i.n	a12, a1, 8
 400040c7:	0911      	s32i.n	a0, a1, 4
-400040c9:	cd03      	mov.n	a12, a3
-400040cb:	3000b4        	extui	a0, a3, 0, 12
-400040ce:	8ca0      	beqz.n	a0, 400040dc <sub_40c0+0x1c>
-400040d0:	0c12      	movi.n	a2, 1
+400040c9:	cd03      	mov.n	a12, a3		; from_address
+400040cb:	3000b4        	extui	a0, a3, 0, 12	; from_address & 0xfff
+400040ce:	8ca0      	beqz.n	a0, 400040dc	; is it at a sector (4K here) boundary?
+400040d0:	0c12      	movi.n	a2, 1		; return 1
 400040d2:	c821      	l32i.n	a12, a1, 8
 400040d4:	0811      	l32i.n	a0, a1, 4
 400040d6:	12c110        	addi	a1, a1, 16
 400040d9:	0df0      	ret.n
-400040db:	00c53a        	excw
-400040de:	000221        	srai	a0, a0, 2
-400040e1:	0051cd        	excw
-400040e4:	f021b7        	excw
-400040e7:	f3505c        	excw
-400040ea:	10c020        	or	a12, a0, a1
-400040ed:	005262        	excw
-400040f0:	0141f2		l32r	a0, 400009f4	; ( a90a0c00 )
-400040f3:	ff          	.byte 0xff
+
+400040db:	00          	.byte 00
+
+400040dc:	c53a00        	call0	4000448c <Wait_SPI_Idle>
+400040df:	022100        	l32i	a0, a1, 0
+400040e2:	51cdf0        	l32r	a5, 40000418 	; ( 00ffffff )
+400040e5:	21b7f3        	l32r	a2, 40000fc4 	; ( 60000200 -- GPIO base )
+400040e8:	505c10        	and	a5, a12, a5	; from_address & 0xffffff (i.e. max 16M)
+400040eb:	c02000        	memw
+400040ee:	526201        	s32i	a5, a2, 4	; SPI_ADDR = from_address & 0xffffff
+400040f1:	41f2ff        	l32r	a4, 400040bc 	; (0x01000000 -- SPI_FLASH_SE "sector erase")
 400040f4:	c02000        	memw
-400040f7:	426200        	s32i	a4, a2, 0
+400040f7:	426200        	s32i	a4, a2, 0	; SPI_CMD = SPI_FLASH_SE
 400040fa:	c02000        	memw
-400040fd:	3802      	l32i.n	a3, a2, 0
-400040ff:	8c63      	beqz.n	a3, 40004109 <sub_40c0+0x49>
+400040fd:	3802      	l32i.n	a3, a2, 0 
+400040ff:	8c63      	beqz.n	a3, 40004109 	; SPI_CMD == 0? i.e. command completed
+
 40004101:	c02000        	memw
 40004104:	6802      	l32i.n	a6, a2, 0
-40004106:	5676ff        	bnez	a6, 40004101 <sub_40c0+0x41>
+40004106:	5676ff        	bnez	a6, 40004101 	; wait while command is running
+
 40004109:	002020        	or	a2, a0, a0
 4000410c:	c53700        	call0	4000448c <Wait_SPI_Idle>
-4000410f:	22a000        	movi	a2, 0
+4000410f:	22a000        	movi	a2, 0		; return 0
 40004112:	c22102        	l32i	a12, a1, 8
 40004115:	0811      	l32i.n	a0, a1, 4
 40004117:	12c110        	addi	a1, a1, 16
@@ -7782,7 +7788,7 @@
 4000411c:	00008000	.long 0x00800000
 40004120:	12c1
 
-40004120 <sub_4120>:
+40004120 <esp_spi_erase_block>:
 40004120:	12c1f0        	addi	a1, a1, -16
 40004123:	326100        	s32i	a3, a1, 0
 40004126:	c26102        	s32i	a12, a1, 8
@@ -7795,15 +7801,17 @@
 40004139:	504410        	and	a4, a4, a5
 4000413c:	c02000        	memw
 4000413f:	4910      	s32i.n	a4, a0, 4
-40004141:	31f6ff		l32r	a3, 4000411c	; ( 00800000 )
+40004141:	31f6ff		l32r	a3, 4000411c	; ( 00800000 -- SPI_FLASH_BE "block erase")
 40004144:	c02000        	memw
-40004147:	3900      	s32i.n	a3, a0, 0
+40004147:	3900      	s32i.n	a3, a0, 0	; SPI_CMD = SPI_FLASH_BE
 40004149:	c02000        	memw
 4000414c:	2800      	l32i.n	a2, a0, 0
-4000414e:	8c62      	beqz.n	a2, 40004158 <sub_4120+0x38>
+4000414e:	8c62      	beqz.n	a2, 40004158	; if already finished...
+
 40004150:	c02000        	memw
 40004153:	6800      	l32i.n	a6, a0, 0
-40004155:	5676ff        	bnez	a6, 40004150 <sub_4120+0x30>
+40004155:	5676ff        	bnez	a6, 40004150	; wait while command is running
+
 40004158:	c02c20        	or	a2, a12, a12
 4000415b:	053300        	call0	4000448c <Wait_SPI_Idle>
 4000415e:	22a000        	movi	a2, 0
@@ -8746,7 +8754,7 @@
 4000499d:	21b5ff		l32r	a2, 40004874	; ( 3fffc714 )
 400049a0:	f02000        	nop
 400049a3:	2802      	l32i.n	a2, a2, 0
-400049a5:	856dff        	call0	40004080 <sub_4080>
+400049a5:	856dff        	call0	40004080 <esp_spi_erase_chip>
 400049a8:	5682fe        	bnez	a2, 40004994
 400049ab:	0c02      	movi.n	a2, 0
 400049ad:	0801      	l32i.n	a0, a1, 0
@@ -8777,7 +8785,7 @@
 400049e5:	2802      	l32i.n	a2, a2, 0
 400049e7:	322202        	l32i	a3, a2, 8
 400049ea:	c03382        	mull	a3, a3, a12
-400049ed:	0573ff        	call0	40004120 <sub_4120>
+400049ed:	0573ff        	call0	40004120 <esp_spi_erase_block>
 400049f0:	56b2fd        	bnez	a2, 400049cf <SPIEraseBlock+0x1b>
 400049f3:	0c02      	movi.n	a2, 0
 400049f5:	c821      	l32i.n	a12, a1, 8
@@ -8789,30 +8797,30 @@
 40004a00 <SPIEraseSector>:
 40004a00:	319dff		l32r	a3, 40004874	; ( 3fffc714 )
 40004a03:	12c1f0        	addi	a1, a1, -16
-40004a06:	c921      	s32i.n	a12, a1, 8
+40004a06:	c921      	s32i.n	a12, a1, 8	
 40004a08:	0911      	s32i.n	a0, a1, 4
-40004a0a:	cd02      	mov.n	a12, a2
-40004a0c:	3803      	l32i.n	a3, a3, 0
-40004a0e:	3901      	s32i.n	a3, a1, 0
-40004a10:	2813      	l32i.n	a2, a3, 4
-40004a12:	322303        	l32i	a3, a3, 12
+40004a0a:	cd02      	mov.n	a12, a2		; sector
+40004a0c:	3803      	l32i.n	a3, a3, 0	; *flashship
+40004a0e:	3901      	s32i.n	a3, a1, 0	
+40004a10:	2813      	l32i.n	a2, a3, 4	; flashship->chip_size
+40004a12:	322303        	l32i	a3, a3, 12	; flashchip->sector_size 
 40004a15:	458009        	call0	4000e21c <__udivsi3>
-40004a18:	273c0a        	bltu	a12, a2, 40004a26 <SPIEraseSector+0x26>
-40004a1b:	0c12      	movi.n	a2, 1
+40004a18:	273c0a        	bltu	a12, a2, 40004a26 ; if (sector < chip_size / sector_size)
+40004a1b:	0c12      	movi.n	a2, 1		; return 1
 40004a1d:	c821      	l32i.n	a12, a1, 8
 40004a1f:	0811      	l32i.n	a0, a1, 4
 40004a21:	12c110        	addi	a1, a1, 16
 40004a24:	0df0      	ret.n
-40004a26:	2801      	l32i.n	a2, a1, 0
+40004a26:	2801      	l32i.n	a2, a1, 0	; *flashship
 40004a28:	05a1ff        	call0	4000443c <SPI_write_enable>
-40004a2b:	56c2fe        	bnez	a2, 40004a1b <SPIEraseSector+0x1b>
+40004a2b:	56c2fe        	bnez	a2, 40004a1b 	; if (SPI_write_enable() != 0) return 1
 40004a2e:	2191ff		l32r	a2, 40004874	; ( 3fffc714 )
-40004a31:	2802      	l32i.n	a2, a2, 0
-40004a33:	322203        	l32i	a3, a2, 12
-40004a36:	c03382        	mull	a3, a3, a12
-40004a39:	4568ff        	call0	400040c0 <sub_40c0>
-40004a3c:	56b2fd        	bnez	a2, 40004a1b <SPIEraseSector+0x1b>
-40004a3f:	0c02      	movi.n	a2, 0
+40004a31:	2802      	l32i.n	a2, a2, 0	; *flashship
+40004a33:	322203        	l32i	a3, a2, 12	; flashchip->sector_size
+40004a36:	c03382        	mull	a3, a3, a12	; = sector * sector_size
+40004a39:	4568ff        	call0	400040c0 <esp_spi_erase_sector>
+40004a3c:	56b2fd        	bnez	a2, 40004a1b 	; if ( != 0) return 1
+40004a3f:	0c02      	movi.n	a2, 0		; return 0
 40004a41:	c821      	l32i.n	a12, a1, 8
 40004a43:	0811      	l32i.n	a0, a1, 4
 40004a45:	12c110        	addi	a1, a1, 16
