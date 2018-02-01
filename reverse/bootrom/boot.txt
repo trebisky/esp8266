@@ -118,7 +118,7 @@
 ;  when it is clear, the cpu runs at 80 Mhz.
 ;  when it is set, the cpu runs at 160 Mhz.
 ;  The bootrom runs at 52 Mhz and we have no clue why, or how to jump to 80.
-; 
+;
 ; MAC address and chip info can be found here as follows:
 ;  0x3FF00050	OTP_MAC0[1]	OTP Memory (Contains byte 6 of MAC address at 0x3FF00053)
 ;  0x3FF00054	OTP_MAC1[1]	OTP Memory (Contains bytes 4-5 of MAC address at 0x3FF00055, 0x3FF00054)
@@ -1818,7 +1818,7 @@
 40000f85:	000000
 
 ; ets_isr_attach ( int_no, function, xx )
-;  
+;
 ; As an example for the Uart == ets_isr_attach ( 5, uart_rx_intr_handler, 3fffde28 )
 ;
 
@@ -1963,13 +1963,13 @@
 ;
 ; ets Jan  8 2013,rst cause:2, boot mode:(3,7)
 ;
-; load 0x40100000, len 27188, room 16 
+; load 0x40100000, len 27188, room 16
 ; tail 4
 ; chksum 0xc0
-; load 0x3ffe8000, len 884, room 4 
+; load 0x3ffe8000, len 884, room 4
 ; tail 0
 ; chksum 0x30
-; load 0x3ffe8378, len 280, room 8 
+; load 0x3ffe8378, len 280, room 8
 ; tail 0
 ; chksum 0x12
 ; csum 0x12
@@ -1988,7 +1988,7 @@
 ;
 ; 3fffd674:	"\n ets %s,rst cause:%d, boot mode:(%d,%d)\n\n"
 ; 3fffd6a0:	"Jan  8 2013"
-; 
+;
 
 40001069:	054601        	call0	400024cc <ets_printf>
 
@@ -2018,7 +2018,7 @@
 40001099:	822c46        	l32i	a8, a12, 0x118
 4000109c:	922000        	l32i	a9, a0, 0
 4000109f:	808025        	extui	a8, a8, 16, 3
-400010a2:	661818        	bnei	a8, 1, 400010be	; just run APP again 
+400010a2:	661818        	bnei	a8, 1, 400010be	; just run APP again
 400010a5:	565901        	bnez	a9, 400010be	; just run APP again
 
 ; This call is what copies an app out of flash and gets it ready to run.
@@ -2415,7 +2415,7 @@
 
 ; Here is the message we see when an app is being
 ;    loaded from flash
-;    Something like:  
+;    Something like:
 ; load 0x40100000, len 27188, room 16
 ; tail 4
 ; chksum 0xc0
@@ -4392,7 +4392,7 @@
 400025dc:	ffffdfff	.long 0xffdfffff
 
 ; Called once during startup.
-; 60000700 are RTC registers 
+; 60000700 are RTC registers
 
 400025e0 <rtc_get_reset_reason>:
 400025e0:	41dffa		l32r	a4, 4000115c	; ( 60000600 )
@@ -5211,7 +5211,7 @@
 ; as set up by timer_setfn, maybe with a call like this:
 ;
 ; call timer_setfn ( &wdt_timer, wdt_isr, 0 );
-; 
+;
 ;  note that timer_setfn sets the first field to -1,
 ;   which makes the object palatable to this routine
 
@@ -5535,7 +5535,7 @@
 ; 6 --> 12
 ; 12 --> 13
 ; else 0
-; 
+;
 ; call this wdt_map(arg)
 
 40002f14 <sub_2f14>:
@@ -6240,7 +6240,7 @@
 40003477:	324c01        	s8i	a3, a12, 1
 4000347a:	46efff        	j	4000343b
 
-; Table index 9 
+; Table index 9
 ;	Write register
 
 4000347d:	2d0e      	mov.n	a2, a14
@@ -7721,7 +7721,7 @@
 40004085:	0901      	s32i.n	a0, a1, 0
 40004087:	cd02      	mov.n	a12, a2
 40004089:	054000        	call0	4000448c <Wait_SPI_Idle>
-4000408c:	31e2f0		l32r	a3, 40000414	; ( 00400000 -- SPI_FLASH_CE "chip erase") 
+4000408c:	31e2f0		l32r	a3, 40000414	; ( 00400000 -- SPI_FLASH_CE "chip erase")
 4000408f:	01cdf3		l32r	a0, 40000fc4	; ( 60000200 -- GPIO base )
 40004092:	c02000        	memw
 40004095:	3900      	s32i.n	a3, a0, 0	; SPI_CMD = SPI_FLASH_CE
@@ -7730,7 +7730,7 @@
 4000409d:	167200        	beqz	a2, 400040a8	; if already finished...
 
 400040a0:	c02000        	memw
-400040a3:	4800      	l32i.n	a4, a0, 0	
+400040a3:	4800      	l32i.n	a4, a0, 0
 400040a5:	5674ff        	bnez	a4, 400040a0	; wait while the command is running
 
 400040a8:	c02c20        	or	a2, a12, a12
@@ -7771,7 +7771,7 @@
 400040f4:	c02000        	memw
 400040f7:	426200        	s32i	a4, a2, 0	; SPI_CMD = SPI_FLASH_SE
 400040fa:	c02000        	memw
-400040fd:	3802      	l32i.n	a3, a2, 0 
+400040fd:	3802      	l32i.n	a3, a2, 0
 400040ff:	8c63      	beqz.n	a3, 40004109 	; SPI_CMD == 0? i.e. command completed
 
 40004101:	c02000        	memw
@@ -7954,9 +7954,11 @@
 
 ; called from SPIRead only
 ;	with:
-;	  a2 = mystery control block in RAM
+;	  a2 = (SpiFlashChip*) flashchip
 ;	  a3 = offset in flash
 ;	  a4 = buffer address
+;               - must be uint32_t aligned,
+;               - must have space for extra bytes - 1..3 - if byte_count % 4 != 0
 ;	  a5 = byte count
 
 400042ac <sub_42ac>:
@@ -7966,11 +7968,11 @@
 400042b3:	c911      	s32i.n	a12, a1, 4	; save a12
 400042b5:	0901      	s32i.n	a0, a1, 0	; return
 400042b7:	cd04      	mov.n	a12, a4		; - target buffer
-400042b9:	0812      	l32i.n	a0, a2, 4	
+400042b9:	0812      	l32i.n	a0, a2, 4	; flashchip->chip_size
 400042bb:	3a45      	add.n	a4, a5, a3	; a4 = a3 + a5 (offset+count)
 400042bd:	47b011        	bgeu	a0, a4, 400042d2
 
-; trouble (end of read is beyond end of device ?)
+; trouble (end of read is beyond end of device)
 
 400042c0:	0c12      	movi.n	a2, 1		; a2 = 1
 400042c2:	c811      	l32i.n	a12, a1, 4	; restore
@@ -7986,91 +7988,114 @@
 400042d2:	30e320        	or	a14, a3, a3
 400042d5:	50d520        	or	a13, a5, a5
 400042d8:	051b00        	call0	4000448c <Wait_SPI_Idle>
-400042db:	e61d02        	bgei	a13, 1, 400042e1
-400042de:	863400        	j	400043b4
+400042db:	e61d02        	bgei	a13, 1, 400042e1 ; byte_count >= 1
+400042de:	863400        	j	400043b4	; goto return 0
 
 400042e1:	0138f3		l32r	a0, 40000fc4	; 60000200 -- spi base
-400042e4:	51a2ff		l32r	a5, 4000416c	; ( 20000000 )
-400042e7:	412ff0		l32r	a4, 400003a4	; ( 80000000 )
-400042ea:	e6cd76        	bgei	a13, 32, 40004364
-400042ed:	807d01        	slli	a7, a13, 24
-400042f0:	707e20        	or	a7, a14, a7
-400042f3:	c02000        	memw
-400042f6:	726001        	s32i	a7, a0, 4
-400042f9:	c02000        	memw
-400042fc:	4900      	s32i.n	a4, a0, 0
-400042fe:	c02000        	memw
-40004301:	6800      	l32i.n	a6, a0, 0
-40004303:	8c66      	beqz.n	a6, 4000430d
-40004305:	c02000        	memw
-40004308:	8800      	l32i.n	a8, a0, 0
-4000430a:	5678ff        	bnez	a8, 40004305
-4000430d:	d0a014        	extui	a10, a13, 0, 2
-40004310:	d07221        	srai	a7, a13, 2
-40004313:	1b97      	addi.n	a9, a7, 1
-40004315:	a07993        	movnez	a7, a9, a10
-40004318:	703074        	extui	a3, a7, 0, 8
-4000431b:	165309        	beqz	a3, 400043b4
-4000431e:	0c02      	movi.n	a2, 0
-40004320:	07670c        	bbci	a7, 0, 40004330
-40004323:	c02000        	memw
-40004326:	0c12      	movi.n	a2, 1
-40004328:	b22010        	l32i	a11, a0, 64
-4000432b:	b26c00        	s32i	a11, a12, 0
-4000432e:	4bcc      	addi.n	a12, a12, 4
-40004330:	30d141        	srli	a13, a3, 1
-40004333:	16dd07        	beqz	a13, 400043b4
+400042e4:	51a2ff		l32r	a5, 4000416c	; ( 20000000 == 32 << 24 )
+400042e7:	412ff0		l32r	a4, 400003a4	; ( 80000000 -- SPI_FLASH_READ )
+400042ea:	e6cd76        	bgei	a13, 32, 40004364 ; byte_count >= 32
 
-40004336:	0062a0        	addx4	a6, a2, a0
+; apparently (todo: confirm this) SPI_W array is split into 2 groups of 8
+; probably by SPI_USR_MOSI_HIGHPART as SPIRead uses 0..7 for reading, thus
+; only registers 0..7 (i.e. 32 bytes) are available for MISO 
+
+400042ed:	807d01        	slli	a7, a13, 24	; byte_count << 24
+400042f0:	707e20        	or	a7, a14, a7	; byte_count << 24 | offset_in_flash
+400042f3:	c02000        	memw
+400042f6:	726001        	s32i	a7, a0, 4	; SPI_ADDR = byte_count << 24 | offset_in_flash
+400042f9:	c02000        	memw
+400042fc:	4900      	s32i.n	a4, a0, 0	; SPI_CMD = SPI_FLASH_READ
+400042fe:	c02000        	memw			;;
+40004301:	6800      	l32i.n	a6, a0, 0	;;
+40004303:	8c66      	beqz.n	a6, 4000430d	;; while (SPI_CMD != 0) /* wait */;
+40004305:	c02000        	memw			;;
+40004308:	8800      	l32i.n	a8, a0, 0	;;
+4000430a:	5678ff        	bnez	a8, 40004305	;;
+
+; note that in _this_ block it reads 1 to 31 bytes, so all those count/index maskings are meaningless
+; they were probably defined as uint8_t, so compiler inserted those extui to ensure they are bytes
+
+4000430d:	d0a014        	extui	a10, a13, 0, 2  ; byte_count & 0x3 // any "tail" bytes outside of uint32
+40004310:	d07221        	srai	a7, a13, 2	; byte_count >> 2 // uin32_count
+40004313:	1b97      	addi.n	a9, a7, 1
+40004315:	a07993        	movnez	a7, a9, a10	; uin32_count = tail_bytes ? uin32_count + 1 : uin32_count
+40004318:	703074        	extui	a3, a7, 0, 8
+4000431b:	165309        	beqz	a3, 400043b4	; if done, then goto return 0
+
+4000431e:	0c02      	movi.n	a2, 0		; i = 0
+
+; the block below looks like a manual loop unrolling to make it copy from 2 SPI_W registers at a time
+
+40004320:	07670c        	bbci	a7, 0, 40004330	; even uin32_count?
+40004323:	c02000        	memw
+40004326:	0c12      	movi.n	a2, 1		; i = 1
+40004328:	b22010        	l32i	a11, a0, 64	; *SPI_W
+4000432b:	b26c00        	s32i	a11, a12, 0	; *uint32_buf = *SPI_W
+4000432e:	4bcc      	addi.n	a12, a12, 4	; ++uint32_buf
+
+40004330:	30d141        	srli	a13, a3, 1
+40004333:	16dd07        	beqz	a13, 400043b4	; if done, then goto return 0
+
+; the unrolled loop
+
+40004336:	0062a0        	addx4	a6, a2, a0	; spi_base = SPI_BASE + i * 4
 40004339:	c02000        	memw
-4000433c:	1b22      	addi.n	a2, a2, 1
-4000433e:	622610        	l32i	a6, a6, 64
-40004341:	690c      	s32i.n	a6, a12, 0
+4000433c:	1b22      	addi.n	a2, a2, 1	; i++
+4000433e:	622610        	l32i	a6, a6, 64	; *spi_w 
+40004341:	690c      	s32i.n	a6, a12, 0	; *uint32_buf = *spi_w
 40004343:	202074        	extui	a2, a2, 0, 8
-40004346:	4b7c      	addi.n	a7, a12, 4
-40004348:	0062a0        	addx4	a6, a2, a0
+40004346:	4b7c      	addi.n	a7, a12, 4	; buf_next_uint32 = uint32_buf + 4
+40004348:	0062a0        	addx4	a6, a2, a0	; spi_base = SPI_BASE + i * 4
 4000434b:	c02000        	memw
-4000434e:	8bcc      	addi.n	a12, a12, 8
-40004350:	1b22      	addi.n	a2, a2, 1
-40004352:	622610        	l32i	a6, a6, 64
-40004355:	6907      	s32i.n	a6, a7, 0
+4000434e:	8bcc      	addi.n	a12, a12, 8	; uint32_buf += 2
+40004350:	1b22      	addi.n	a2, a2, 1	; i++ 
+40004352:	622610        	l32i	a6, a6, 64	; *spi_w
+40004355:	6907      	s32i.n	a6, a7, 0	; *buf_next_uint32 = *spi_w
 40004357:	202074        	extui	a2, a2, 0, 8
-4000435a:	2793d8        	bne	a3, a2, 40004336
-4000435d:	c61400        	j	400043b4
+4000435a:	2793d8        	bne	a3, a2, 40004336 ; while (i != uin32_count)
+4000435d:	c61400        	j	400043b4	; goto return 0
 40004360:	00
 
-40004361:	a6cd88        	blti	a13, 32, 400042ed
-40004364:	508e20        	or	a8, a14, a5
+40004361:	a6cd88        	blti	a13, 32, 400042ed ; if (byte_count < 32)
+
+; the loop below reads 32 bytes at a time
+; and as in the loop above (that reads the tail) extui are likely just leftovers from uint8_t declarations
+
+40004364:	508e20        	or	a8, a14, a5	; offset_in_flash | 0x20000000 
 40004367:	c02000        	memw
-4000436a:	8910      	s32i.n	a8, a0, 4
+4000436a:	8910      	s32i.n	a8, a0, 4	; SPI_ADDR = offset_in_flash | 32 << 24
 4000436c:	c02000        	memw
-4000436f:	4900      	s32i.n	a4, a0, 0
-40004371:	c02000        	memw
-40004374:	7800      	l32i.n	a7, a0, 0
-40004376:	8c87      	beqz.n	a7, 40004382
-40004378:	c02000        	memw
-4000437b:	9800      	l32i.n	a9, a0, 0
-4000437d:	3df0      	nop.n
-4000437f:	5659ff        	bnez	a9, 40004378
-40004382:	0c02      	movi.n	a2, 0
-40004384:	0032a0        	addx4	a3, a2, a0
+4000436f:	4900      	s32i.n	a4, a0, 0	; SPI_CMD = SPI_FLASH_READ
+40004371:	c02000        	memw			;;
+40004374:	7800      	l32i.n	a7, a0, 0	;; while (SPI_CMD != 0) /* wait */;
+40004376:	8c87      	beqz.n	a7, 40004382	;;
+40004378:	c02000        	memw			;;
+4000437b:	9800      	l32i.n	a9, a0, 0	;;
+4000437d:	3df0      	nop.n			;;
+4000437f:	5659ff        	bnez	a9, 40004378	;;
+
+40004382:	0c02      	movi.n	a2, 0		; i = 0
+
+40004384:	0032a0        	addx4	a3, a2, a0	; spi_base = SPI_BASE + i * 4
 40004387:	c02000        	memw
-4000438a:	1b22      	addi.n	a2, a2, 1
-4000438c:	322310        	l32i	a3, a3, 64
-4000438f:	390c      	s32i.n	a3, a12, 0
+4000438a:	1b22      	addi.n	a2, a2, 1	; i++
+4000438c:	322310        	l32i	a3, a3, 64	; *spi_w
+4000438f:	390c      	s32i.n	a3, a12, 0	; *uint32_buf = *spi_w
 40004391:	202074        	extui	a2, a2, 0, 8
-40004394:	4b6c      	addi.n	a6, a12, 4
-40004396:	0032a0        	addx4	a3, a2, a0
+40004394:	4b6c      	addi.n	a6, a12, 4	; buf_next_uint32 = uint32_buf + 4
+40004396:	0032a0        	addx4	a3, a2, a0	; spi_base = SPI_BASE + i * 4
 40004399:	c02000        	memw
-4000439c:	8bcc      	addi.n	a12, a12, 8
-4000439e:	1b22      	addi.n	a2, a2, 1
-400043a0:	322310        	l32i	a3, a3, 64
-400043a3:	3906      	s32i.n	a3, a6, 0
+4000439c:	8bcc      	addi.n	a12, a12, 8	; uint32_buf += 2
+4000439e:	1b22      	addi.n	a2, a2, 1	; i++
+400043a0:	322310        	l32i	a3, a3, 64	; *spi_w
+400043a3:	3906      	s32i.n	a3, a6, 0	; *buf_next_uint32 = *spi_w
 400043a5:	202074        	extui	a2, a2, 0, 8
-400043a8:	6682d8        	bnei	a2, 8, 40004384
-400043ab:	e2ce20        	addi	a14, a14, 32
-400043ae:	d2cde0        	addi	a13, a13, -32
-400043b1:	e61dac        	bgei	a13, 1, 40004361
+400043a8:	6682d8        	bnei	a2, 8, 40004384 ; while (i != 8)
+
+400043ab:	e2ce20        	addi	a14, a14, 32	; offset_in_flash += 32
+400043ae:	d2cde0        	addi	a13, a13, -32	; byte_count -= 32
+400043b1:	e61dac        	bgei	a13, 1, 40004361 ; while (byte_count >= 1)
 
 400043b4:	0c02      	movi.n	a2, 0
 400043b6:	c811      	l32i.n	a12, a1, 4
@@ -8380,7 +8405,7 @@
 
 ; What is meant by cache here?  Apparently the cache mapped over SPI flash ?
 ; This is controlled by bits in the SPI_READY register.
-; 
+;
 ; 0x0001 - cache flush start
 ; 0x0002 - cache is empty
 ; 0x0100 - (bit 8) undocumented, but gets lots of attention here.
@@ -8797,13 +8822,13 @@
 40004a00 <SPIEraseSector>:
 40004a00:	319dff		l32r	a3, 40004874	; ( 3fffc714 )
 40004a03:	12c1f0        	addi	a1, a1, -16
-40004a06:	c921      	s32i.n	a12, a1, 8	
+40004a06:	c921      	s32i.n	a12, a1, 8
 40004a08:	0911      	s32i.n	a0, a1, 4
 40004a0a:	cd02      	mov.n	a12, a2		; sector
 40004a0c:	3803      	l32i.n	a3, a3, 0	; *flashship
-40004a0e:	3901      	s32i.n	a3, a1, 0	
+40004a0e:	3901      	s32i.n	a3, a1, 0
 40004a10:	2813      	l32i.n	a2, a3, 4	; flashship->chip_size
-40004a12:	322303        	l32i	a3, a3, 12	; flashchip->sector_size 
+40004a12:	322303        	l32i	a3, a3, 12	; flashchip->sector_size
 40004a15:	458009        	call0	4000e21c <__udivsi3>
 40004a18:	273c0a        	bltu	a12, a2, 40004a26 ; if (sector < chip_size / sector_size)
 40004a1b:	0c12      	movi.n	a2, 1		; return 1
@@ -8929,7 +8954,7 @@
 40004b25:	0901      	s32i.n	a0, a1, 0	; save return
 40004b27:	2153ff		l32r	a2, 40004874	; ( 3fffc714 )
 40004b2a:	4d07      	mov.n	a4, a7
-40004b2c:	2802      	l32i.n	a2, a2, 0
+40004b2c:	2802      	l32i.n	a2, a2, 0	; flashchip
 40004b2e:	c577ff        	call0	400042ac <sub_42ac>
 40004b31:	0c04      	movi.n	a4, 0
 40004b33:	3801      	l32i.n	a3, a1, 0	; fetch return
@@ -9139,7 +9164,7 @@
 ;  0x60000308 <-- clear
 ;  0x60000310 <-- enable
 ;  0x60000314 <-- disable
-; 
+;
 ; to set high:  gpio_output_set ( m, 0, m, 0 )
 ; to set low:  gpio_output_set ( 0, m, m, 0 )
 ; for input:  gpio_output_set ( 0, 0, 0, m )
@@ -13041,7 +13066,7 @@
 400072d8 <rom_i2c_writeReg>:
 400072d8:	008511        	slli	a8, a5, 16	; a8 = val << 16
 400072db:	807411        	slli	a7, a4, 8	; a7 = reg << 8
-400072de:	911df3		l32r	a9, 40003f54	; ( 60000a00 ) 
+400072de:	911df3		l32r	a9, 40003f54	; ( 60000a00 )
 400072e1:	807720        	or	a7, a7, a8	; a7 |= a8
 400072e4:	8176f3		l32r	a8, 400040bc	; ( 01000000 )
 400072e7:	707220        	or	a7, a2, a7	; a7 |= cmd
@@ -24580,9 +24605,9 @@
 3fffd650:	01010101 01010101 01010101 00030101     ................
 3fffd660:	00000000 00000000 00000000 00000000     ................
 3fffd670:	00000043 7465200a 73252073 7473722c     C.... ets %s,rst
-3fffd680:	75616320 253a6573 62202c64 20746f6f      cause:%d, boot 
+3fffd680:	75616320 253a6573 62202c64 20746f6f      cause:%d, boot
 3fffd690:	65646f6d 6425283a 2964252c 00000a0a     mode:(%d,%d)....
-3fffd6a0:	206e614a 32203820 00333130 20746477     Jan  8 2013.wdt 
+3fffd6a0:	206e614a 32203820 00333130 20746477     Jan  8 2013.wdt
 3fffd6b0:	65736572 00000a74 25207325 000a2073     reset...%s %s ..
 3fffd6c0:	5f737465 6e69616d 0000632e 6e6b6e75     ets_main.c..unkn
 3fffd6d0:	206e776f 65736572 00000a74 72657375     own reset...user
@@ -24590,7 +24615,7 @@
 3fffd6f0:	20676e69 20726f66 74736f68 0000000a     ing for host....
 3fffd700:	64616f6c 25783020 2c783830 6e656c20     load 0x%08x, len
 3fffd710:	2c642520 6f6f7220 6425206d 00000a20      %d, room %d ...
-3fffd720:	73616c66 65722068 65206461 202c7272     flash read err, 
+3fffd720:	73616c66 65722068 65206461 202c7272     flash read err,
 3fffd730:	000a7325 6c696174 0a642520 00000000     %s..tail %d.....
 3fffd740:	736b6863 30206d75 32302578 00000a78     chksum 0x%02x...
 3fffd750:	6d757363 25783020 0a783230 00000000     csum 0x%02x.....
@@ -24598,8 +24623,8 @@
 3fffd770:	61742064 25206c69 6f722064 25206d6f     d tail %d room %
 3fffd780:	00000a64 25207073 000a2070 645f6673     d...sp %p ..sf_d
 3fffd790:	5b706d75 205d6425 203a3061 30257830     ump[%d] a0: 0x%0
-3fffd7a0:	20207838 203a3161 30257830 20207838     8x  a1: 0x%08x  
-3fffd7b0:	203a3261 30257830 20207838 203a3361     a2: 0x%08x  a3: 
+3fffd7a0:	20207838 203a3161 30257830 20207838     8x  a1: 0x%08x
+3fffd7b0:	203a3261 30257830 20207838 203a3361     a2: 0x%08x  a3:
 3fffd7c0:	30257830 0a207838 00000000 31637065     0x%08x .....epc1
 3fffd7d0:	2578303d 2c783830 63706520 78303d32     =0x%08x, epc2=0x
 3fffd7e0:	78383025 7065202c 303d3363 38302578     %08x, epc3=0x%08
@@ -24615,9 +24640,9 @@
 3fffd880:	00632e72 746f6f62 2c207075 64646120     r.c.bootup , add
 3fffd890:	78302072 78383025 0000000a 72206f6e     r 0x%08x....no r
 3fffd8a0:	000a7364 20706973 75676f62 78722073     ds..sip bogus rx
-3fffd8b0:	6e6f6420 00000a65 64207872 20656e6f      done...rx done 
-3fffd8c0:	6e6b6e75 0a6e776f 00000000 20706973     unknown.....sip 
-3fffd8d0:	75676f62 78742073 0000000a 20716573     bogus tx....seq 
+3fffd8b0:	6e6f6420 00000a65 64207872 20656e6f      done...rx done
+3fffd8c0:	6e6b6e75 0a6e776f 00000000 20706973     unknown.....sip
+3fffd8d0:	75676f62 78742073 0000000a 20716573     bogus tx....seq
 3fffd8e0:	202c7525 64207525 70252073 0000000a     %u, %u ds %p....
 3fffd8f0:	75207874 6f6e6b6e 000a6e77 71697872     tx unknown..rxiq
 3fffd900:	7465675f 73696d5f 5f73203a 3d727770     _get_mis: s_pwr=
@@ -24625,13 +24650,13 @@
 3fffd920:	64252820 2964252c 00000020 252c6425      (%d,%d) ...%d,%
 3fffd930:	00002064 67617473 64252065 4743203a     d ..stage %d: CG
 3fffd940:	3d4e4941 46206425 4e494147 2c64253d     AIN=%d FGAIN=%d,
-3fffd950:	5f434420 283d534f 252c6425 202c2964      DC_OS=(%d,%d), 
+3fffd950:	5f434420 283d534f 252c6425 202c2964      DC_OS=(%d,%d),
 3fffd960:	3d434144 2c642528 20296425 0000000a     DAC=(%d,%d) ....
 3fffd970:	74637770 203a6c72 65746172 253d695f     pwctrl: rate_i=%
 3fffd980:	74202c64 65677261 6f705f74 3d726577     d, target_power=
 3fffd990:	202c6425 65746564 705f7463 7265776f     %d, detect_power
 3fffd9a0:	0a64253d 00000000 5f6d756e 64253d6b     =%d.....num_k=%d
-3fffd9b0:	6f70202c 5f726577 3d74756f 202c6425     , power_out=%d, 
+3fffd9b0:	6f70202c 5f726577 3d74756f 202c6425     , power_out=%d,
 3fffd9c0:	00000000 5f676572 64253d69 6e69202c     ....reg_i=%d, in
 3fffd9d0:	61746164 0a64253d 00000000 71697874     data=%d.....txiq
 3fffd9e0:	6f74203a 615f656e 6e657474 0a64253d     : tone_atten=%d.
@@ -24655,22 +24680,22 @@
 ;  ets %s,rst cause:%d, boot mode:(%d,%d)
 ; Jan  8 2013
 ; wdt reset
-; %s %s 
+; %s %s
 ; ets_main.c
 ; unknown reset
 ; user code done
 ; waiting for host
-; load 0x%08x, len %d, room %d 
+; load 0x%08x, len %d, room %d
 ; flash read err, %s
 ; tail %d
 ; chksum 0x%02x
 ; csum 0x%02x
 ; csum err
 ; ho %d tail %d room %d
-; sp %p 
-; sf_dump[%d] a0: 0x%08x  a1: 0x%08x  a2: 0x%08x  a3: 0x%08x 
+; sp %p
+; sf_dump[%d] a0: 0x%08x  a1: 0x%08x  a2: 0x%08x  a3: 0x%08x
 ; epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x
-; Fatal exception (%d): 
+; Fatal exception (%d):
 ; eprintf no buf
 ; 0123456789
 ; 0123456789abcdef
@@ -24683,17 +24708,17 @@
 ; sip bogus tx
 ; seq %u, %u ds %p
 ; tx unknown
-; rxiq_get_mis: s_pwr=%lld, %d-%d, 
-;  (%d,%d) 
-; %d,%d 
-; stage %d: CGAIN=%d FGAIN=%d, DC_OS=(%d,%d), DAC=(%d,%d) 
+; rxiq_get_mis: s_pwr=%lld, %d-%d,
+;  (%d,%d)
+; %d,%d
+; stage %d: CGAIN=%d FGAIN=%d, DC_OS=(%d,%d), DAC=(%d,%d)
 ; pwctrl: rate_i=%d, target_power=%d, detect_power=%d
-; num_k=%d, power_out=%d, 
+; num_k=%d, power_out=%d,
 ; reg_i=%d, indata=%d
 ; txiq: tone_atten=%d
 ; txiq_gain=%d
 ; txiq_phase=%d
-; bt: 
+; bt:
 ; #$%!@#%&^
 
 ; Block 3  4000fe34
