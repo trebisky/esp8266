@@ -2352,10 +2352,10 @@
 ; calls SPIRead ( 0, stack, 16 )
 40001321:	857f03        	call0	40004b1c <SPIRead>
 40001324:	ccc2      	bnez.n	a2, 40001334
-40001326:	e20101        	l8ui	a14, a1, 1
-40001329:	c811      	l32i.n	a12, a1, 4
-4000132b:	020100        	l8ui	a0, a1, 0
-4000132e:	22a0e9        	movi	a2, 233
+40001326:	e20101        	l8ui	a14, a1, 1	; num segments
+40001329:	c811      	l32i.n	a12, a1, 4	; entry point
+4000132b:	020100        	l8ui	a0, a1, 0	; image magic
+4000132e:	22a0e9        	movi	a2, 233		; E9
 40001331:	271013        	beq	a0, a2, 40001348
 
 ; trouble
@@ -2369,13 +2369,13 @@
 40001343:	12c160        	addi	a1, a1, 96
 40001346:	0df0      	ret.n
 
-40001348:	220102        	l8ui	a2, a1, 2
+40001348:	220102        	l8ui	a2, a1, 2	; flash mode
 4000134b:	055a03        	call0	400048ec <SPIReadModeCnfig>
 4000134e:	3d01      	mov.n	a3, a1		; read to here.
 40001350:	1c04      	movi.n	a4, 16		; another 16 bytes
-40001352:	22010e        	l8ui	a2, a1, 14
-40001355:	f20108        	l8ui	a15, a1, 8
-40001358:	d2010b        	l8ui	a13, a1, 11
+40001352:	22010e        	l8ui	a2, a1, 14	; buf[12..15] >> section size 
+40001355:	f20108        	l8ui	a15, a1, 8	; buf[8..11] >> section addr
+40001358:	d2010b        	l8ui	a13, a1, 11	; 
 4000135b:	02010a        	l8ui	a0, a1, 10
 4000135e:	80dd11        	slli	a13, a13, 8
 40001361:	00dd20        	or	a13, a13, a0
@@ -2383,7 +2383,7 @@
 40001367:	80dd11        	slli	a13, a13, 8
 4000136a:	00dd20        	or	a13, a13, a0
 4000136d:	80dd11        	slli	a13, a13, 8
-40001370:	f0dd20        	or	a13, a13, a15
+40001370:	f0dd20        	or	a13, a13, a15	; a13 = section addr
 40001373:	f2010f        	l8ui	a15, a1, 15
 40001376:	02010c        	l8ui	a0, a1, 12
 40001379:	80ff11        	slli	a15, a15, 8
@@ -2393,25 +2393,26 @@
 40001385:	20ff20        	or	a15, a15, a2
 40001388:	22a010        	movi	a2, 16		; starting offset in flash
 4000138b:	80ff11        	slli	a15, a15, 8
-4000138e:	00ff20        	or	a15, a15, a0
+4000138e:	00ff20        	or	a15, a15, a0	; a15 = section size 
 40001391:	857803        	call0	40004b1c <SPIRead>
-40001394:	56c2f9        	bnez	a2, 40001334
+40001394:	56c2f9        	bnez	a2, 40001334	; return 1
 
-40001397:	d26114        	s32i	a13, a1, 80
-4000139a:	c9b1      	s32i.n	a12, a1, 44
-4000139c:	169e21        	beqz	a14, 400015b9
+40001397:	d26114        	s32i	a13, a1, 80	; section addr
+4000139a:	c9b1      	s32i.n	a12, a1, 44	; entry point
+4000139c:	169e21        	beqz	a14, 400015b9	; num segments == 0?
 4000139f:	322114        	l32i	a3, a1, 80
 400013a2:	1961      	s32i.n	a1, a1, 24
-400013a4:	c2a0ef        	movi	a12, 239
+400013a4:	c2a0ef        	movi	a12, 239	; EF
 400013a7:	dd01      	mov.n	a13, a1
 400013a9:	f26115        	s32i	a15, a1, 84
-400013ac:	e981      	s32i.n	a14, a1, 32
+400013ac:	e981      	s32i.n	a14, a1, 32	; num segments remaining
 400013ae:	0c07      	movi.n	a7, 0
 400013b0:	2c08      	movi.n	a8, 32
 400013b2:	826113        	s32i	a8, a1, 76
 400013b5:	79c1      	s32i.n	a7, a1, 48
 400013b7:	e22115        	l32i	a14, a1, 84
-400013ba:	30f320        	or	a15, a3, a3
+
+400013ba:	30f320        	or	a15, a3, a3	; section addr
 
 ; Here is the message we see when an app is being
 ;    loaded from flash
@@ -2582,7 +2583,7 @@
 4000153c:	216dff		l32r	a2, 400012f0	; ( 3fffd740 )
 4000153f:	3d0c      	mov.n	a3, a12
 40001541:	85f800        	call0	400024cc <ets_printf>
-40001544:	4881      	l32i.n	a4, a1, 32
+40001544:	4881      	l32i.n	a4, a1, 32	; num segments remaining
 40001546:	0871      	l32i.n	a0, a1, 28
 40001548:	0b44      	addi.n	a4, a4, -1
 4000154a:	163422        	beqz	a4, 40001771
@@ -2626,7 +2627,7 @@
 400015af:	9961      	s32i.n	a9, a1, 24
 400015b1:	a08074        	extui	a8, a10, 0, 8
 400015b4:	8981      	s32i.n	a8, a1, 32
-400015b6:	5608e0        	bnez	a8, 400013ba
+400015b6:	5608e0        	bnez	a8, 400013ba	; num segments remaining != 0?
 400015b9:	28b1      	l32i.n	a2, a1, 44
 
 ; Execution will start at the address we stash here.
@@ -8736,7 +8737,7 @@
 40004941:	0df0      	ret.n
 40004943:	00
 
-40004944:	01e6ff        	l32r	a0, 400048dc
+40004944:	01e6ff        	l32r	a0, 400048dc	; ( 01002000 )
 40004947:	0901      	s32i.n	a0, a1, 0
 40004949:	2805      	l32i.n	a2, a5, 0
 4000494b:	45b7ff        	call0	400044c0 <sub_44c0>
@@ -8854,7 +8855,7 @@
 
 40004a4c <SPIWrite>:
 40004a4c:	5d04      	mov.n	a5, a4
-40004a4e:	8189ff		l32r	a8, 40004874	; ( 3fffc714 )
+40004a4e:	8189ff		l32r	a8, 40004874	; ( 3fffc714 -- flashship )
 40004a51:	12c1d0        	addi	a1, a1, -48
 40004a54:	c931      	s32i.n	a12, a1, 12
 40004a56:	e951      	s32i.n	a14, a1, 20
@@ -8863,12 +8864,12 @@
 40004a5c:	f961      	s32i.n	a15, a1, 24
 40004a5e:	d941      	s32i.n	a13, a1, 16
 40004a60:	fd03      	mov.n	a15, a3
-40004a62:	4808      	l32i.n	a4, a8, 0
+40004a62:	4808      	l32i.n	a4, a8, 0	; *flashship
 40004a64:	dd02      	mov.n	a13, a2
-40004a66:	0814      	l32i.n	a0, a4, 4
-40004a68:	2a25      	add.n	a2, a5, a2
-40004a6a:	27b010        	bgeu	a0, a2, 40004a7e <SPIWrite+0x32>
-40004a6d:	0c12      	movi.n	a2, 1
+40004a66:	0814      	l32i.n	a0, a4, 4	; flashship.chip_size
+40004a68:	2a25      	add.n	a2, a5, a2	; offset + size
+40004a6a:	27b010        	bgeu	a0, a2, 40004a7e
+40004a6d:	0c12      	movi.n	a2, 1		; return 1
 40004a6f:	c831      	l32i.n	a12, a1, 12
 40004a71:	d841      	l32i.n	a13, a1, 16
 40004a73:	e851      	l32i.n	a14, a1, 20
@@ -8876,6 +8877,7 @@
 40004a77:	0821      	l32i.n	a0, a1, 8
 40004a79:	12c130        	addi	a1, a1, 48
 40004a7c:	0df0      	ret.n
+
 40004a7e:	4981      	s32i.n	a4, a1, 32
 40004a80:	2d0d      	mov.n	a2, a13
 40004a82:	e844      	l32i.n	a14, a4, 16
