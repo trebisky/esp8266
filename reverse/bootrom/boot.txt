@@ -3,6 +3,7 @@
 ;	Tom Trebisky 1-7-2016 began studying Kongo's disassembly
 ;	Tom Trebisky 1-24-2016 migrated to my own disassembly
 ;	Tom Trebisky 2-28-2017 busy with this again.
+;	Tom Trebisky 7-5-2018 pull request by quietboil
 ;
 ; This is the ESP8266 bootrom -- 64K in size.
 ;
@@ -11,8 +12,15 @@
 ; annotation in the form of comments (like this one).
 ;
 ; TODO --
-; Get a firm understanding of ESP8266 interrupts.
+; 1 - Use my esp32 disassembler to redo this since it should clean
+;    up many sections that are now badly mangled.
+; 2 - Get a firm understanding of ESP8266 interrupts.
 ;
+;---------------------------------------------------
+; In early 2018 I got a pull request from "quietboil" that added
+; annotation for flash erase commands.
+; See: esp_spi_erase_sector -and- esp_spi_erase_block
+; as well as other code.
 ;---------------------------------------------------
 ;
 ; I did a couple of special things to generate the initial disassembly.
