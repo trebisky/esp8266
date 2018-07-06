@@ -8834,9 +8834,9 @@
 40004a06:	c921      	s32i.n	a12, a1, 8
 40004a08:	0911      	s32i.n	a0, a1, 4
 40004a0a:	cd02      	mov.n	a12, a2		; sector
-40004a0c:	3803      	l32i.n	a3, a3, 0	; *flashship
+40004a0c:	3803      	l32i.n	a3, a3, 0	; *flashchip
 40004a0e:	3901      	s32i.n	a3, a1, 0
-40004a10:	2813      	l32i.n	a2, a3, 4	; flashship->chip_size
+40004a10:	2813      	l32i.n	a2, a3, 4	; flashchip->chip_size
 40004a12:	322303        	l32i	a3, a3, 12	; flashchip->sector_size
 40004a15:	458009        	call0	4000e21c <__udivsi3>
 40004a18:	273c0a        	bltu	a12, a2, 40004a26 ; if (sector < chip_size / sector_size)
@@ -8845,11 +8845,11 @@
 40004a1f:	0811      	l32i.n	a0, a1, 4
 40004a21:	12c110        	addi	a1, a1, 16
 40004a24:	0df0      	ret.n
-40004a26:	2801      	l32i.n	a2, a1, 0	; *flashship
+40004a26:	2801      	l32i.n	a2, a1, 0	; *flashchip
 40004a28:	05a1ff        	call0	4000443c <SPI_write_enable>
 40004a2b:	56c2fe        	bnez	a2, 40004a1b 	; if (SPI_write_enable() != 0) return 1
 40004a2e:	2191ff		l32r	a2, 40004874	; ( 3fffc714 )
-40004a31:	2802      	l32i.n	a2, a2, 0	; *flashship
+40004a31:	2802      	l32i.n	a2, a2, 0	; *flashchip
 40004a33:	322203        	l32i	a3, a2, 12	; flashchip->sector_size
 40004a36:	c03382        	mull	a3, a3, a12	; = sector * sector_size
 40004a39:	4568ff        	call0	400040c0 <esp_spi_erase_sector>
@@ -8863,7 +8863,7 @@
 
 40004a4c <SPIWrite>:
 40004a4c:	5d04      	mov.n	a5, a4
-40004a4e:	8189ff		l32r	a8, 40004874	; ( 3fffc714 -- flashship )
+40004a4e:	8189ff		l32r	a8, 40004874	; ( 3fffc714 -- flashchip )
 40004a51:	12c1d0        	addi	a1, a1, -48
 40004a54:	c931      	s32i.n	a12, a1, 12
 40004a56:	e951      	s32i.n	a14, a1, 20
@@ -8872,9 +8872,9 @@
 40004a5c:	f961      	s32i.n	a15, a1, 24
 40004a5e:	d941      	s32i.n	a13, a1, 16
 40004a60:	fd03      	mov.n	a15, a3
-40004a62:	4808      	l32i.n	a4, a8, 0	; *flashship
+40004a62:	4808      	l32i.n	a4, a8, 0	; *flashchip
 40004a64:	dd02      	mov.n	a13, a2
-40004a66:	0814      	l32i.n	a0, a4, 4	; flashship.chip_size
+40004a66:	0814      	l32i.n	a0, a4, 4	; flashchip.chip_size
 40004a68:	2a25      	add.n	a2, a5, a2	; offset + size
 40004a6a:	27b010        	bgeu	a0, a2, 40004a7e
 40004a6d:	0c12      	movi.n	a2, 1		; return 1
