@@ -92,12 +92,23 @@ $old_line = nil
 def crank_old
 	loop {
 	    break if $old_line.eof
+
 	    # print any run of comments
+	    # but modify our old style function names
 	    unless $old_line.is_dis
-		puts $old_line.raw
+		if $old_line.raw =~ />:/
+		    # puts " DUMP -- " + $old_line.raw
+		    name = $old_line.raw
+		    name = name.sub /^.*</, ""
+		    name = name.sub />.*/, ""
+		    puts "  " + name + ":"
+		else
+		    puts $old_line.raw
+		end
 		$old_line = r_old
 		next
 	    end
+
 	    # have a disassembled line
 	    # skip it if it precedes new
 	    if $old_line.addr < $new_line.addr
@@ -112,6 +123,7 @@ end
 #  Skip: chatter
 #
 # anything not a disassembled instruction is "chatter"
+# with one exception, we like our new style function labels.
 def crank_new
 	until $new_line.eof || $new_line.is_dis
 	    $new_line = r_new
