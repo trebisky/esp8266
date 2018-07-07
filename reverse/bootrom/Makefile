@@ -1,5 +1,7 @@
 # Makefile for ESP8266 development
 # Tom Trebisky  12-26-2015
+# 
+# Added stuff for the new "espdis" program 7-7-2018
 
 all:
 	echo "You need to be more specific"
@@ -51,6 +53,16 @@ bootsym.elf:	wrap bootrom.bin calls.sy
 
 showsym:	bootsym.elf
 	xtensa-lx106-elf-nm bootsym.elf
+
+# ------------------------------------------
+# Run new multipass disassembler 7-7-2018
+
+new.dis:
+	./espdis all >new.dis
+
+# This became boot.txt
+#mergeit:
+#	./merge_dis >boot_NEW.txt
 
 # ------------------------------------------
 # Do the following:

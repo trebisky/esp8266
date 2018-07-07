@@ -1,0 +1,839 @@
+#!/bin/ruby
+
+# Tom Trebisky  5-12-2018
+
+# Anyone who realizes what is being done here will be appalled.
+# I am launching a process to run objdump for EACH and EVERY line
+# that needs to be disassembled.  Too bad.
+# If you don't like it, write your own disassembler !!  :-)
+# This is a "get 'er done" approach and enabled me to get most
+# of this written in an evening.
+#
+# It takes just under 20 seconds now, with two passes,
+#  on my 3.5 Ghz x86_64 system,
+# and anway, that computer has nothing better to do.
+
+# I have discovered that rom1 follows after rom0 at
+# addresses 0x40060000 to 0x4006ffff
+# So we actually have 7 * 64k of ROM to deal with.
+#    458752 bytes
+
+# After chasing the thread of execution that begins at
+# 0x40000400, we have disassembled 19234 bytes of 458752
+# (approximately 4 percent!)
+
+# Using our symbol list as entry points, we are
+#  disassembling well over 50 percent of the ROM:
+# disassembled 268236 bytes of 458752
+
+# DONE:
+# 1 - find out why my "Twice" messages don't run in a continuous
+#       flow thru areas where I am sure they must.  DONE
+#  Things involving setting ruby subarrays that I still don't understand.
+# 2 - deal with l32r nicely. DONE
+# 3 - generate an output in proper order via pass2. DONE
+# 5 - symbols from ld file DONE
+# 7 - add call table and generate "sub_xxx" sort of labels DONE
+#     for all call targets not in the ld file.
+# 8 arrange for hints file DONE
+# -- chase all the entry points in the sym table. DONE
+#
+# TODO:
+# -- strings
+# -- dump the "gaps" in some nice way. sorta DONE
+# -- figure out what to do with the no yet disassembled sections.
+
+# 7-6-2018 -- copied from esp32 bootrom project
+
+$bin_file = "esp8266.bin"
+$elf_file = "esp8266.elf"
+
+$sym_file = "syms"
+
+$rom_base = 0x40000000
+# $rom_size_esp32 = 65536 * 7
+$rom_size = 65536
+
+$hintfile = "hints"
+
+$debug_pass1 = false
+$debug_pass2 = false
+
+$debug = true if $debug_pass1 or $debug_pass2
+
+# Augment this with some convenience methods
+class Integer
+    def hex
+	"%08x" % self
+    end
+    def xhex
+	"0x%08x" % self
+    end
+end
+
+def error ( a, s )
+    puts "Trouble at " + a.xhex
+    puts s
+    exit
+end
+
+
+# Information for a single instruction
+# Sort of acts like a C structure might.
+class Instr
+    attr_reader :addr
+    attr_reader :line
+    attr_reader :size
+    attr_reader :target
+    attr_reader :is_branch
+    attr_reader :is_call
+    attr_reader :is_call8
+    attr_reader :is_jump
+    attr_reader :is_l32r
+    attr_reader :is_term
+    attr_reader :illegal
+
+    def initialize ( addr, line )
+	@is_branch = false
+	@is_call = false
+	@is_call8 = false
+	@is_jump = false
+	@is_l32r = false
+	@is_term = false
+	@illegal = false
+	@target = nil
+
+	@addr = addr
+	@line = line
+
+	w = line.split
+	if w.size < 3
+	    error addr, stuff
+	end
+	@size = w[1].size / 2
+	if @size < 1 or @size > 3
+	    error addr, stuff
+	end
+	op = w[2]
+
+	@is_term = true if op =~ /^ret/
+	@is_term = true if op =~ /^j/
+
+	# There are a host of rf = "return from"
+	# as in rfi = return from interrupt
+	# but rfr is an exception
+	@is_term = true if op =~ /^rf/
+	@is_term = false if op =~ /^rfr/
+
+
+	@is_jump = true if op =~ /^j/
+	@is_jump = false if op =~ /^jx/
+	@is_branch = true if op =~ /^loopnez/
+	@is_branch = true if op =~ /^b/
+	@is_branch = false if op =~ /^break/
+	@is_call8 = true if op =~ /^call8/
+	@is_call = true if op =~ /^call/
+	@is_call = false if op =~ /^callx/
+	@is_l32r = true if op =~ /^l32r/
+	@illegal = true if op =~ /^ill/
+
+	if @is_jump
+	    @target = w[-1]
+	end
+	if @is_call
+	    @target = w[-1]
+	end
+	if @is_branch
+	    @target = w[-1]
+	end
+	if @is_l32r
+	    @target = w[-1]
+	end
+    end
+end
+
+# This is the interface to Gnu objdump
+# The cache was introduced after the program was all but finished.
+# It reduced runtime from 21 seconds to 1.7 seconds.
+#
+# I had some concern that it might contain some instructions that
+# were misaligned and badly disassembled, but on further reflection
+# this is of no concern.  This program will only ask for
+# instructions on valid addresses and will never ask for
+# bad instructions at strange addresses tha might be in the cache.
+class Code
+    def initialize
+	@elf = $elf_file
+	# This should be on the search path, if not prefix
+	# with something like /opt/esp32/xtensa-esp32-elf/bin
+#	@cmd = "xtensa-lx106-elf-objdump -mxtensa -d -z"
+	@cmd = "xtensa-esp32-elf-objdump -mxtensa -d -z"
+	@cache = nil
+
+    end
+    def one_inst_ORIG ( addr )
+	eaddr = addr + 3
+	range = "--start-address=#{addr.xhex} --stop-address=#{eaddr.xhex}"
+	cmd = @cmd + " " + range + " #{@elf}"
+
+	stuff = `#{cmd}`	# note backticks
+
+	info = stuff.split "\n"
+#	puts stuff
+#	puts info.size
+	line = nil
+	match = Regexp.new "^" + addr.hex + ":"
+	info.each { |l|
+	    line = l if match =~ l
+	}
+
+	error addr, stuff unless line
+
+	return Instr.new addr, line
+    end
+
+    def load_cache ( addr )
+	eaddr = addr + 300
+	range = "--start-address=#{addr.xhex} --stop-address=#{eaddr.xhex}"
+	cmd = @cmd + " " + range + " #{@elf}"
+
+	stuff = `#{cmd}`	# note backticks
+	lines = stuff.split "\n"
+	@cache = Hash.new
+
+	lines.each { |line|
+	    next unless line =~ /^400.....:/
+	    tag = line.sub /:.*/, ""
+	    @cache[tag] = line
+	    #puts tag + " " + line
+	}
+
+	error addr, stuff unless @cache[addr.hex]
+    end
+
+    def one_inst ( addr )
+
+	load_cache addr unless @cache 
+	line = @cache[addr.hex]
+	unless line
+	    load_cache addr
+	    line = @cache[addr.hex]
+	end
+
+	#puts line
+
+	return Instr.new addr, line
+    end
+end
+
+
+# The purpose of this is to hide the map and the way we represent it
+# We also hide indexing, all external access is via addresses
+class Map
+
+    def initialize ( base, size )
+	@base = base
+	@size = size
+	@limit = base + size - 1
+	@map = Array.new size, "X"
+	@call = nil
+    end
+
+    def good_addr addr
+	return false if addr < @base
+	return false if addr > @limit
+	return true
+    end
+    def claim ( index, size, type )
+	size.times {
+	    @map[index] = type
+	    index += 1
+	}
+    end
+
+    def one_hint line
+	# puts "Hint: " + line
+	words = line.split
+	cmd = words[0].downcase
+	# mark a single byte
+
+	if cmd == "data"
+	    a = words[1].split ":"
+	    a1 = a[0].hex
+	    a2 = a[1].hex
+	    if a2 >= a1 and good_addr a1 and good_addr a2
+		claim a1-@base, a2-a1+1, "E"
+		#puts "D " + a1.hex + " " + a2.hex
+	    end
+	end
+
+	# single data byte "poison" marker
+	if cmd == "data1"
+	    addr = words[1].hex
+	    if good_addr addr
+		@map[addr-@base] = "D"
+	    end
+	end
+
+	# mark a range
+	if cmd == "data4"
+	    a = words[1].split ":"
+	    a1 = a[0].hex
+	    a2 = a[1].hex
+	    if a2 >= a1 and good_addr a1 and good_addr a2
+		claim a1-@base, a2-a1+1, "4"
+		#puts "D " + a1.hex + " " + a2.hex
+	    end
+	end
+	if cmd == "sym"
+	    addr = words[1].hex
+	    @call.add_sym addr, words[2]
+	end
+    end
+
+    def load_hints ( calls )
+	@call = calls
+	if File.exist? $hintfile
+	    f = File.open $hintfile
+	    f.each { |l|
+		next if l =~ /^#/
+		next if l =~ /^$/
+		one_hint l
+	    }
+	    f.close
+	end
+    end
+
+    def show_map
+	addr = @base
+	i = 0
+	loop {
+	    break unless @map[i]
+	    print "MAP #{addr.hex}: "
+	    16.times {
+		print " " + @map[i] 
+		i += 1
+	    }
+	    print "\n"
+	    addr += 16
+	}
+    end
+    def show_map_addr ( addr )
+	addr &= ~0xf
+	i = addr - @base
+	print "MAP #{addr.hex}: "
+	16.times {
+	    print " " + @map[i] 
+	    i += 1
+	}
+	print "\n"
+    end
+
+    def get_count
+	rv = 0;
+	@map.each { |m|
+	    rv += 1 if m != "X"
+	}
+	rv
+    end
+    def claim_l32r ( addr )
+	index = addr - @base
+	claim index, 4, "L"
+    end
+    def claim_instr ( addr, size )
+	index = addr - @base
+	claim index, size, "I"
+    end
+
+    def is_avail ( addr )
+	return @map[addr-@base] == "X"
+    end
+    # sort of hackish sloppy version of the above
+    def is_ok ( addr )
+	index = addr - @base
+	return true if @map[index] == "X"
+	return true if @map[index] == "I"
+	return false
+    end
+    def is_instr ( addr )
+	return @map[addr-@base] == "I"
+    end
+    def is_l32r ( addr )
+	return @map[addr-@base] == "L"
+    end
+
+    # This is the heart of Pass 2
+    # Use the map to delimit sections to
+    # disassemble in different ways.
+    # XXX - Does not hide codes
+    def get_range ( addr )
+	index = addr - @base
+	if index >= @size
+	    return "Q", 0
+	end
+	if @map[index] == "L"
+	    return "L", addr + 4
+	end
+	t = @map[index]
+	loop {
+	    index = index + 1
+	    break if index >= @size
+	    break if @map[index] != t
+	}
+	return t, @base + index
+    end
+end
+
+# We need this to fetch stuff for l32r cleanup
+# also to dump binary stuff for short regions
+class Image
+    def initialize
+	@base = $rom_base
+	#@size = $rom_size
+
+	file = File.open $bin_file, "rb"
+	@im = file.read
+	file.close
+	if @im.size != $rom_size
+	    puts "Something is wrong with binary file"
+	    exit
+	end
+    end
+    def fetch_long ( addr )
+	index = addr - @base
+	bytes = @im[index,4]
+	vals = bytes.unpack "L"
+	val = vals[0]
+    end
+    def fetch_hex ( addr, count )
+	index = addr - @base
+	bytes = @im[index,count]
+	vals = bytes.unpack "C*"
+	rv = ""
+	vals.each { |v|
+	    rv = rv + "%02x" % v
+	}
+	return rv
+    end
+end
+
+class Calls
+    #attr_reader :calls
+    attr_reader :syms
+
+    def initialize
+	@base = $rom_base
+	@calls = Hash.new
+	@syms = Hash.new
+
+	# Note that in this scheme of loading the syms
+	# table, we take no care for alternate names that
+	# may pop up for the same location, the last one
+	# just overwrites the first.
+	if File.exist? "syms"
+	    f = File.open "syms"
+	    f.each { |l|
+		next unless l =~ /^PROVIDE/
+		vals = l.split
+		@syms[vals[4].hex] = vals[2]
+	    }
+	    f.close
+	end
+	if File.exist? "iosyms"
+	    f = File.open "iosyms"
+	    f.each { |l|
+		next unless l =~ /^PROVIDE/
+		vals = l.split
+		@syms[vals[4].hex] = "IO:" + vals[2]
+	    }
+	    f.close
+	end
+    end
+
+    # Used to load a symbol from the hints file
+    def add_sym ( addr, name )
+	@syms[addr] = name
+    end
+
+    # avoid adding the same name twice
+    # also this gives priority to names from the
+    # symbol table that have been preloaded.
+    def add ( addr )
+	name = @calls[addr]
+	return name if name
+
+	# If there is a name in the symbol list, use it
+	# otherwise generate a name
+	name = @syms[addr]
+	unless name
+	    name = "sub_%x" % (addr - @base)
+	end
+	@calls[addr] = name
+	return name
+    end
+
+    def call_lookup ( addr )
+	return @calls[addr]
+    end
+    def sym_lookup ( addr )
+	return @syms[addr]
+    end
+    def sym_lookup_name ( name )
+	return @syms.key name
+    end
+end
+
+class Dumper
+    def initialize
+	@size = $rom_size
+	@base = $rom_base
+	@limit = @base + @size -1
+
+	@show_pass1 = false
+	@debug_pass1 = $debug_pass1
+	@debug_pass2 = $debug_pass2
+	@show_pass1 = true if $debug_pass1
+
+	@cur_addr = Array.new
+	@old_addr = Array.new
+
+	@code = Code.new
+	@call = Calls.new
+	@map = Map.new $rom_base, $rom_size
+	@map.load_hints @call
+	@image = Image.new
+    end
+
+    def add_addr ( target )
+	# error 0xdead, target if target !~ /^0x4/
+	addr = target.hex
+	return if addr < @base
+	# Never see this, now that we have all 7 * 64k
+	# but this is what tipped us off to the address map
+	# in the reference manual being wrong.
+	if addr > @limit
+	    puts "Wow, skipping: " + addr.hex
+	    return
+	end
+	return if @new_addr.include? addr
+	return if @old_addr.include? addr
+	puts "Add: " + addr.hex if @debug_pass1
+	@new_addr << addr
+    end
+
+    def print_l32r_OLD ( i )
+	val = @image.fetch_long ( i.target.hex )
+	sym = @call.sym_lookup val
+	if sym
+	    puts i.line + "\t; #{sym} ( " + val.xhex + " )"
+	else
+	    puts i.line + "\t; ( " + val.xhex + " )"
+	end
+    end
+
+    # To make the l32r disassembly more "readable" I decided to use
+    # this square bracket notation -- and put the more or less
+    # irrelevant address of the l32r value in the comment field
+    def print_l32r ( i )
+	a, b = i.line.split ", "
+
+	val = @image.fetch_long ( i.target.hex )
+	sym = @call.sym_lookup val
+	if sym
+	    #puts a + ", " + b + "\t; #{sym} ( " + val.xhex + " )"
+	    puts a + ", [" + sym + "]\t; [" + val.xhex + "] " + b
+	else
+	    #puts a + ", " + b + "\t; ( " + val.xhex + " )"
+	    puts a + ", [" + val.xhex + "]\t; " + b
+	end
+    end
+
+    def print_instr ( i )
+
+	    # print a nice label before known subroutines
+	    marked = false
+	    name = @call.call_lookup i.addr
+	    if name
+		puts ""
+		puts "  " + name + ":"
+		marked = true
+	    end
+
+	    name = @call.sym_lookup i.addr
+	    if name and not marked
+		puts ""
+		puts "  " + name + ":"
+	    end
+
+	    if i.is_call8
+		name = @call.call_lookup i.target.hex
+		if name
+		    puts i.line + "\t; " + name
+		else
+		    # should never happen
+		    puts i.line + "\t; " + "????"
+		end
+		return
+	    end
+
+	    if i.is_l32r
+		print_l32r i
+		return
+	    end
+
+	    puts i.line
+    end
+
+    def range1 ( addr )
+	loop {
+	    break unless @map.is_avail addr
+
+	    i = @code.one_inst addr
+
+	    if i.is_call8
+		@call.add i.target.hex
+	    end
+
+	    print_instr i if @show_pass1
+
+	    if i.is_l32r
+		@map.claim_l32r i.target.hex
+	    end
+
+	    if i.illegal
+		puts "*** Illegal instruction, ending range"
+		break
+	    end
+
+	    # This indicates we have "slid" into a section we
+	    # already disassembled, usually because we followed a
+	    # branch prior to that section, so we can justend.
+	    if @map.is_instr addr
+		# puts "Twice visiting: " + addr.hex
+		puts "*** END (Twice) ***" if @debug_pass1
+		break
+	    end
+
+	    @map.claim_instr addr, i.size
+
+	    add_addr i.target if i.is_jump
+	    add_addr i.target if i.is_branch
+	    add_addr i.target if i.is_call
+
+	    addr += i.size
+	    if i.is_term
+		puts "*** END ***" if @debug_pass1
+		break
+	    end
+	    i = nil	# help garbage collection ??
+	}
+    end
+
+    def pass1 ( addr )
+	# @map.show_map_addr 0x400649cd
+	# @map.show_map_addr 0x400657d3
+	@cur_addr << addr
+	pass = 0
+	loop {
+	    pass += 1
+	    break if @cur_addr.size < 1
+	    puts "Starting scan for %d items" % @cur_addr.size if @debug_pass1
+	    @new_addr = Array.new
+	    loop {
+		t = @cur_addr.shift
+		break unless t
+		@old_addr << t
+		next unless @map.is_avail t
+		puts "Chase: " + t.hex + " (#{@cur_addr.size})" if @debug_pass1
+		range1 t
+	    }
+	    puts "!!! Scan #{pass} finished, %d waiting" % @new_addr.size if @debug_pass1
+
+	    # We drop things that we saved as potential targets,
+	    # but apparently continued on to disassemble
+	    @new_addr.each { |n|
+		unless @map.is_avail n
+		    puts "Dropping: " + n.hex if @debug_pass1
+		    next
+		end
+		@cur_addr << n
+	    }
+	}
+    end
+
+
+    # Just display, following a linear thread of execution
+    # until it terminates.
+    def range2 ( addr )
+	loop {
+	    # This test avoids runon disassembly that
+	    # goes outside of regions already delimited
+	    # in pass 1. Now sort of belt and suspenders,
+	    # but we have seen it happen in cases where
+	    # only a hint would set things right.
+	    break unless @map.is_ok addr
+	    i = @code.one_inst addr
+	    print_instr i
+	    puts "" if i.is_term
+
+	    addr += i.size
+	    if i.is_term
+		# puts "*** END2 ***"
+		break
+	    end
+	    i = nil	# help garbage collection ??
+	}
+	return addr
+    end
+
+    # dump a data range, 4 longs per line
+    def dump_data ( addr, xaddr )
+	baddr = addr & ~0xf
+	eaddr = baddr + 16
+	print "#{baddr.hex}:	"
+	loop {
+	    hval = @image.fetch_long(addr).hex
+	    print hval + " "
+	    addr += 4
+	    break if addr >= xaddr
+	    if addr == eaddr
+		print "\n"
+		print "#{addr.hex}:	"
+		eaddr = addr + 16
+	    end
+	}
+	print "\n"
+    end
+
+    def pass2
+	addr = @base
+	loop {
+	    type, xaddr = @map.get_range addr
+	    break if type == "Q"
+	    
+	    puts "Pass2 #{addr.hex} #{xaddr.hex} #{type}" if @debug_pass2
+
+	    # Handle an l32r
+	    if type == "L"
+		hval = @image.fetch_long(addr).hex
+		print "#{addr.hex}:	" + hval + "	; l32r\n"
+	    elsif type == "4"
+		loop {
+		    hval = @image.fetch_long(addr).hex
+		    print "#{addr.hex}:	" + hval + "\n"
+		    addr += 4
+		    break if addr >= xaddr
+		}
+	    elsif type == "I"
+		loop {
+		    naddr = range2 addr
+		    puts "Range2 #{addr.hex} #{naddr.hex}" if @debug_pass2
+		    break if naddr >= xaddr
+		    puts "I ended prematurely: #{naddr.hex} #{xaddr.hex}" if @debug_pass2
+
+		    addr = naddr
+		}
+	    # Handle a block of data
+	    elsif type == "E"
+		dump_data addr, xaddr
+	    # Handle an unknown block
+	    else	# "X"
+		len = xaddr - addr;
+		if ( len > 16 )
+		    eaddr = xaddr - 1 - @base
+		    eaddr_hex = "%x" % eaddr
+		    puts "#{addr.hex}:#{eaddr_hex}\t\t\tunknown\t; (not disassembled)"
+		else
+		    print "#{addr.hex}:\t"
+		    print @image.fetch_hex addr, len
+		    print "\n"
+		end
+	    end
+	    addr = xaddr
+	}
+    end
+
+    def show_map
+	@map.show_map
+    end
+    def summary
+	count = @map.get_count;
+	puts ""
+	puts "; disassembled #{count} bytes of #{@size}"
+    end
+
+    # The following are the 3 ways to run this.
+
+    def everything
+	#pass1 0x40000400
+	#pass1 0x400649c4
+	#return
+
+	@call.syms.each { |addr,_|
+	    next if addr < @base or addr > @limit
+	    next unless @map.is_avail addr
+	    # puts "Everything, run: " + addr.hex
+	    pass1 addr
+	}
+    end
+
+    # Just the startup code (what we began with)
+    def startup_only
+# ESP32
+#	pass1 0x40000400
+# ESP8266
+	pass1 0x400000a4
+    end
+
+    # A particular symbol by name
+    # or by hex address
+    def one_symbol ( who )
+	if who =~ /^0x/
+	    addr = who.hex
+	else
+	    addr = @call.sym_lookup_name who
+	    unless addr
+		puts "Sorry, no such symbol"
+		exit
+	    end
+	end
+	#puts addr.hex
+	pass1 addr
+    end
+
+end
+
+name = nil
+if ARGV.size > 0
+    name = ARGV[0]
+end
+
+d = Dumper.new
+
+#d.show_map
+#exit
+
+if name and name == "all"
+    d.everything
+    d.pass2
+    d.summary
+    exit
+end
+
+if name
+    d.one_symbol name
+    d.pass2
+    exit
+end
+
+puts "Begin Pass 1" if $debug
+d.startup_only
+puts "End of Pass 1" if $debug
+#d.show_map
+d.pass2
+d.summary
+
+puts "DONE" if $debug
+
+# THE END
+

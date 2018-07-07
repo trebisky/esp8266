@@ -1,0 +1,183 @@
+#!/bin/ruby
+
+# merge_dis  Tom Trebisky  7-7-2018
+#
+# On 7-6-2018, I copied my multipass disassembler
+#  from the esp32 bootrom project to this project and
+#  ran it on the esp8266 bootrom image.
+#
+# This produces a much nicer raw disassembly in many ways.
+# However, I have a significant amount of hand generated
+# annotation in the old disassembly file and I don't want
+# to lose it.  I also don't want to transfer it by hand,
+# hence this program.
+#
+# At this time, the number of lines involved are:
+#
+#   24773 - old file
+#   22439 - new file
+#    2816 - lines with comments in old file.
+
+$old_file = "boot_OLD.txt"
+$new_file = "new.dis"
+
+$old = File.new $old_file
+$new = File.new $new_file
+
+# Augment this with some convenience methods
+class Integer
+    def hex
+        "%08x" % self
+    end
+    def xhex
+        "0x%08x" % self
+    end
+end
+
+class Line
+	attr_reader :raw
+	attr_reader :is_dis
+	attr_reader :eof
+	attr_reader :addr
+	attr_reader :comment
+
+	def initializeX ( arg )
+	    puts arg
+	end
+
+	def initialize ( x )
+	    @raw = x
+	    @eof = x == nil
+	    @is_dis = false
+	    @comment = false
+	    if x =~ /^4000....:/
+		@is_dis = true
+	    end
+	    if @is_dis
+		@addr = x.hex
+		if x =~ /;/
+		    @comment = x.sub /^[^;]*/, ""
+		end
+	    end
+	end
+end
+
+# Avoid chomping the nil that indicates EOF
+def reader ( file )
+	l = file.gets
+	if l
+	    return Line.new l.chomp
+	else
+	    return Line.new l
+	end
+end
+
+def r_old
+	return reader $old
+end
+
+def r_new
+	return reader $new
+end
+
+$new_line = nil
+$old_line = nil
+
+# Move through the "old" file.
+#  Copy:  between line comments as is.
+#  Skip:  disassembly lines prior to the current "new" location.
+#
+# So, once this is finished $old_line should hold
+# a disassembled instruction at the same location as new
+def crank_old
+	loop {
+	    break if $old_line.eof
+	    # print any run of comments
+	    unless $old_line.is_dis
+		puts $old_line.raw
+		$old_line = r_old
+		next
+	    end
+	    # have a disassembled line
+	    # skip it if it precedes new
+	    if $old_line.addr < $new_line.addr
+		$old_line = r_old
+		next
+	    end
+	    break
+	}
+end
+
+# Here we move through the "new" file.
+#  Skip: chatter
+#
+# anything not a disassembled instruction is "chatter"
+def crank_new
+	until $new_line.eof || $new_line.is_dis
+	    $new_line = r_new
+	end
+end
+
+def add_comment
+	while $new_line.addr < $old_line.addr
+	    puts $new_line.raw
+	    $new_line = r_new
+	    crank_new
+	    return if $new_line.eof
+	end
+
+	# A mismatch usually indicates a mangled section
+	# in the old file, so we ignore the bogus comment,
+	# and write the new line as is.
+	# I examined all of these and indeed this is always
+	# the right thing to do.
+	if $old_line.addr != $new_line.addr
+#	    puts "Whaa - OLD: " + $old_line.raw
+#	    puts "Whaa - NEW: " + $new_line.raw
+	    puts $new_line.raw
+	    return
+	end
+
+	# Skip old style l32r annotations
+	# Some of these had "extra" stuff at the end.
+	#  that we want to preserve.
+	if $old_line.comment =~ /^; \( /
+	    extra = $old_line.comment.sub /^;.*\)/,""
+	    if extra == ""
+		puts $new_line.raw
+	    else
+		#print "EXTRA: " + $new_line.raw + " -- " + extra + "\n"
+		print $new_line.raw + " -- " + extra + "\n"
+	    end
+	    return
+	end
+
+	# Append the old comment
+	print $new_line.raw + "\t\t" + $old_line.comment + "\n"
+end
+
+# ---
+
+$new_line = r_new
+crank_new
+
+$old_line = r_old
+
+loop {
+	crank_old
+	crank_new
+
+	if $old_line.comment
+	    add_comment
+	else
+	    puts $new_line.raw
+	end
+
+	$new_line = r_new
+	crank_new
+	break if $new_line.eof
+}
+
+#puts "Finished"
+
+# THE END
