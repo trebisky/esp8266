@@ -20,3 +20,5 @@ dumper
 OLD
 new.dis
 new_OLD.dis
+boot_NEW.txt
+*.OLD

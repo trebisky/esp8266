@@ -101,3 +101,15 @@ addr 0x40007109
 addr 0x4000710f
 addr 0x40007115
 addr 0x4000711c
+
+# gleaned from old disassembly
+sym 0x4000dc54 xtos_return_from_exc
+sym 0x400011ac uart_loader
+sym 0x4000711c rom_chip_v5_rx_init
+
+sym 0x40004120 esp_spi_erase_block
+sym 0x40004080 esp_spi_erase_chip
+sym 0x400040c0 esp_spi_erase_sector
+
+#sym 0x4000XXXX xx
+# THE END

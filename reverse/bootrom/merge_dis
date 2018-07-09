@@ -37,9 +37,11 @@ end
 class Line
 	attr_reader :raw
 	attr_reader :is_dis
+	attr_reader :not_dis
 	attr_reader :eof
 	attr_reader :addr
 	attr_reader :comment
+	attr_accessor :chatter
 
 	def initializeX ( arg )
 	    puts arg
@@ -47,11 +49,14 @@ class Line
 
 	def initialize ( x )
 	    @raw = x
+	    @chatter = nil
 	    @eof = x == nil
 	    @is_dis = false
+	    @not_dis = true
 	    @comment = false
 	    if x =~ /^4000....:/
 		@is_dis = true
+		@not_dis = false
 	    end
 	    if @is_dis
 		@addr = x.hex
@@ -80,74 +85,57 @@ def r_new
 	return reader $new
 end
 
-$new_line = nil
-$old_line = nil
+# ----------------------------------------
 
-# Move through the "old" file.
-#  Copy:  between line comments as is.
-#  Skip:  disassembly lines prior to the current "new" location.
-#
-# So, once this is finished $old_line should hold
-# a disassembled instruction at the same location as new
-def crank_old
+# We stash any chatter prior to the line so we can output it
+# right before (and along with) the line in question
+def get_new
+	chatter = Array.new
+
+	new = r_new
+	while new.not_dis
+	    chatter << new.raw if new.raw !~ /^\*\*\*/
+	    new = r_new
+	end
+
+
+	new.chatter = chatter
+	return new
+end
+
+# Move through old file, copying comments
+# return with next old instruction
+def old_comments
+	# copy comments
 	loop {
+	    $old_line = r_old
 	    break if $old_line.eof
 
-	    # print any run of comments
-	    # but modify our old style function names
-	    unless $old_line.is_dis
-		if $old_line.raw =~ />:/
-		    # puts " DUMP -- " + $old_line.raw
-		    name = $old_line.raw
-		    name = name.sub /^.*</, ""
-		    name = name.sub />.*/, ""
-		    puts "  " + name + ":"
-		else
+		# copy all comments, but skip labels
+	    if $old_line.not_dis
+		if $old_line.raw !~ />:/
 		    puts $old_line.raw
 		end
-		$old_line = r_old
 		next
 	    end
 
-	    # have a disassembled line
-	    # skip it if it precedes new
-	    if $old_line.addr < $new_line.addr
-		$old_line = r_old
-		next
-	    end
-	    break
+	    break if $old_line.addr >= $new_line.addr
 	}
 end
 
-# Here we move through the "new" file.
-#  Skip: chatter
-#
-# anything not a disassembled instruction is "chatter"
-# with one exception, we like our new style function labels.
-def crank_new
-	until $new_line.eof || $new_line.is_dis
-	    $new_line = r_new
-	end
-end
-
 def add_comment
-	while $new_line.addr < $old_line.addr
-	    puts $new_line.raw
-	    $new_line = r_new
-	    crank_new
-	    return if $new_line.eof
-	end
 
 	# A mismatch usually indicates a mangled section
 	# in the old file, so we ignore the bogus comment,
 	# and write the new line as is.
-	# I examined all of these and indeed this is always
-	# the right thing to do.
 	if $old_line.addr != $new_line.addr
 #	    puts "Whaa - OLD: " + $old_line.raw
 #	    puts "Whaa - NEW: " + $new_line.raw
-	    puts $new_line.raw
-	    return
+	    return $new_line.raw
+	end
+
+	unless $old_line.comment
+	    return $new_line.raw
 	end
 
 	# Skip old style l32r annotations
@@ -156,40 +144,35 @@ def add_comment
 	if $old_line.comment =~ /^; \( /
 	    extra = $old_line.comment.sub /^;.*\)/,""
 	    if extra == ""
-		puts $new_line.raw
-	    else
-		#print "EXTRA: " + $new_line.raw + " -- " + extra + "\n"
-		print $new_line.raw + " -- " + extra + "\n"
+		return $new_line.raw
 	    end
-	    return
+	    #print "EXTRA: " + $new_line.raw + " -- " + extra + "\n"
+	    return $new_line.raw + " -- " + extra + "\n"
 	end
 
 	# Append the old comment
-	print $new_line.raw + "\t\t" + $old_line.comment + "\n"
+	return $new_line.raw + "\t\t" + $old_line.comment + "\n"
 end
 
-# ---
+def write_line
+	$new_line.chatter.each { |c|
+	    puts c
+	}
+	puts add_comment
+end
 
-$new_line = r_new
-crank_new
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
-$old_line = r_old
+# Let the new file drive the process.
 
 loop {
-	crank_old
-	crank_new
+	$new_line = get_new
+	break if $new_line.addr > 0x4000e326
 
-	if $old_line.comment
-	    add_comment
-	else
-	    puts $new_line.raw
-	end
+	old_comments
 
-	$new_line = r_new
-	crank_new
-	break if $new_line.eof
+	write_line
 }
-
-#puts "Finished"
 
 # THE END

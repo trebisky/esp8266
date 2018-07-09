@@ -473,6 +473,7 @@ class Calls
 	# table, we take no care for alternate names that
 	# may pop up for the same location, the last one
 	# just overwrites the first.
+	# (and there are some duplicates in the syms file)
 	if File.exist? $sym_file
 	    f = File.open $sym_file
 	    f.each { |l|
@@ -482,6 +483,8 @@ class Calls
 	    }
 	    f.close
 	end
+
+	# So far, we only have this for the ESP32
 	if File.exist? $iosym_file
 	    f = File.open $iosym_file
 	    f.each { |l|
