@@ -3,8 +3,8 @@
 # 
 # Added stuff for the new "espdis" program 7-7-2018
 
-all:
-	echo "You need to be more specific"
+all:	new.dis
+#	echo "You need to be more specific"
 
 install:
 	cp dumper /home/tom/bin
@@ -57,7 +57,7 @@ showsym:	bootsym.elf
 # ------------------------------------------
 # Run new multipass disassembler 7-7-2018
 
-new.dis:
+new.dis:  hints espdis
 	./espdis all >new.dis
 
 # This became boot.txt

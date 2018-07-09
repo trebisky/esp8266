@@ -49,6 +49,7 @@ $bin_file = "esp8266.bin"
 $elf_file = "esp8266.elf"
 
 $sym_file = "syms"
+$iosym_file = "iosyms"
 
 $rom_base = 0x40000000
 # $rom_size_esp32 = 65536 * 7
@@ -87,6 +88,7 @@ class Instr
     attr_reader :target
     attr_reader :is_branch
     attr_reader :is_call
+    attr_reader :is_call0
     attr_reader :is_call8
     attr_reader :is_jump
     attr_reader :is_l32r
@@ -96,6 +98,7 @@ class Instr
     def initialize ( addr, line )
 	@is_branch = false
 	@is_call = false
+	@is_call0 = false
 	@is_call8 = false
 	@is_jump = false
 	@is_l32r = false
@@ -132,6 +135,7 @@ class Instr
 	@is_branch = true if op =~ /^b/
 	@is_branch = false if op =~ /^break/
 	@is_call8 = true if op =~ /^call8/
+	@is_call0 = true if op =~ /^call0/
 	@is_call = true if op =~ /^call/
 	@is_call = false if op =~ /^callx/
 	@is_l32r = true if op =~ /^l32r/
@@ -267,6 +271,18 @@ class Map
 	    end
 	end
 
+	# like "data" but will be dumped without monkeying
+	# with start/stop values and 4 bytes per line.
+	if cmd == "ldata"
+	    a = words[1].split ":"
+	    a1 = a[0].hex
+	    a2 = a[1].hex
+	    if a2 >= a1 and good_addr a1 and good_addr a2
+		claim a1-@base, a2-a1+1, "F"
+		#puts "D " + a1.hex + " " + a2.hex
+	    end
+	end
+
 	# single data byte "poison" marker
 	if cmd == "data1"
 	    addr = words[1].hex
@@ -288,6 +304,13 @@ class Map
 	if cmd == "sym"
 	    addr = words[1].hex
 	    @call.add_sym addr, words[2]
+	end
+	if cmd == "addr"
+	    addr = words[1].hex
+	    name = "sub_%x" % (addr - $rom_base)
+	    @call.add_sym addr, name
+	    # This makes it like an internally discovered call
+	    #@call.add addr
 	end
     end
 
@@ -365,6 +388,7 @@ class Map
     # This is the heart of Pass 2
     # Use the map to delimit sections to
     # disassemble in different ways.
+    # returns index AFTER the range
     # XXX - Does not hide codes
     def get_range ( addr )
 	index = addr - @base
@@ -390,6 +414,7 @@ class Image
     def initialize
 	@base = $rom_base
 	#@size = $rom_size
+	@limit = $rom_base + $rom_size - 1
 
 	file = File.open $bin_file, "rb"
 	@im = file.read
@@ -399,12 +424,30 @@ class Image
 	    exit
 	end
     end
+
+    # the 8266 is little endian, but this
+    # takes care of it.
     def fetch_long ( addr )
+	if ( addr < @base || (addr + 3) > @limit )
+	    return nil
+	end
 	index = addr - @base
 	bytes = @im[index,4]
 	vals = bytes.unpack "L"
 	val = vals[0]
     end
+
+    # As of ruby 1.9 pulling a single character
+    # out of a string yields a string (due to unicode rubbish)
+    def fetch_byte ( addr )
+	if addr < @base || addr > @limit
+	    return nil
+	end
+	index = addr - @base
+	data = @im[index].unpack "C"
+	return data[0]
+    end
+
     def fetch_hex ( addr, count )
 	index = addr - @base
 	bytes = @im[index,count]
@@ -430,8 +473,8 @@ class Calls
 	# table, we take no care for alternate names that
 	# may pop up for the same location, the last one
 	# just overwrites the first.
-	if File.exist? "syms"
-	    f = File.open "syms"
+	if File.exist? $sym_file
+	    f = File.open $sym_file
 	    f.each { |l|
 		next unless l =~ /^PROVIDE/
 		vals = l.split
@@ -439,8 +482,8 @@ class Calls
 	    }
 	    f.close
 	end
-	if File.exist? "iosyms"
-	    f = File.open "iosyms"
+	if File.exist? $iosym_file
+	    f = File.open $iosym_file
 	    f.each { |l|
 		next unless l =~ /^PROVIDE/
 		vals = l.split
@@ -508,11 +551,13 @@ class Dumper
 	# error 0xdead, target if target !~ /^0x4/
 	addr = target.hex
 	return if addr < @base
-	# Never see this, now that we have all 7 * 64k
+	# Never see this, now that we have all 7 * 64k for the esp32
 	# but this is what tipped us off to the address map
 	# in the reference manual being wrong.
+	# Can happen if we are disassembling data regions (esp8266)
 	if addr > @limit
-	    puts "Wow, skipping: " + addr.hex
+	    puts "*** Refusing to follow call or branch to: " + addr.hex
+	    #puts "Wow, skipping: " + addr.hex
 	    return
 	end
 	return if @new_addr.include? addr
@@ -521,15 +566,15 @@ class Dumper
 	@new_addr << addr
     end
 
-    def print_l32r_OLD ( i )
-	val = @image.fetch_long ( i.target.hex )
-	sym = @call.sym_lookup val
-	if sym
-	    puts i.line + "\t; #{sym} ( " + val.xhex + " )"
-	else
-	    puts i.line + "\t; ( " + val.xhex + " )"
-	end
-    end
+#    def print_l32r_OLD ( i )
+#	val = @image.fetch_long ( i.target.hex )
+#	sym = @call.sym_lookup val
+#	if sym
+#	    puts i.line + "\t; #{sym} ( " + val.xhex + " )"
+#	else
+#	    puts i.line + "\t; ( " + val.xhex + " )"
+#	end
+#    end
 
     # To make the l32r disassembly more "readable" I decided to use
     # this square bracket notation -- and put the more or less
@@ -537,8 +582,14 @@ class Dumper
     def print_l32r ( i )
 	a, b = i.line.split ", "
 
-	val = @image.fetch_long ( i.target.hex )
+	val = @image.fetch_long i.target.hex
+	if val == nil
+	    puts a + ", [" + "----" + "]\t; [" + "----" + "] " + b
+	    return
+	end
+
 	sym = @call.sym_lookup val
+
 	if sym
 	    #puts a + ", " + b + "\t; #{sym} ( " + val.xhex + " )"
 	    puts a + ", [" + sym + "]\t; [" + val.xhex + "] " + b
@@ -548,31 +599,47 @@ class Dumper
 	end
     end
 
+    # Used for call8 (esp32) or call0 (esp8266 and esp32)
+    # Rather than put name in comment, modify the instruction
+    def print_call ( i )
+	name = @call.call_lookup i.target.hex
+	if name
+	    w = i.line.split
+	    print w[0] + "\t" + w[1] + "\t\t" + w[2]
+	    print "\t" + name + "\t\t; " + w[3] + "\n"
+	    #puts i.line + "\t; " + name
+	else
+	    # should never happen
+	    puts i.line + "\t; " + "????"
+	end
+    end
+
+    # print label if this address has a name
+    def mark_addr ( addr )
+	marked = false
+	name = @call.call_lookup addr
+	if name
+	    puts ""
+	    puts "  " + name + ":"
+	    marked = true
+	end
+
+	name = @call.sym_lookup addr
+	if name and not marked
+	    puts ""
+	    puts "  " + name + ":"
+	end
+    end
+
     def print_instr ( i )
 
 	    # print a nice label before known subroutines
-	    marked = false
-	    name = @call.call_lookup i.addr
-	    if name
-		puts ""
-		puts "  " + name + ":"
-		marked = true
-	    end
+	    mark_addr i.addr
 
-	    name = @call.sym_lookup i.addr
-	    if name and not marked
-		puts ""
-		puts "  " + name + ":"
-	    end
-
-	    if i.is_call8
-		name = @call.call_lookup i.target.hex
-		if name
-		    puts i.line + "\t; " + name
-		else
-		    # should never happen
-		    puts i.line + "\t; " + "????"
-		end
+	    # Added call0 for esp8266
+	    # No harm for esp32
+	    if i.is_call8 || i.is_call0
+		print_call i
 		return
 	    end
 
@@ -590,7 +657,9 @@ class Dumper
 
 	    i = @code.one_inst addr
 
-	    if i.is_call8
+	    # Added call0 for esp8266
+	    # No harm for esp32
+	    if i.is_call8 || i.is_call0
 		@call.add i.target.hex
 	    end
 
@@ -601,7 +670,7 @@ class Dumper
 	    end
 
 	    if i.illegal
-		puts "*** Illegal instruction, ending range"
+		puts "*** Illegal instruction, ending range at: " + addr.hex
 		break
 	    end
 
@@ -686,8 +755,68 @@ class Dumper
 	return addr
     end
 
-    # dump a data range, 4 longs per line
+    def dump_bytes ( addr, len )
+	print "#{addr.hex}:	"
+	len.times {
+	    b = @image.fetch_byte(addr)
+	    print "%02x" % b
+	    addr += 1
+	}
+	print "\n"
+    end
+
+    # "ldata" in hints file
+    def dump_ldata ( addr, xaddr )
+
+	return if addr >= xaddr
+	len = xaddr - addr
+	
+	misc_len = 4 - ( addr & 0x3 )
+	misc_len = len if misc_len > len
+	if misc_len < 4
+	    dump_bytes addr, misc_len
+	    addr += misc_len
+	end
+	return if addr >= xaddr
+
+	# longs dumped this way are byte swapped
+	while addr + 4 <= xaddr
+	    dump_bytes addr, 4
+	    addr += 4
+	end
+	return if addr >= xaddr
+
+	dump_bytes addr, xaddr - addr
+    end
+
     def dump_data ( addr, xaddr )
+
+	return if addr >= xaddr
+	len = xaddr - addr
+	
+	misc_len = 4 - ( addr & 0x3 )
+	misc_len = len if misc_len > len
+	if misc_len < 4
+	    dump_bytes addr, misc_len
+	    addr += misc_len
+	end
+	return if addr >= xaddr
+
+	while addr + 4 <= xaddr
+	    hval = @image.fetch_long(addr).hex
+	    print "#{addr.hex}:	" + hval + "\n"
+	    addr += 4
+	end
+	return if addr >= xaddr
+
+	dump_bytes addr, xaddr - addr
+    end
+
+    # "data" in hints file
+    # dump a data range, 4 longs per line
+    # This pretty much sucks.
+    # kept for legacy reasons for esp32 XXX
+    def dump_data_OLD ( addr, xaddr )
 	baddr = addr & ~0xf
 	eaddr = baddr + 16
 	print "#{baddr.hex}:	"
@@ -733,12 +862,20 @@ class Dumper
 
 		    addr = naddr
 		}
-	    # Handle a block of data
 	    elsif type == "E"
+		# dump an explicitly marked block of data
+		# (indicated by "data" in hints file)
+		mark_addr addr
 		dump_data addr, xaddr
+	    elsif type == "F"
+		# dump an explicitly marked block of data
+		# (indicated by "ldata" in hints file)
+		mark_addr addr
+		dump_ldata addr, xaddr
 	    # Handle an unknown block
 	    else	# "X"
 		len = xaddr - addr;
+		mark_addr addr
 		if ( len > 16 )
 		    eaddr = xaddr - 1 - @base
 		    eaddr_hex = "%x" % eaddr
@@ -808,11 +945,13 @@ if ARGV.size > 0
     name = ARGV[0]
 end
 
+# This should initialize everything.
 d = Dumper.new
 
 #d.show_map
 #exit
 
+# This is the usual thing
 if name and name == "all"
     d.everything
     d.pass2
@@ -820,12 +959,24 @@ if name and name == "all"
     exit
 end
 
+# Start at hex address (no leading 0x)
+if name and name =~ /^40/
+    addr = name.hex
+    sub_name = "sub_%x" % (addr - $rom_base)
+    puts "  " + sub_name + ":"
+    d.pass1 addr
+    d.pass2
+    exit
+end
+
+# Start at given symbol
 if name
     d.one_symbol name
     d.pass2
     exit
 end
 
+# default - start at chip reset
 puts "Begin Pass 1" if $debug
 d.startup_only
 puts "End of Pass 1" if $debug
@@ -836,4 +987,3 @@ d.summary
 puts "DONE" if $debug
 
 # THE END
-

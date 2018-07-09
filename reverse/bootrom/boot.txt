@@ -24,6 +24,30 @@
 ; 1 - Get a firm understanding of ESP8266 interrupts.
 ;
 ;---------------------------------------------------
+; The espdis script is by no means perfect, and has skipped some
+; sections entirely.  This is because it simply did not have enough
+; starting points -- but these are labeled in the disassembly below
+; as "unknown" and can be filled in by hand.
+;
+;   unknown	; (not disassembled)
+;
+; What I do is to track these down one by one, then go to the old
+; disassembly and figure out what is going on in these regions.
+; When I find an unreferenced subroutine, I get the address and
+; feed it to "espdis" like this:
+;
+;   espdis 400017e0 >zzz
+;
+; Then I examine the file "zzz" and cut and paste as appropriate.
+; We could gather up all of these missing entry points and put
+; them into a syms file by hand and then redo the whole batch,
+; but we aren't going down that road.
+;
+; I am labeling unreachable functions that I have added by hand
+;  "xsub_xxxx" in the following listing, so 400017e0 becomes
+;  "xsub_17e0"
+;
+;---------------------------------------------------
 ; In early 2018 I got a pull request from "quietboil" that added
 ; annotation for flash erase commands.
 ; See: esp_spi_erase_sector -and- esp_spi_erase_block
@@ -148,6 +172,7 @@
 ;
 ; Early on, it sets the vector base to 0x40000000 (right here!!)
 ; Which means there is no way for software to mess with the basic vector table.
+; Note that the vector table simply has code every 16 bytes (0x10)
 
   _Rom_start:
 40000000:	00000000000000000000000000000000
@@ -179,7 +204,15 @@
 40000030:	004100        	break	1, 0		; breakpoint exception
 40000033:	46feff        	j	0x40000030
 
-40000036:4f			unknown	; (not disassembled)
+40000036:       000000
+40000039:       000000
+4000003c:       000000
+4000003f:       000000
+40000042:       000000
+40000045:       000000
+40000048:       000000
+4000004b:       000000
+4000004e:       0000
 
 ; Here are the intial values of the interrupt dispatch
 ; table as first set up by the ROM
@@ -239,7 +272,7 @@
 4000005d:	3032a0        	addx4	a3, a2, a3		; add to base
 40000060:	3803      	l32i.n	a3, a3, 0		; fetch from there
 40000062:	4971      	s32i.n	a4, a1, 28		; save a4
-40000064:	a00300        	jx	a3		; << dispatch via JUMP table
+40000064:	a00300        	jx	a3			; << dispatch via JUMP table
 
 40000067:	000000000000000000
 
@@ -442,194 +475,9 @@
 	....
 	....
 	....
-40000152:	000000        	ill
-40000155:	000000        	ill
-40000158:	000000        	ill
-4000015b:	000000        	ill
-4000015e:	000000        	ill
-40000161:	000000        	ill
-40000164:	000000        	ill
-40000167:	000000        	ill
-4000016a:	000000        	ill
-4000016d:	000000        	ill
-40000170:	000000        	ill
-40000173:	000000        	ill
-40000176:	000000        	ill
-40000179:	000000        	ill
-4000017c:	000000        	ill
-4000017f:	000000        	ill
-40000182:	000000        	ill
-40000185:	000000        	ill
-40000188:	000000        	ill
-4000018b:	000000        	ill
-4000018e:	000000        	ill
-40000191:	000000        	ill
-40000194:	000000        	ill
-40000197:	000000        	ill
-4000019a:	000000        	ill
-4000019d:	000000        	ill
-400001a0:	000000        	ill
-400001a3:	000000        	ill
-400001a6:	000000        	ill
-400001a9:	000000        	ill
-400001ac:	000000        	ill
-400001af:	000000        	ill
-400001b2:	000000        	ill
-400001b5:	000000        	ill
-400001b8:	000000        	ill
-400001bb:	000000        	ill
-400001be:	000000        	ill
-400001c1:	000000        	ill
-400001c4:	000000        	ill
-400001c7:	000000        	ill
-400001ca:	000000        	ill
-400001cd:	000000        	ill
-400001d0:	000000        	ill
-400001d3:	000000        	ill
-400001d6:	000000        	ill
-400001d9:	000000        	ill
-400001dc:	000000        	ill
-400001df:	000000        	ill
-400001e2:	000000        	ill
-400001e5:	000000        	ill
-400001e8:	000000        	ill
-400001eb:	000000        	ill
-400001ee:	000000        	ill
-400001f1:	000000        	ill
-400001f4:	000000        	ill
-400001f7:	000000        	ill
-400001fa:	000000        	ill
-400001fd:	000000        	ill
-40000200:	000000        	ill
-40000203:	000000        	ill
-40000206:	000000        	ill
-40000209:	000000        	ill
-4000020c:	000000        	ill
-4000020f:	000000        	ill
-40000212:	000000        	ill
-40000215:	000000        	ill
-40000218:	000000        	ill
-4000021b:	000000        	ill
-4000021e:	000000        	ill
-40000221:	000000        	ill
-40000224:	000000        	ill
-40000227:	000000        	ill
-4000022a:	000000        	ill
-4000022d:	000000        	ill
-40000230:	000000        	ill
-40000233:	000000        	ill
-40000236:	000000        	ill
-40000239:	000000        	ill
-4000023c:	000000        	ill
-4000023f:	000000        	ill
-40000242:	000000        	ill
-40000245:	000000        	ill
-40000248:	000000        	ill
-4000024b:	000000        	ill
-4000024e:	000000        	ill
-40000251:	000000        	ill
-40000254:	000000        	ill
-40000257:	000000        	ill
-4000025a:	000000        	ill
-4000025d:	000000        	ill
-40000260:	000000        	ill
-40000263:	000000        	ill
-40000266:	000000        	ill
-40000269:	000000        	ill
-4000026c:	000000        	ill
-4000026f:	000000        	ill
-40000272:	000000        	ill
-40000275:	000000        	ill
-40000278:	000000        	ill
-4000027b:	000000        	ill
-4000027e:	000000        	ill
-40000281:	000000        	ill
-40000284:	000000        	ill
-40000287:	000000        	ill
-4000028a:	000000        	ill
-4000028d:	000000        	ill
-40000290:	000000        	ill
-40000293:	000000        	ill
-40000296:	000000        	ill
-40000299:	000000        	ill
-4000029c:	000000        	ill
-4000029f:	000000        	ill
-400002a2:	000000        	ill
-400002a5:	000000        	ill
-400002a8:	000000        	ill
-400002ab:	000000        	ill
-400002ae:	000000        	ill
-400002b1:	000000        	ill
-400002b4:	000000        	ill
-400002b7:	000000        	ill
-400002ba:	000000        	ill
-400002bd:	000000        	ill
-400002c0:	000000        	ill
-400002c3:	000000        	ill
-400002c6:	000000        	ill
-400002c9:	000000        	ill
-400002cc:	000000        	ill
-400002cf:	000000        	ill
-400002d2:	000000        	ill
-400002d5:	000000        	ill
-400002d8:	000000        	ill
-400002db:	000000        	ill
-400002de:	000000        	ill
-400002e1:	000000        	ill
-400002e4:	000000        	ill
-400002e7:	000000        	ill
-400002ea:	000000        	ill
-400002ed:	000000        	ill
-400002f0:	000000        	ill
-400002f3:	000000        	ill
-400002f6:	000000        	ill
-400002f9:	000000        	ill
-400002fc:	000000        	ill
-400002ff:	000000        	ill
-40000302:	000000        	ill
-40000305:	000000        	ill
-40000308:	000000        	ill
-4000030b:	000000        	ill
-4000030e:	000000        	ill
-40000311:	000000        	ill
-40000314:	000000        	ill
-40000317:	000000        	ill
-4000031a:	000000        	ill
-4000031d:	000000        	ill
-40000320:	000000        	ill
-40000323:	000000        	ill
-40000326:	000000        	ill
-40000329:	000000        	ill
-4000032c:	000000        	ill
-4000032f:	000000        	ill
-40000332:	000000        	ill
-40000335:	000000        	ill
-40000338:	000000        	ill
-4000033b:	000000        	ill
-4000033e:	000000        	ill
-40000341:	000000        	ill
-40000344:	000000        	ill
-40000347:	000000        	ill
-4000034a:	000000        	ill
-4000034d:	000000        	ill
-40000350:	000000        	ill
-40000353:	000000        	ill
-40000356:	000000        	ill
-40000359:	000000        	ill
-4000035c:	000000        	ill
-4000035f:	000000        	ill
-40000362:	000000        	ill
-40000365:	000000        	ill
-40000368:	000000        	ill
-4000036b:	000000        	ill
-4000036e:	000000        	ill
-40000371:	000000        	ill
-40000374:	000000        	ill
-40000377:	000000        	ill
 4000037a:	000000        	ill
-
 4000037d:	000000        	ill
-4000014c:37f			unknown	; (not disassembled)
+
 40000380:	40000000	; l32r
 40000384:	3fffdab0	; l32r
 40000388:	3fffeb30	; l32r
@@ -2053,8 +1901,8 @@
 40000fcc:	3fffd674	; l32r
 40000fd0:	3fffd6b8	; l32r
 40000fd4:	3fffd6c0	; l32r
-40000fd8:	400017e0	; l32r
-40000fdc:	40001878	; l32r
+40000fd8:	400017e0	; l32r		; xsub_17e0
+40000fdc:	40001878	; l32r		; xsub_1878
 40000fe0:	3fffd6dc	; l32r
 40000fe4:	3fffd6ac	; l32r
 40000fe8:	3fffd6cc	; l32r
@@ -2191,13 +2039,13 @@
 4000108a:	c02000        	memw
 4000108d:	722c46        	l32i	a7, a12, 0x118
 40001090:	707025        	extui	a7, a7, 16, 3
-40001093:	263711        	beqi	a7, 3, 0x400010a8		; << ** load APP
+40001093:	263711        	beqi	a7, 3, 0x400010a8	; << ** load APP
 
 40001096:	c02000        	memw
 40001099:	822c46        	l32i	a8, a12, 0x118
 4000109c:	922000        	l32i	a9, a0, 0
 4000109f:	808025        	extui	a8, a8, 16, 3
-400010a2:	661818        	bnei	a8, 1, 0x400010be		; just run APP again
+400010a2:	661818        	bnei	a8, 1, 0x400010be	; just run APP again
 400010a5:	565901        	bnez	a9, 0x400010be		; just run APP again
 
 ; This call is what copies an app out of flash and gets it ready to run.
@@ -2226,10 +2074,10 @@
 ; then make the call to run APP code.
 
 400010be:	22a009        	movi	a2, 9
-400010c1:	31c5ff        	l32r	a3, [0x400017e0]	; 0x40000fd8
+400010c1:	31c5ff        	l32r	a3, [0x400017e0]	; 0x40000fd8 -- xsub_17e0
 400010c4:	c538ff        	call0	0x40000454
 
-400010c7:	c1c5ff        	l32r	a12, [0x40001878]	; 0x40000fdc
+400010c7:	c1c5ff        	l32r	a12, [0x40001878]	; 0x40000fdc -- xsub_1878
 400010ca:	0c02      	movi.n	a2, 0
 400010cc:	3d0c      	mov.n	a3, a12
 400010ce:	4538ff        	call0	0x40000454
@@ -3025,25 +2873,161 @@
 400017c6:	45d000        	call0	0x400024cc
 400017c9:	067bff        	j	0x400015b9
 
-400017cc:18a3			unknown	; (not disassembled)
+400017cc:       00000000
 
+400017d0:       3fffdce0        ; l32r
+400017d4:       3fffd784        ; l32r
+400017d8:       3fffd78c        ; l32r
+400017dc:       3fffd7cc        ; l32r
 
 ; Subroutine, set as exception handler
+XXX
+  sub_17e0:
+400017e0:	12c1f0        	addi	a1, a1, -16
+400017e3:	d921      	s32i.n	a13, a1, 8
+400017e5:	e931      	s32i.n	a14, a1, 12
+400017e7:	c911      	s32i.n	a12, a1, 4
+400017e9:	0901      	s32i.n	a0, a1, 0
+400017eb:	cd01      	mov.n	a12, a1
+400017ed:	45b30c        	call0	0x4000e324	; xthal_window_spill
+400017f0:	0c0e      	movi.n	a14, 0
+400017f2:	d1f7ff        	l32r	a13, [0x3fffdce0]	; 0x400017d0
+400017f5:	62adf8        	movi	a6, 0xfffffdf8
+400017f8:	d00d20        	or	a0, a13, a13
+400017fb:	52cd50        	addi	a5, a13, 80
+400017fe:	6a4c      	add.n	a4, a12, a6
+40001800:	22247e        	l32i	a2, a4, 0x1f8
+40001803:	2900      	s32i.n	a2, a0, 0
+40001805:	32247f        	l32i	a3, a4, 0x1fc
+40001808:	3910      	s32i.n	a3, a0, 4
+4000180a:	722480        	l32i	a7, a4, 0x200
+4000180d:	7920      	s32i.n	a7, a0, 8
+4000180f:	422481        	l32i	a4, a4, 0x204
+40001812:	4930      	s32i.n	a4, a0, 12
+40001814:	8c92      	beqz.n	a2, 0x40001821
+40001816:	1bee      	addi.n	a14, a14, 1
+40001818:	30c320        	or	a12, a3, a3
+4000181b:	02c010        	addi	a0, a0, 16
+4000181e:	5790dc        	bne	a0, a5, 0x400017fe
+40001821:	3d0c      	mov.n	a3, a12
+40001823:	21ecff        	l32r	a2, [0x3fffd784]	; 0x400017d4
+40001826:	101120        	or	a1, a1, a1
+40001829:	05ca00        	call0	0x400024cc	; ets_printf
+4000182c:	0c0c      	movi.n	a12, 0
+4000182e:	a61e1a        	blti	a14, 1, 0x4000184c
+40001831:	21e9ff        	l32r	a2, [0x3fffd78c]	; 0x400017d8
+40001834:	c03c20        	or	a3, a12, a12
+40001837:	422d00        	l32i	a4, a13, 0
+4000183a:	522d01        	l32i	a5, a13, 4
+4000183d:	682d      	l32i.n	a6, a13, 8
+4000183f:	783d      	l32i.n	a7, a13, 12
+40001841:	85c800        	call0	0x400024cc	; ets_printf
+40001844:	d2cd10        	addi	a13, a13, 16
+40001847:	1bcc      	addi.n	a12, a12, 1
+40001849:	e79ce4        	bne	a12, a14, 0x40001831
+4000184c:	21e4ff        	l32r	a2, [0x3fffd7cc]	; 0x400017dc
+4000184f:	30b103        	rsr.epc1	a3
+40001852:	40b203        	rsr.epc2	a4
+40001855:	50b303        	rsr.epc3	a5
+40001858:	60ee03        	rsr.excvaddr	a6
+4000185b:	70c003        	rsr.depc	a7
+4000185e:	c5c600        	call0	0x400024cc	; ets_printf
+40001861:	c22101        	l32i	a12, a1, 4
+40001864:	d22102        	l32i	a13, a1, 8
+40001867:	e22103        	l32i	a14, a1, 12
+4000186a:	0801      	l32i.n	a0, a1, 0
+4000186c:	12c110        	addi	a1, a1, 16
+4000186f:	0df0      	ret.n
+XXX
 
+  xsub_17e0:
+400017e0:       12c1f0          addi    a1, a1, -16
+400017e3:       d921            s32i.n  a13, a1, 8
+400017e5:       e931            s32i.n  a14, a1, 12
+400017e7:       c911            s32i.n  a12, a1, 4
+400017e9:       0901            s32i.n  a0, a1, 0
+400017eb:       cd01            mov.n   a12, a1
+400017ed:	45b30c        	call0	0x4000e324	; xthal_window_spill
+400017f0:       0c0e            movi.n  a14, 0
+400017f2:       d1f7ff          l32r    a13, [0x3fffdce0]       ; 0x400017d0
+400017f5:       62adf8          movi    a6, 0xfffffdf8
+400017f8:       d00d20          or      a0, a13, a13
+400017fb:       52cd50          addi    a5, a13, 80
+400017fe:       6a4c            add.n   a4, a12, a6
+40001800:       22247e          l32i    a2, a4, 0x1f8
+40001803:       2900            s32i.n  a2, a0, 0
+40001805:       32247f          l32i    a3, a4, 0x1fc
+40001808:       3910            s32i.n  a3, a0, 4
+4000180a:       722480          l32i    a7, a4, 0x200
+4000180d:       7920            s32i.n  a7, a0, 8
+4000180f:       422481          l32i    a4, a4, 0x204
+40001812:       4930            s32i.n  a4, a0, 12
+40001814:       8c92            beqz.n  a2, 0x40001821
+40001816:       1bee            addi.n  a14, a14, 1
+40001818:       30c320          or      a12, a3, a3
+4000181b:       02c010          addi    a0, a0, 16
+4000181e:       5790dc          bne     a0, a5, 0x400017fe
+40001821:       3d0c            mov.n   a3, a12
 
 ; Format: "sp %p "
+40001823:       21ecff          l32r    a2, [0x3fffd784]        ; 0x400017d4
+40001826:       101120          or      a1, a1, a1
+40001829:       05ca00          call0   0x400024cc		; ets_printf
+4000182c:       0c0c            movi.n  a12, 0
+4000182e:       a61e1a          blti    a14, 1, 0x4000184c
 
 ; Format: "sf_dump[%d] a0: 0x%08x  a1: 0x%08x  a2: 0x%08x  a3: 0x%08x "
+40001831:       21e9ff          l32r    a2, [0x3fffd78c]        ; 0x400017d8
+40001834:       c03c20          or      a3, a12, a12
+40001837:       422d00          l32i    a4, a13, 0
+4000183a:       522d01          l32i    a5, a13, 4
+4000183d:       682d            l32i.n  a6, a13, 8
+4000183f:       783d            l32i.n  a7, a13, 12
+40001841:       85c800          call0   0x400024cc		; ets_printf
+40001844:       d2cd10          addi    a13, a13, 16
+40001847:       1bcc            addi.n  a12, a12, 1
+40001849:       e79ce4          bne     a12, a14, 0x40001831
 
 ; Format: "epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x"
+4000184c:       21e4ff          l32r    a2, [0x3fffd7cc]        ; 0x400017dc
+4000184f:       30b103          rsr.epc1        a3
+40001852:       40b203          rsr.epc2        a4
+40001855:       50b303          rsr.epc3        a5
+40001858:       60ee03          rsr.excvaddr    a6
+4000185b:       70c003          rsr.depc        a7
+4000185e:       c5c600          call0   0x400024cc		; ets_printf
+40001861:       c22101          l32i    a12, a1, 4
+40001864:       d22102          l32i    a13, a1, 8
+40001867:       e22103          l32i    a14, a1, 12
+4000186a:       0801            l32i.n  a0, a1, 0
+4000186c:       12c110          addi    a1, a1, 16
+4000186f:       0df0            ret.n
 
+40001871:       000000
+40001874:       3fffd814        ; l32r
 
 ; gets installed as exception handler
 
+  xsub_1878:
+40001878:       30e803          rsr.exccause    a3
 
 ; Format: "Fatal exception (%d): "
+4000187b:       21feff          l32r    a2, [0x3fffd814]        ; 0x40001874
+4000187e:       12c1f0          addi    a1, a1, -16
+40001881:       026100          s32i    a0, a1, 0
+40001884:       45c400          call0   0x400024cc		; ets_printf
 
 ; Format: "epc1=0x%08x, epc2=0x%08x, epc3=0x%08x, excvaddr=0x%08x, depc=0x%08x"
+40001887:       21d5ff          l32r    a2, [0x3fffd7cc]        ; 0x400017dc
+4000188a:       30b103          rsr.epc1        a3
+4000188d:       40b203          rsr.epc2        a4
+40001890:       50b303          rsr.epc3        a5
+40001893:       60ee03          rsr.excvaddr    a6
+40001896:       70c003          rsr.depc        a7
+40001899:       05c300          call0   0x400024cc		; ets_printf
+4000189c:       022100          l32i    a0, a1, 0
+4000189f:       12c110          addi    a1, a1, 16
+400018a2:       0df0            ret.n
 
   ets_memset:
 400018a4:	12c1f0        	addi	a1, a1, -16
@@ -3479,20 +3463,42 @@
 40001ccf:	5a33      	add.n	a3, a3, a5
 40001cd1:	325404        	s16i	a3, a4, 8
 40001cd4:	0df0      	ret.n
-40001cd6:1d0f			unknown	; (not disassembled)
+40001cd6:	0000
 
+40001cd8:       3fffd82c        ; l32r
 
 ; subroutine referenced by eprintf below.
 
+  xsub_1cdc:
+40001cdc:       12c1f0          addi    a1, a1, -16
+40001cdf:       51f4ff          l32r    a5, [0x3fffdd3c]        ; 0x40001cb0
+40001ce2:       0901            s32i.n  a0, a1, 0
+40001ce4:       021504          l16ui   a0, a5, 8
+40001ce7:       9c50            beqz.n  a0, 0x40001d00
+40001ce9:       0b30            addi.n  a3, a0, -1
+40001ceb:       0815            l32i.n  a0, a5, 4
+40001ced:       325504          s16i    a3, a5, 8
+40001cf0:       224000          s8i     a2, a0, 0
+40001cf3:       1b00            addi.n  a0, a0, 1
+40001cf5:       0915            s32i.n  a0, a5, 4
+40001cf7:       0801            l32i.n  a0, a1, 0
+40001cf9:       12c110          addi    a1, a1, 16
+40001cfc:       0df0            ret.n
+40001cfe:       0000
 
 ; Format: "eprintf no buf"
+40001d00:       21f6ff          l32r    a2, [0x3fffd82c]        ; 0x40001cd8
+40001d03:       857c00          call0   0x400024cc		; ets_printf
+40001d06:       0801            l32i.n  a0, a1, 0
+40001d08:       12c110          addi    a1, a1, 16
+40001d0b:       0df0            ret.n
 
 40001d10:	40001cdc	; l32r
 
 ; many calls to this -- apparently to print debug only
 
   eprintf:
-40001d14:	9d03      	mov.n	a9, a3		; a9 = a3 (second arg)
+40001d14:	9d03      	mov.n	a9, a3			; a9 = a3 (second arg)
 40001d16:	12c1d0        	addi	a1, a1, -48		; make space on stack
 40001d19:	7991      	s32i.n	a7, a1, 36
 40001d1b:	6981      	s32i.n	a6, a1, 32
@@ -3508,7 +3514,7 @@
 40001d30:	0c40      	movi.n	a0, 4
 40001d32:	5d08      	mov.n	a5, a8
 40001d34:	4d08      	mov.n	a4, a8
-40001d36:	21f6ff        	l32r	a2, [0x40001cdc]	; 0x40001d10
+40001d36:	21f6ff        	l32r	a2, [0x40001cdc]	; 0x40001d10 -- xsub_1cdc
 40001d39:	0921      	s32i.n	a0, a1, 8
 40001d3b:	6d00      	mov.n	a6, a0
 40001d3d:	051c00        	call0	0x40001f00
@@ -3567,33 +3573,147 @@
 40001da5:	01c2ff        	l32r	a0, [0x3fffdd3c]	; 0x40001cb0
 40001da8:	c911      	s32i.n	a12, a1, 4		; save a12
 40001daa:	4830      	l32i.n	a4, a0, 12		; fetch first call addr
-40001dac:	cd02      	mov.n	a12, a2		; save character
+40001dac:	cd02      	mov.n	a12, a2			; save character
 40001dae:	165400        	beqz	a4, 0x40001db7		; is first call valid?
 40001db1:	c00400        	callx0	a4
 
 40001db4:	01bfff        	l32r	a0, [0x3fffdd3c]	; 0x40001cb0
 40001db7:	4840      	l32i.n	a4, a0, 16		; fetch second call addr
 40001db9:	8c34      	beqz.n	a4, 0x40001dc0		; is it valid
-40001dbb:	2d0c      	mov.n	a2, a12		; restore character
+40001dbb:	2d0c      	mov.n	a2, a12			; restore character
 40001dbd:	c00400        	callx0	a4
 
 40001dc0:	c811      	l32i.n	a12, a1, 4		; restore a12
 40001dc2:	0801      	l32i.n	a0, a1, 0		; restore return
 40001dc4:	12c110        	addi	a1, a1, 16		; restore stack
 40001dc7:	0df0      	ret.n
-40001dc9:1ee3			unknown	; (not disassembled)
 
 ; installed by ets_install_uart_printf()
 
+  xsub_1dcc
+40001dcc:       12c1f0          addi    a1, a1, -16             ; space on stack
+40001dcf:       0901            s32i.n  a0, a1, 0               ; save return
+40001dd1:       26920f          beqi    a2, 10, 40001de4        ; newline ?
+40001dd4:       0cd0            movi.n  a0, 13
+40001dd6:       071202          beq     a2, a0, 40001ddc
+40001dd9:       45d501          call0   40003b30 <uart_tx_one_char>
+40001ddc:       0801            l32i.n  a0, a1, 0               ; restore a0
+40001dde:       12c110          addi    a1, a1, 16              ; restore stack
+40001de1:       0df0            ret.n
+40001de3:       00
 
+40001de4:       22a00d          movi    a2, 13                  ; send CR
+40001de7:       85d401          call0   40003b30 <uart_tx_one_char>
+40001dea:       22a00a          movi    a2, 10                  ; send NL
+40001ded:       05d401          call0   40003b30 <uart_tx_one_char>
+40001df0:       0801            l32i.n  a0, a1, 0               ; restore a0
+40001df2:       12c110          addi    a1, a1, 16              ; restore stack
+40001df5:       0df0            ret.n
+40001df7:       00
 
-  sub_1df8:
+; called from below
 
+  xsub_1df8:
+40001df8:       12c180          addi    a1, a1, -128
+40001dfb:       c26116          s32i    a12, a1, 88
+40001dfe:       f26119          s32i    a15, a1, 100
+40001e01:       32611c          s32i    a3, a1, 112
+40001e04:       d26117          s32i    a13, a1, 92
+40001e07:       e26118          s32i    a14, a1, 96
+40001e0a:       026115          s32i    a0, a1, 84
+40001e0d:       ed02            mov.n   a14, a2
+40001e0f:       0c00            movi.n  a0, 0
+40001e11:       dd04            mov.n   a13, a4
+40001e13:       0c03            movi.n  a3, 0
+40001e15:       4d05            mov.n   a4, a5
+40001e17:       f2211c          l32i    a15, a1, 112
+40001e1a:       0c15            movi.n  a5, 1
+40001e1c:       f03583          moveqz  a3, a5, a15
+40001e1f:       200583          moveqz  a0, a5, a2
+40001e22:       37000a          bnone   a0, a3, 0x40001e30
+40001e25:       1bc1            addi.n  a12, a1, 1
+40001e27:       3c06            movi.n  a6, 48
+40001e29:       624100          s8i     a6, a1, 0
+40001e2c:       c61100          j       0x40001e77
+40001e2f:       00
 
+40001e30:       cd01            mov.n   a12, a1
+40001e32:       42611b          s32i    a4, a1, 108
+40001e35:       626114          s32i    a6, a1, 80
+40001e38:       407f31          srai    a7, a4, 31
+40001e3b:       72611a          s32i    a7, a1, 104
+40001e3e:       3d0f            mov.n   a3, a15
+40001e40:       2d0e            mov.n   a2, a14
+40001e42:       52211a          l32i    a5, a1, 104
+40001e45:       42211b          l32i    a4, a1, 108
+40001e48:       45920b          call0   0x4000d770
+40001e4b:       3d0f            mov.n   a3, a15
+40001e4d:       52211a          l32i    a5, a1, 104
+40001e50:       922114          l32i    a9, a1, 80
+40001e53:       42211b          l32i    a4, a1, 108
+40001e56:       2a99            add.n   a9, a9, a2
+40001e58:       920900          l8ui    a9, a9, 0
+40001e5b:       2d0e            mov.n   a2, a14
+40001e5d:       924c00          s8i     a9, a12, 0
+40001e60:       1bcc            addi.n  a12, a12, 1
+40001e62:       c54a0b          call0   0x4000d310
+40001e65:       ed02            mov.n   a14, a2
+40001e67:       fd03            mov.n   a15, a3
+40001e69:       0c10            movi.n  a0, 1
+40001e6b:       303093          movnez  a3, a0, a3
+40001e6e:       202093          movnez  a2, a0, a2
+40001e71:       30a220          or      a10, a2, a3
+40001e74:       566afc          bnez    a10, 0x40001e3e
+40001e77:       0d01            mov.n   a0, a1
+40001e79:       171c47          beq     a12, a1, 0x40001ec4
+40001e7c:       102cc0          sub     a2, a12, a1
+40001e7f:       204141          srli    a4, a2, 1
+40001e82:       07620a          bbci    a2, 0, 0x40001e90
+40001e85:       0bcc            addi.n  a12, a12, -1
+40001e87:       320c00          l8ui    a3, a12, 0
+40001e8a:       324d00          s8i     a3, a13, 0
+40001e8d:       d2cd01          addi    a13, a13, 1
+40001e90:       e22118          l32i    a14, a1, 96
+40001e93:       f22119          l32i    a15, a1, 100
+40001e96:       0c07            movi.n  a7, 0
+40001e98:       9c44            beqz.n  a4, 0x40001eb0
+40001e9a:       0b6c            addi.n  a6, a12, -1
+40001e9c:       620600          l8ui    a6, a6, 0
+40001e9f:       c2ccfe          addi    a12, a12, -2
+40001ea2:       520c00          l8ui    a5, a12, 0
+40001ea5:       624d00          s8i     a6, a13, 0
+40001ea8:       524d01          s8i     a5, a13, 1
+40001eab:       2bdd            addi.n  a13, a13, 2
+40001ead:       c730e9          bltu    a0, a12, 0x40001e9a
+40001eb0:       022115          l32i    a0, a1, 84
+40001eb3:       c22116          l32i    a12, a1, 88
+40001eb6:       724d00          s8i     a7, a13, 0
+40001eb9:       32a080          movi    a3, 128
+40001ebc:       d22117          l32i    a13, a1, 92
+40001ebf:       3a11            add.n   a1, a1, a3
+40001ec1:       0df0            ret.n
+
+40001ec3:       00
+40001ec4:       0c02            movi.n  a2, 0
+40001ec6:       022115          l32i    a0, a1, 84
+40001ec9:       c22116          l32i    a12, a1, 88
+40001ecc:       e22118          l32i    a14, a1, 96
+40001ecf:       f22119          l32i    a15, a1, 100
+40001ed2:       0c08            movi.n  a8, 0
+40001ed4:       32a080          movi    a3, 128
+40001ed7:       824d00          s8i     a8, a13, 0
+40001eda:       d22117          l32i    a13, a1, 92
+40001edd:       3a11            add.n   a1, a1, a3
+40001edf:       0df0            ret.n
+40001ee1:       000000
 
 40001ee4:	3fffc890	; l32r
 40001ee8:	3fffc970	; l32r
-40001eec:1eff			unknown	; (not disassembled)
+40001eec:       3fffcac0
+40001ef0:       3fffd870	; l32r
+40001ef4:       3fffd848
+40001ef8:       3fffd85c
+40001efc:       3fffd83c
 
   ets_vprintf:
 40001f00:	72a090        	movi	a7, 144
@@ -3702,8 +3822,23 @@
 4000200a:	f730e3        	bltu	a0, a15, 0x40001ff1
 4000200d:	46e9ff        	j	0x40001fb6
 
-40002010:2033			unknown	; (not disassembled)
+; referenced in table way down below ...
+  xsub_2010
+40002010:       0c1a            movi.n  a10, 1
+40002012:       16e92f          beqz    a9, 40002314
+40002015:       1c87            movi.n  a7, 24
+40002017:       82211a          l32i    a8, a1, 104
+4000201a:       7c82            movi.n  a2, -8
+4000201c:       7b08            addi.n  a0, a8, 7
+4000201e:       200010          and     a0, a0, a2
+40002021:       8b80            addi.n  a8, a0, 8
+40002023:       82611a          s32i    a8, a1, 104
+40002026:       87a702          bge     a7, a8, 4000202c
+40002029:       464b00          j       4000215a
 
+4000202c:       022111          l32i    a0, a1, 68
+4000202f:       064d00          j       40002167
+40002032:       0000
 
 40002034:	626120        	s32i	a6, a1, 128
 40002037:	2c52      	movi.n	a2, 37
@@ -3716,7 +3851,57 @@
 40002044:	2bcc      	addi.n	a12, a12, 2
 40002046:	461f00        	j	0x400020c7
 
-40002049:20c6			unknown	; (not disassembled)
+; unreferenced block follows:
+; referenced in table way down below ...
+
+  xsub_2049
+40002049:       dd06            mov.n   a13, a6
+4000204b:       16d635          beqz    a6, 400023ac
+4000204e:       0bf6            addi.n  a15, a6, -1
+40002050:       a61f70          blti    a15, 1, 400020c4
+40002053:       9d01            mov.n   a9, a1
+40002055:       0c00            movi.n  a0, 0
+40002057:       0c1a            movi.n  a10, 1
+40002059:       076f1c          bbci    a15, 0, 40002079
+4000205c:       1b91            addi.n  a9, a1, 1
+4000205e:       3c14            movi.n  a4, 49
+40002060:       2ce3            movi.n  a3, 46
+40002062:       72211d          l32i    a7, a1, 116
+40002065:       000040          ssr     a0
+40002068:       52211e          l32i    a5, a1, 120
+4000206b:       0d0a            mov.n   a0, a10
+4000206d:       705581          src     a5, a5, a7
+40002070:       505004          extui   a5, a5, 0, 1
+40002073:       503493          movnez  a3, a4, a5
+40002076:       324100          s8i     a3, a1, 0
+40002079:       f08121          srai    a8, a15, 1
+4000207c:       164804          beqz    a8, 400020c4
+4000207f:       2ce7            movi.n  a7, 46
+40002081:       1b50            addi.n  a5, a0, 1
+40002083:       b2c0e0          addi    a11, a0, -32
+40002086:       42211d          l32i    a4, a1, 116
+40002089:       22211e          l32i    a2, a1, 120
+4000208c:       000040          ssr     a0
+4000208f:       20a0b1          sra     a10, a2
+40002092:       408281          src     a8, a2, a4
+40002095:       b08ab3          movgez  a8, a10, a11
+40002098:       000540          ssr     a5
+4000209b:       ad07            mov.n   a10, a7
+4000209d:       2030b1          sra     a3, a2
+400020a0:       808004          extui   a8, a8, 0, 1
+400020a3:       402281          src     a2, a2, a4
+400020a6:       3c1b            movi.n  a11, 49
+400020a8:       42c0e1          addi    a4, a0, -31
+400020ab:       2b00            addi.n  a0, a0, 2
+400020ad:       807b93          movnez  a7, a11, a8
+400020b0:       4023b3          movgez  a2, a3, a4
+400020b3:       202004          extui   a2, a2, 0, 1
+400020b6:       724900          s8i     a7, a9, 0
+400020b9:       20ab93          movnez  a10, a11, a2
+400020bc:       a24901          s8i     a10, a9, 1
+400020bf:       2b99            addi.n  a9, a9, 2
+400020c1:       079fba          bne     a15, a0, 4000207f
+400020c4:       12611f          s32i    a1, a1, 124
 400020c7:	d26119        	s32i	a13, a1, 100
 400020ca:	22211b        	l32i	a2, a1, 108
 400020cd:	022110        	l32i	a0, a1, 64
@@ -3775,11 +3960,56 @@
 40002152:	c22115        	l32i	a12, a1, 84
 40002155:	3a11      	add.n	a1, a1, a3
 40002157:	0df0      	ret.n
-40002159:21cb			unknown	; (not disassembled)
+40002159:       00
 
+; jumped to from above
+  xsub_215a:
+4000215a:       1c8b            movi.n  a11, 24
+4000215c:       072b04          blt     a11, a0, 40002164
+4000215f:       2c80            movi.n  a0, 40
+40002161:       02611a          s32i    a0, a1, 104
+40002164:       022112          l32i    a0, a1, 72
+40002167:       22211a          l32i    a2, a1, 104
+4000216a:       0a22            add.n   a2, a2, a0
+4000216c:       22d2ff          addmi   a2, a2, 0xffffff00
+4000216f:       32223f          l32i    a3, a2, 252
+40002172:       32611e          s32i    a3, a1, 120
+40002175:       22223e          l32i    a2, a2, 248
+40002178:       22611d          s32i    a2, a1, 116
+4000217b:       32cf9c          addi    a3, a15, -100
+4000217e:       162314          beqz    a3, 400022c4
+40002181:       42cfbc          addi    a4, a15, -68
+40002184:       16c413          beqz    a4, 400022c4
+40002187:       0c05            movi.n  a5, 0
+40002189:       82211d          l32i    a8, a1, 116
+4000218c:       82611d          s32i    a8, a1, 116
+4000218f:       52611e          s32i    a5, a1, 120
+40002192:       0c0b            movi.n  a11, 0
+40002194:       b26110          s32i    a11, a1, 64
+40002197:       c690ff          j       40001fde
+4000219a:       0000
 
+; referenced in table way down below ...
+4000219c:       626120          s32i    a6, a1, 128
+4000219f:       3c02            movi.n  a2, 48
+400021a1:       c00e00          callx0  a14
+400021a4:       22a078          movi    a2, 120
+400021a7:       c00e00          callx0  a14
+400021aa:       0c86            movi.n  a6, 8
+400021ac:       0c10            movi.n  a0, 1
+400021ae:       02611b          s32i    a0, a1, 108
+400021b1:       3c52            movi.n  a2, 53
+400021b3:       02cfbc          addi    a0, a15, -68
+400021b6:       273002          bltu    a0, a2, 400021bc
+400021b9:       c6c1ff          j       400020c4
+400021bc:       314cff          l32r    a3, 40001eec    ; ( 3fffcac0 )
+400021bf:       3030a0          addx4   a3, a0, a3
+400021c2:       3803            l32i.n  a3, a3, 0
+400021c4:       626120          s32i    a6, a1, 128
+400021c7:       a00300          jx      a3              ; indirect jump
+400021ca:       0000
 
-
+; branched to from above
 400021cc:	522113        	l32i	a5, a1, 76
 400021cf:	f20500        	l8ui	a15, a5, 0
 400021d2:	1b55      	addi.n	a5, a5, 1
@@ -3823,41 +4053,199 @@
 40002228:	063500        	j	0x40002300
 4000222b:	4663ff        	j	0x40001fbc
 
-4000222e:22f7			unknown	; (not disassembled)
+  xsub_222e:
+4000222e:       f2211a          l32i    a15, a1, 104
+40002231:       1c8d            movi.n  a13, 24
+40002233:       0d0f            mov.n   a0, a15
+40002235:       4bff            addi.n  a15, a15, 4
+40002237:       f2611a          s32i    a15, a1, 104
+4000223a:       f72d2c          blt     a13, a15, 4000226a
+4000223d:       022111          l32i    a0, a1, 68
+40002240:       c60c00          j       40002277
 
+40002243:       626120          s32i    a6, a1, 128
+40002246:       32211a          l32i    a3, a1, 104
+40002249:       1c82            movi.n  a2, 24
+4000224b:       0d03            mov.n   a0, a3
+4000224d:       4b33            addi.n  a3, a3, 4
+4000224f:       32611a          s32i    a3, a1, 104
+40002252:       372250          blt     a2, a3, 400022a6
+40002255:       022111          l32i    a0, a1, 68
+40002258:       c61500          j       400022b3
+4000225b:       00
 
+4000225c:       626120          s32i    a6, a1, 128
+4000225f:       2c52            movi.n  a2, 37
+40002261:       c00e00          callx0  a14
+40002264:       622120          l32i    a6, a1, 128
+40002267:       0697ff          j       400020c7
 
+4000226a:       1c84            movi.n  a4, 24
+4000226c:       072404          blt     a4, a0, 40002274
+4000226f:       2c45            movi.n  a5, 36
+40002271:       52611a          s32i    a5, a1, 104
+40002274:       022112          l32i    a0, a1, 72
+40002277:       72211a          l32i    a7, a1, 104
+4000227a:       811dff          l32r    a8, [0x3fffd870]        ; 0x40001ef0
+4000227d:       0a77            add.n   a7, a7, a0
+4000227f:       72d7ff          addmi   a7, a7, 0xffffff00
+40002282:       72273f          l32i    a7, a7, 252
+40002285:       707883          moveqz  a7, a8, a7
+40002288:       72611f          s32i    a7, a1, 124
+4000228b:       720700          l8ui    a7, a7, 0
+4000228e:       160718          beqz    a7, 40002412
+40002291:       02211f          l32i    a0, a1, 124
+40002294:       0c0d            movi.n  a13, 0
+40002296:       1bdd            addi.n  a13, a13, 1
+40002298:       820001          l8ui    a8, a0, 1
+4000229b:       1b00            addi.n  a0, a0, 1
+4000229d:       5658ff          bnez    a8, 40002296
+400022a0:       c688ff          j       400020c7
+400022a3:       000000
 
+400022a6:       1c89            movi.n  a9, 24
+400022a8:       072904          blt     a9, a0, 400022b0
+400022ab:       2c4a            movi.n  a10, 36
+400022ad:       a2611a          s32i    a10, a1, 104
+400022b0:       022112          l32i    a0, a1, 72
+400022b3:       22211a          l32i    a2, a1, 104
+400022b6:       0a22            add.n   a2, a2, a0
+400022b8:       22d2ff          addmi   a2, a2, 0xffffff00
+400022bb:       2202fc          l8ui    a2, a2, 252
+400022be:       c00e00          callx0  a14
+400022c1:       4620ff          j       40001f46
 
+400022c4:       22211d          l32i    a2, a1, 116
+400022c7:       0c0a            movi.n  a10, 0
+400022c9:       32211e          l32i    a3, a1, 120
+400022cc:       0c00            movi.n  a0, 0
+400022ce:       e61302          bgei    a3, 1, 400022d4
+400022d1:       c63800          j       400023b8
 
+400022d4:       16a0eb          beqz    a0, 40002192
+400022d7:       52211d          l32i    a5, a1, 116
+400022da:       7cfb            movi.n  a11, -1
+400022dc:       82211e          l32i    a8, a1, 120
+400022df:       2cd4            movi.n  a4, 45
+400022e1:       426110          s32i    a4, a1, 64
+400022e4:       b08830          xor     a8, a8, a11
+400022e7:       507060          neg     a7, a5
+400022ea:       72611d          s32i    a7, a1, 116
+400022ed:       1ba8            addi.n  a10, a8, 1
+400022ef:       508a83          moveqz  a8, a10, a5
+400022f2:       82611e          s32i    a8, a1, 120
+400022f5:       4639ff          j       40001fde
 
 400022f8:	3c90      	movi.n	a0, 57
-400022fa:	f7b002        	bgeu	a0, a15, 0x40002300
+400022fa:	f7b002        	bgeu	a0, a15, 40002300
 400022fd:	c62eff        	j	0x40001fbc
 40002300:	322113        	l32i	a3, a1, 76
 40002303:	2cf2      	movi.n	a2, 47
 40002305:	f20300        	l8ui	a15, a3, 0
 40002308:	1b33      	addi.n	a3, a3, 1
 4000230a:	326113        	s32i	a3, a1, 76
-4000230d:	f732e7        	bltu	a2, a15, 0x400022f8
+4000230d:	f732e7        	bltu	a2, a15, 400022f8
 40002310:	062aff        	j	0x40001fbc
-40002313:239b			unknown	; (not disassembled)
+40002313:       00
 
+  xsub_2314:
+40002314:       168a0a          beqz    a10, 400023c0
+40002317:       52211a          l32i    a5, a1, 104
+4000231a:       1c84            movi.n  a4, 24
+4000231c:       0d05            mov.n   a0, a5
+4000231e:       4b55            addi.n  a5, a5, 4
+40002320:       52611a          s32i    a5, a1, 104
+40002323:       572407          blt     a4, a5, 4000232e
+40002326:       022111          l32i    a0, a1, 68
+40002329:       860300          j       4000233b
+4000232c:       0000
 
+4000232e:       1c87            movi.n  a7, 24
+40002330:       072704          blt     a7, a0, 40002338
+40002333:       2c48            movi.n  a8, 36
+40002335:       82611a          s32i    a8, a1, 104
+40002338:       022112          l32i    a0, a1, 72
+4000233b:       a2211a          l32i    a10, a1, 104
+4000233e:       0aaa            add.n   a10, a10, a0
+40002340:       a2daff          addmi   a10, a10, 0xffffff00
+40002343:       a22a3f          l32i    a10, a10, 252
+40002346:       a2611d          s32i    a10, a1, 116
+40002349:       a0af31          srai    a10, a10, 31
+4000234c:       a2611e          s32i    a10, a1, 120
+4000234f:       068aff          j       4000217b
+40002352:       0000
 
+  xsub_2354:
+40002354:       32211e          l32i    a3, a1, 120
+40002357:       22211d          l32i    a2, a1, 116
+4000235a:       4d01            mov.n   a4, a1
+4000235c:       1c05            movi.n  a5, 16
+4000235e:       61e5fe          l32r    a6, [0x3fffd848]        ; 0x40001ef4
+40002361:       45a9ff          call0   40001df8		; sub_1df8
+40002364:       622120          l32i    a6, a1, 128
+40002367:       dd02            mov.n   a13, a2
+40002369:       c655ff          j       400020c4
 
+4000236c:       32211e          l32i    a3, a1, 120
+4000236f:       22211d          l32i    a2, a1, 116
+40002372:       4d01            mov.n   a4, a1
+40002374:       1c05            movi.n  a5, 16
+40002376:       61e0fe          l32r    a6, [0x3fffd85c]        ; 0x40001ef8
+40002379:       c5a7ff          call0   40001df8		; sub_1df8
+4000237c:       622120          l32i    a6, a1, 128
+4000237f:       dd02            mov.n   a13, a2
+40002381:       c64fff          j       400020c4
 
+40002384:       32211e          l32i    a3, a1, 120
+40002387:       22211d          l32i    a2, a1, 116
+4000238a:       4d01            mov.n   a4, a1
+4000238c:       0ca5            movi.n  a5, 10
+4000238e:       61dbfe          l32r    a6, [0x3fffd83c]        ; 0x40001efc
+40002391:       45a6ff          call0   40001df8		; sub_1df8
+40002394:       622120          l32i    a6, a1, 128
+40002397:       dd02            mov.n   a13, a2
+40002399:       c649ff          j       400020c4
 
 4000239c:	f20500        	l8ui	a15, a5, 0
 4000239f:	0c19      	movi.n	a9, 1
 400023a1:	1bb5      	addi.n	a11, a5, 1
 400023a3:	b26113        	s32i	a11, a1, 76
 400023a6:	468dff        	j	0x400021df
-400023a9:23f9			unknown	; (not disassembled)
+400023a9:       000000
 
+400023ac:       168906          beqz    a9, 40002418
+400023af:       3cff            movi.n  a15, 63
+400023b1:       4c0d            movi.n  a13, 64
+400023b3:       0627ff          j       40002053
+400023b6:       0000
 
+400023b8:       164306          beqz    a3, 40002420
+400023bb:       0c10            movi.n  a0, 1
+400023bd:       c6c4ff          j       400022d4
 
+400023c0:       52211a          l32i    a5, a1, 104
+400023c3:       1c84            movi.n  a4, 24
+400023c5:       0d05            mov.n   a0, a5
+400023c7:       4b55            addi.n  a5, a5, 4
+400023c9:       52611a          s32i    a5, a1, 104
+400023cc:       572406          blt     a4, a5, 400023d6
+400023cf:       022111          l32i    a0, a1, 68
+400023d2:       460300          j       400023e3
+400023d5:       00
 
+400023d6:       1c87            movi.n  a7, 24
+400023d8:       072704          blt     a7, a0, 400023e0
+400023db:       2c48            movi.n  a8, 36
+400023dd:       82611a          s32i    a8, a1, 104
+400023e0:       022112          l32i    a0, a1, 72
+400023e3:       a2211a          l32i    a10, a1, 104
+400023e6:       0aaa            add.n   a10, a10, a0
+400023e8:       a2daff          addmi   a10, a10, 0xffffff00
+400023eb:       a22a3f          l32i    a10, a10, 252
+400023ee:       a2611d          s32i    a10, a1, 116
+400023f1:       a0af31          srai    a10, a10, 31
+400023f4:       a2611e          s32i    a10, a1, 120
+400023f7:       0660ff          j       4000217b
 
 400023fa:	0c02      	movi.n	a2, 0
 400023fc:	c22115        	l32i	a12, a1, 84
@@ -3869,9 +4257,19 @@
 4000240e:	3a11      	add.n	a1, a1, a3
 40002410:	0df0      	ret.n
 
-40002412:242b			unknown	; (not disassembled)
+40002412:       0c0d            movi.n  a13, 0
+40002414:       c62bff          j       400020c7
+40002417:       00
 
+40002418:       1cff            movi.n  a15, 31
+4000241a:       2c0d            movi.n  a13, 32
+4000241c:       c60cff          j       40002053
+4000241f:       00
 
+40002420:       a73202          bltu    a2, a10, 40002426
+40002423:       46abff          j       400022d4
+40002426:       46e4ff          j       400023bb
+40002429:       000000
 
 ; ** End of ets_vprintf
 
@@ -3887,7 +4285,7 @@
 40002434:	40001dcc	; l32r
 
   ets_install_uart_printf:
-40002438:	21ffff        	l32r	a2, [0x40001dcc]	; 0x40002434
+40002438:	21ffff        	l32r	a2, [0x40001dcc]	; 0x40002434 -- xsub_1dcc
 4000243b:	12c1f0        	addi	a1, a1, -16
 4000243e:	026100        	s32i	a0, a1, 0
 40002441:	85feff        	call0	0x4000242c
@@ -3940,10 +4338,23 @@
 4000249f:	0c02      	movi.n	a2, 0
 400024a1:	22530e        	s16i	a2, a3, 28
 400024a4:	0df0      	ret.n
-400024a6:24c3			unknown	; (not disassembled)
+400024a6:       0000
 
 ; subroutine, installed as "putc2" just above.
 
+400024a8:       6102fe          l32r    a6, [0x3fffdd3c]        ; 0x40001cb0
+400024ab:       42160e          l16ui   a4, a6, 28
+400024ae:       3886            l32i.n  a3, a6, 32
+400024b0:       8cc4            beqz.n  a4, 0x400024c0
+400024b2:       224300          s8i     a2, a3, 0
+400024b5:       0b54            addi.n  a5, a4, -1
+400024b7:       1b33            addi.n  a3, a3, 1
+400024b9:       52560e          s16i    a5, a6, 28
+400024bc:       3986            s32i.n  a3, a6, 32
+400024be:       0df0            ret.n
+
+400024c0:       0df0            ret.n
+400024c2:       0000
 
 400024c4:	3fffdd5c	; l32r
 400024c8:	40001da0	; l32r
@@ -4024,7 +4435,7 @@
 40002560:	0c40      	movi.n	a0, 4
 40002562:	5d08      	mov.n	a5, a8
 40002564:	4d08      	mov.n	a4, a8
-40002566:	21b3ff        	l32r	a2, [0x40001dcc]	; 0x40002434
+40002566:	21b3ff        	l32r	a2, [0x40001dcc]	; 0x40002434 -- xsub_1dcc
 40002569:	0921      	s32i.n	a0, a1, 8
 4000256b:	6d00      	mov.n	a6, a0
 4000256d:	0599ff        	call0	0x40001f00
@@ -5106,22 +5517,22 @@
 
 
 40002e58:	40002e24	; l32r
-40002e5c:	3feffe00	; l32r		; Poochie
+40002e5c:	3feffe00	; l32r	--- Poochie
 40002e60:	40002e3c	; l32r
 40002e64:	3fffddc0	; l32r
 
   ets_timer_init:
-40002e68:	22a00a        	movi	a2, 10		; a2 = 10
+40002e68:	22a00a        	movi	a2, 10			; a2 = 10
 40002e6b:	12c1f0        	addi	a1, a1, -16		; stack
 40002e6e:	31faff        	l32r	a3, [0x40002e24]	; 0x40002e58
 40002e71:	026100        	s32i	a0, a1, 0		; return
 40002e74:	0179ff        	l32r	a0, [0x3fffddb0]	; 0x40002c58
-40002e77:	42a000        	movi	a4, 0		; a4 = 0
+40002e77:	42a000        	movi	a4, 0			; a4 = 0
 40002e7a:	4900      	s32i.n	a4, a0, 0		; 0 --> 3fffddb0
 40002e7c:	8510fe        	call0	0x40000f88
 
 ; Enable TIMER_FRC2 interrupt
-40002e7f:	0c44      	movi.n	a4, 4		; a4 = 4
+40002e7f:	0c44      	movi.n	a4, 4			; a4 = 4
 40002e81:	31f6ff        	l32r	a3, [0x3feffe00]	; 0x40002e5c -- 	Poochie
 40002e84:	c02000        	memw
 40002e87:	222381        	l32i	a2, a3, 0x204		; INTC_EDGE_EN
@@ -5134,16 +5545,16 @@
 40002e98:	c510fe        	call0	0x40000fa8
 
 40002e9b:	21f1ff        	l32r	a2, [0x40002e3c]	; 0x40002e60
-40002e9e:	1cf3      	movi.n	a3, 31		; a3 = 31
+40002e9e:	1cf3      	movi.n	a3, 31			; a3 = 31
 40002ea0:	41f1ff        	l32r	a4, [0x3fffddc0]	; 0x40002e64
-40002ea3:	0c45      	movi.n	a5, 4		; a5 = 4
+40002ea3:	0c45      	movi.n	a5, 4			; a5 = 4
 40002ea5:	85f2fd        	call0	0x40000dd0
 
 40002ea8:	61adf8        	l32r	a6, [0x60000600]	; 0x4000115c
 40002eab:	c02000        	memw
-40002eae:	0c05      	movi.n	a5, 0		; a5 = 0;
+40002eae:	0c05      	movi.n	a5, 0			; a5 = 0;
 40002eb0:	59c6      	s32i.n	a5, a6, 48		; 0 --> 600000630
-40002eb2:	72a088        	movi	a7, 136		; a7 = 136
+40002eb2:	72a088        	movi	a7, 136			; a7 = 136
 40002eb5:	c02000        	memw
 40002eb8:	79a6      	s32i.n	a7, a6, 40		; 136 --> 60000628
 40002eba:	c02000        	memw
@@ -5240,26 +5651,50 @@
 ; +314 = 60000914 = WD_FEED
 ; +318 = 60000918 = WD_z
 
-40002f30:	3fffc708	; l32r		; wdt_info
+40002f30:	3fffc708	; l32r	-- wdt_info
 
   ets_wdt_get_mode:
-40002f34:	21ffff        	l32r	a2, [0x3fffc708]	; 0x40002f30 -- 	wdt_info
+40002f34:	21ffff        	l32r	a2, [0x3fffc708]	; 0x40002f30 -- wdt_info
 40002f37:	2802      	l32i.n	a2, a2, 0		; return wdt_info.mode
 40002f39:	0df0      	ret.n
-40002f3b:2f97			unknown	; (not disassembled)
+40002f3b:       00
 
 ; called from wrapper below, used as an ISR.
 ; wdt_xxx ( arg )
 
   sub_2f3c:
+40002f3c:       12c1f0          addi    a1, a1, -16
+40002f3f:       0901            s32i.n  a0, a1, 0
+40002f41:       05ffff          call0   0x40002f34		; ets_wdt_get_mode
+40002f44:       42a073          movi    a4, 115			; 0x73
+40002f47:       0185f8          l32r    a0, [0x60000600]        ; 0x4000115c - iobase
+40002f4a:       261212          beqi    a2, 1, 0x40002f60	; arg == 1
+40002f4d:       662208          bnei    a2, 2, 0x40002f59	; arg != 2
 
+40002f50:       c02000          memw				; arg == 0 ??
+40002f53:       2220c4          l32i    a2, a0, 0x310		; WD_y
+40002f56:       26121a          beqi    a2, 1, 0x40002f74
 
-; arg == 0 ??
+40002f59:       0801            l32i.n  a0, a1, 0		; return
+40002f5b:       12c110          addi    a1, a1, 16
+40002f5e:       0df0            ret.n
 
+40002f60:       c02000          memw				; arg == 1
+40002f63:       4260c5          s32i    a4, a0, 0x314		; WD_FEED = 0x73
+40002f66:       c02000          memw
+40002f69:       3220c4          l32i    a3, a0, 0x310		; WD_y
+40002f6c:       0801            l32i.n  a0, a1, 0
+40002f6e:       12c110          addi    a1, a1, 16
+40002f71:       0df0            ret.n
+40002f73:       00
 
-; arg == 1
-
-; here when WD_y == 1
+40002f74:       c02000          memw				; here when WD_y == 1
+40002f77:       4260c6          s32i    a4, a0, 0x318		; WD_z = 0x73
+40002f7a:       c02000          memw
+40002f7d:       4260c5          s32i    a4, a0, 0x314		; WD_FEED = 0x73
+40002f80:       0801            l32i.n  a0, a1, 0
+40002f82:       12c110          addi    a1, a1, 16
+40002f85:       0df0            ret.n
 
 ; wdt_isr ()
 ;   subroutine, wrapper on above
@@ -5269,11 +5704,18 @@
 ;
 ; Note that the WDT interrupt is 8 ( with mask 0x100 )
 
+40002f88:       12c1f0          addi    a1, a1, -16
+40002f8b:       0901            s32i.n  a0, a1, 0
+40002f8d:       c5faff          call0   40002f3c <sub_2f3c>
+40002f90:       0801            l32i.n  a0, a1, 0
+40002f92:       12c110          addi    a1, a1, 16
+40002f95:       0df0            ret.n
+40002f97:       00
 
 ; wdt_timer is a pointer to a 20 byte timer management structure
 
-40002f98:	40002f88	; l32r		; wdt_isr ()
-40002f9c:	3fffdde0	; l32r		; wdt_timer
+40002f98:       40002f88        ; l32r -- wdt_isr ()
+40002f9c:       3fffdde0        ; l32r -- wdt_timer
 
 ; ets_wdt_enable ( mode, y, z )
 
@@ -5501,7 +5943,7 @@
 4000315f:	4174ff        	l32r	a4, [0x3fffc708]	; 0x40002f30 --   wdt_info
 40003162:	3814      	l32i.n	a3, a4, 4		; Y
 40003164:	4824      	l32i.n	a4, a4, 8		; Z
-40003166:	85e3ff        	call0	0x40002fa0
+40003166:	85e3ff        	call0	0x40002fa0		; ets_wdt_enable
 40003169:	0801      	l32i.n	a0, a1, 0		; restore
 4000316b:	12c110        	addi	a1, a1, 16		; restore
 4000316e:	0df0      	ret.n
@@ -7528,14 +7970,14 @@
 400042b1:	e931      	s32i.n	a14, a1, 12		; save a14
 400042b3:	c911      	s32i.n	a12, a1, 4		; save a12
 400042b5:	0901      	s32i.n	a0, a1, 0		; return
-400042b7:	cd04      	mov.n	a12, a4		; - target buffer
+400042b7:	cd04      	mov.n	a12, a4			; - target buffer
 400042b9:	0812      	l32i.n	a0, a2, 4		; flashchip->chip_size
 400042bb:	3a45      	add.n	a4, a5, a3		; a4 = a3 + a5 (offset+count)
 400042bd:	47b011        	bgeu	a0, a4, 0x400042d2
 
 ; trouble (end of read is beyond end of device)
 
-400042c0:	0c12      	movi.n	a2, 1		; a2 = 1
+400042c0:	0c12      	movi.n	a2, 1			; a2 = 1
 400042c2:	c811      	l32i.n	a12, a1, 4		; restore
 400042c4:	d821      	l32i.n	a13, a1, 8		; restore
 400042c6:	e831      	l32i.n	a14, a1, 12		; restore
@@ -7549,13 +7991,13 @@
 400042d2:	30e320        	or	a14, a3, a3
 400042d5:	50d520        	or	a13, a5, a5
 400042d8:	051b00        	call0	0x4000448c
-400042db:	e61d02        	bgei	a13, 1, 0x400042e1		; byte_count >= 1
+400042db:	e61d02        	bgei	a13, 1, 0x400042e1	; byte_count >= 1
 400042de:	863400        	j	0x400043b4		; goto return 0
 
-400042e1:	0138f3        	l32r	a0, [0x60000200]	; 0x40000fc4		; 60000200 -- spi base
+400042e1:	0138f3        	l32r	a0, [0x60000200]	; 0x40000fc4 (spibase)
 400042e4:	51a2ff        	l32r	a5, [0x20000000]	; 0x4000416c
 400042e7:	412ff0        	l32r	a4, [0x80000000]	; 0x400003a4
-400042ea:	e6cd76        	bgei	a13, 32, 0x40004364		; byte_count >= 32
+400042ea:	e6cd76        	bgei	a13, 32, 0x40004364	; byte_count >= 32
 
 ; apparently (todo: confirm this) SPI_W array is split into 2 groups of 8
 ; probably by SPI_USR_MOSI_HIGHPART as SPIRead uses 0..7 for reading, thus
@@ -7567,12 +8009,12 @@
 400042f6:	726001        	s32i	a7, a0, 4		; SPI_ADDR = byte_count << 24 | offset_in_flash
 400042f9:	c02000        	memw
 400042fc:	4900      	s32i.n	a4, a0, 0		; SPI_CMD = SPI_FLASH_READ
-400042fe:	c02000        	memw		;;
-40004301:	6800      	l32i.n	a6, a0, 0		;;
+400042fe:	c02000        	memw
+40004301:	6800      	l32i.n	a6, a0, 0
 40004303:	8c66      	beqz.n	a6, 0x4000430d		;; while (SPI_CMD != 0) /* wait */;
-40004305:	c02000        	memw		;;
-40004308:	8800      	l32i.n	a8, a0, 0		;;
-4000430a:	5678ff        	bnez	a8, 0x40004305		;;
+40004305:	c02000        	memw
+40004308:	8800      	l32i.n	a8, a0, 0
+4000430a:	5678ff        	bnez	a8, 0x40004305
 
 ; note that in _this_ block it reads 1 to 31 bytes, so all those count/index maskings are meaningless
 ; they were probably defined as uint8_t, so compiler inserted those extui to ensure they are bytes
@@ -7584,13 +8026,13 @@
 40004318:	703074        	extui	a3, a7, 0, 8
 4000431b:	165309        	beqz	a3, 0x400043b4		; if done, then goto return 0
 
-4000431e:	0c02      	movi.n	a2, 0		; i = 0
+4000431e:	0c02      	movi.n	a2, 0		`	; i = 0
 
 ; the block below looks like a manual loop unrolling to make it copy from 2 SPI_W registers at a time
 
-40004320:	07670c        	bbci	a7, 0, 0x40004330		; even uin32_count?
+40004320:	07670c        	bbci	a7, 0, 0x40004330	; even uin32_count?
 40004323:	c02000        	memw
-40004326:	0c12      	movi.n	a2, 1		; i = 1
+40004326:	0c12      	movi.n	a2, 1			; i = 1
 40004328:	b22010        	l32i	a11, a0, 64		; *SPI_W
 4000432b:	b26c00        	s32i	a11, a12, 0		; *uint32_buf = *SPI_W
 4000432e:	4bcc      	addi.n	a12, a12, 4		; ++uint32_buf
@@ -7614,11 +8056,11 @@
 40004352:	622610        	l32i	a6, a6, 64		; *spi_w
 40004355:	6907      	s32i.n	a6, a7, 0		; *buf_next_uint32 = *spi_w
 40004357:	202074        	extui	a2, a2, 0, 8
-4000435a:	2793d8        	bne	a3, a2, 0x40004336		; while (i != uin32_count)
+4000435a:	2793d8        	bne	a3, a2, 0x40004336	; while (i != uin32_count)
 4000435d:	c61400        	j	0x400043b4		; goto return 0
 40004360:	00
 
-40004361:	a6cd88        	blti	a13, 32, 0x400042ed		; if (byte_count < 32)
+40004361:	a6cd88        	blti	a13, 32, 0x400042ed	; if (byte_count < 32)
 
 ; the loop below reads 32 bytes at a time
 ; and as in the loop above (that reads the tail) extui are likely just leftovers from uint8_t declarations
@@ -7628,15 +8070,15 @@
 4000436a:	8910      	s32i.n	a8, a0, 4		; SPI_ADDR = offset_in_flash | 32 << 24
 4000436c:	c02000        	memw
 4000436f:	4900      	s32i.n	a4, a0, 0		; SPI_CMD = SPI_FLASH_READ
-40004371:	c02000        	memw		;;
+40004371:	c02000        	memw
 40004374:	7800      	l32i.n	a7, a0, 0		;; while (SPI_CMD != 0) /* wait */;
-40004376:	8c87      	beqz.n	a7, 0x40004382		;;
-40004378:	c02000        	memw		;;
-4000437b:	9800      	l32i.n	a9, a0, 0		;;
-4000437d:	3df0      	nop.n		;;
-4000437f:	5659ff        	bnez	a9, 0x40004378		;;
+40004376:	8c87      	beqz.n	a7, 0x40004382
+40004378:	c02000        	memw
+4000437b:	9800      	l32i.n	a9, a0, 0
+4000437d:	3df0      	nop.n
+4000437f:	5659ff        	bnez	a9, 0x40004378
 
-40004382:	0c02      	movi.n	a2, 0		; i = 0
+40004382:	0c02      	movi.n	a2, 0			; i = 0
 
 40004384:	0032a0        	addx4	a3, a2, a0		; spi_base = SPI_BASE + i * 4
 40004387:	c02000        	memw
@@ -7652,11 +8094,11 @@
 400043a0:	322310        	l32i	a3, a3, 64		; *spi_w
 400043a3:	3906      	s32i.n	a3, a6, 0		; *buf_next_uint32 = *spi_w
 400043a5:	202074        	extui	a2, a2, 0, 8
-400043a8:	6682d8        	bnei	a2, 8, 0x40004384		; while (i != 8)
+400043a8:	6682d8        	bnei	a2, 8, 0x40004384	; while (i != 8)
 
 400043ab:	e2ce20        	addi	a14, a14, 32		; offset_in_flash += 32
 400043ae:	d2cde0        	addi	a13, a13, -32		; byte_count -= 32
-400043b1:	e61dac        	bgei	a13, 1, 0x40004361		; while (byte_count >= 1)
+400043b1:	e61dac        	bgei	a13, 1, 0x40004361	; while (byte_count >= 1)
 
 400043b4:	0c02      	movi.n	a2, 0
 400043b6:	c811      	l32i.n	a12, a1, 4
@@ -7727,8 +8169,8 @@
 4000443f:	d931      	s32i.n	a13, a1, 12
 40004441:	c921      	s32i.n	a12, a1, 8
 40004443:	0911      	s32i.n	a0, a1, 4		; save return
-40004445:	cd02      	mov.n	a12, a2		; SPI-param
-40004447:	0c00      	movi.n	a0, 0		; a0 = 0
+40004445:	cd02      	mov.n	a12, a2			; SPI-param
+40004447:	0c00      	movi.n	a0, 0			; a0 = 0
 40004449:	0901      	s32i.n	a0, a1, 0		; write to stack
 4000444b:	050400        	call0	0x4000448c
 
@@ -7768,20 +8210,20 @@
 40004494:	c02000        	memw
 
 40004497:	322083        	l32i	a3, a0, 0x20c		; SPI_READY
-4000449a:	976308        	bbci	a3, 9, 0x400044a6		; clear ?
+4000449a:	976308        	bbci	a3, 9, 0x400044a6	; clear ?
 4000449d:	c02000        	memw
 400044a0:	422083        	l32i	a4, a0, 0x20c		; SPI_READY
-400044a3:	97e4f6        	bbsi	a4, 9, 0x4000449d		; spin till clear
+400044a3:	97e4f6        	bbsi	a4, 9, 0x4000449d	; spin till clear
 
 400044a6:	3d01      	mov.n	a3, a1
 400044a8:	c5f1ff        	call0	0x400043c8
-400044ab:	0c06      	movi.n	a6, 0		; a6 = 0
+400044ab:	0c06      	movi.n	a6, 0			; a6 = 0
 400044ad:	5811      	l32i.n	a5, a1, 4		; fetch return
-400044af:	0c10      	movi.n	a0, 1		; a0 = 1
+400044af:	0c10      	movi.n	a0, 1			; a0 = 1
 400044b1:	12c110        	addi	a1, a1, 16		; restore stack
 400044b4:	200683        	moveqz	a0, a6, a2
-400044b7:	2d00      	mov.n	a2, a0		; a2 = a0 (return value)
-400044b9:	0d05      	mov.n	a0, a5		; restore return
+400044b7:	2d00      	mov.n	a2, a0			; a2 = a0 (return value)
+400044b9:	0d05      	mov.n	a0, a5			; restore return
 400044bb:	0df0      	ret.n
 400044bd:	000000
 
@@ -8212,7 +8654,7 @@
 ;  3fffc72c:	0000ffff	; + 20
 
   SPIUnlock:
-40004878:	21ffff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+40004878:	21ffff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 4000487b:	12c1f0        	addi	a1, a1, -16
 4000487e:	0901      	s32i.n	a0, a1, 0
 40004880:	222200        	l32i	a2, a2, 0		; deref
@@ -8223,7 +8665,7 @@
 4000488c:	12c110        	addi	a1, a1, 16
 4000488f:	0df0      	ret.n
 
-40004891:	21f8ff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+40004891:	21f8ff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 40004894:	0c03      	movi.n	a3, 0
 40004896:	222200        	l32i	a2, a2, 0		; deref
 40004899:	45b6ff        	call0	0x40004400
@@ -8234,7 +8676,7 @@
 400048a6:	0df0      	ret.n
 
   SPILock:
-400048a8:	21f3ff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+400048a8:	21f3ff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 400048ab:	12c1f0        	addi	a1, a1, -16
 400048ae:	0901      	s32i.n	a0, a1, 0
 400048b0:	222200        	l32i	a2, a2, 0		; deref
@@ -8244,7 +8686,7 @@
 400048ba:	0801      	l32i.n	a0, a1, 0
 400048bc:	12c110        	addi	a1, a1, 16
 400048bf:	0df0      	ret.n
-400048c1:	21ecff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+400048c1:	21ecff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 400048c4:	1cc3      	movi.n	a3, 28
 400048c6:	222200        	l32i	a2, a2, 0
 400048c9:	45b3ff        	call0	0x40004400
@@ -8264,7 +8706,7 @@
 400048ec:	12c1f0        	addi	a1, a1, -16
 400048ef:	0911      	s32i.n	a0, a1, 4
 400048f1:	41f9ff        	l32r	a4, [0xfe6f9fff]	; 0x400048d8
-400048f4:	51e0ff        	l32r	a5, [flashchip]	; [0x3fffc714] 0x40004874
+400048f4:	51e0ff        	l32r	a5, [flashchip]		; [0x3fffc714] 0x40004874
 400048f7:	01b3f1        	l32r	a0, [0x60000200]	; 0x40000fc4
 400048fa:	c02000        	memw
 400048fd:	3820      	l32i.n	a3, a0, 8
@@ -8326,7 +8768,7 @@
 40004981:	000000
 
   SPIEraseChip:
-40004984:	21bcff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+40004984:	21bcff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 40004987:	12c1f0        	addi	a1, a1, -16
 4000498a:	0901      	s32i.n	a0, a1, 0
 4000498c:	222200        	l32i	a2, a2, 0		; deref
@@ -8336,7 +8778,7 @@
 40004996:	0801      	l32i.n	a0, a1, 0
 40004998:	12c110        	addi	a1, a1, 16
 4000499b:	0df0      	ret.n
-4000499d:	21b5ff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+4000499d:	21b5ff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 400049a0:	f02000        	nop
 400049a3:	2802      	l32i.n	a2, a2, 0
 400049a5:	856dff        	call0	0x40004080
@@ -8347,7 +8789,7 @@
 400049b2:	0df0      	ret.n
 
   SPIEraseBlock:
-400049b4:	31b0ff        	l32r	a3, [flashchip]	; [0x3fffc714] 0x40004874
+400049b4:	31b0ff        	l32r	a3, [flashchip]		; [0x3fffc714] 0x40004874
 400049b7:	12c1f0        	addi	a1, a1, -16
 400049ba:	c921      	s32i.n	a12, a1, 8
 400049bc:	0911      	s32i.n	a0, a1, 4
@@ -8366,7 +8808,7 @@
 400049da:	2801      	l32i.n	a2, a1, 0
 400049dc:	c5a5ff        	call0	0x4000443c
 400049df:	56c2fe        	bnez	a2, 0x400049cf
-400049e2:	21a4ff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+400049e2:	21a4ff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 400049e5:	2802      	l32i.n	a2, a2, 0
 400049e7:	322202        	l32i	a3, a2, 8
 400049ea:	c03382        	mull	a3, a3, a12
@@ -8380,18 +8822,18 @@
 400049fe:	0000
 
   SPIEraseSector:
-40004a00:	319dff        	l32r	a3, [flashchip]	; [0x3fffc714] 0x40004874
+40004a00:	319dff        	l32r	a3, [flashchip]		; [0x3fffc714] 0x40004874
 40004a03:	12c1f0        	addi	a1, a1, -16
 40004a06:	c921      	s32i.n	a12, a1, 8
 40004a08:	0911      	s32i.n	a0, a1, 4
-40004a0a:	cd02      	mov.n	a12, a2		; sector
+40004a0a:	cd02      	mov.n	a12, a2			; sector
 40004a0c:	3803      	l32i.n	a3, a3, 0		; *flashchip
 40004a0e:	3901      	s32i.n	a3, a1, 0
 40004a10:	2813      	l32i.n	a2, a3, 4		; flashchip->chip_size
 40004a12:	322303        	l32i	a3, a3, 12		; flashchip->sector_size
 40004a15:	458009        	call0	0x4000e21c
 40004a18:	273c0a        	bltu	a12, a2, 0x40004a26		; if (sector < chip_size / sector_size)
-40004a1b:	0c12      	movi.n	a2, 1		; return 1
+40004a1b:	0c12      	movi.n	a2, 1			; return 1
 40004a1d:	c821      	l32i.n	a12, a1, 8
 40004a1f:	0811      	l32i.n	a0, a1, 4
 40004a21:	12c110        	addi	a1, a1, 16
@@ -8399,13 +8841,13 @@
 40004a26:	2801      	l32i.n	a2, a1, 0		; *flashchip
 40004a28:	05a1ff        	call0	0x4000443c
 40004a2b:	56c2fe        	bnez	a2, 0x40004a1b		; if (SPI_write_enable() != 0) return 1
-40004a2e:	2191ff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+40004a2e:	2191ff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 40004a31:	2802      	l32i.n	a2, a2, 0		; *flashchip
 40004a33:	322203        	l32i	a3, a2, 12		; flashchip->sector_size
 40004a36:	c03382        	mull	a3, a3, a12		; = sector * sector_size
 40004a39:	4568ff        	call0	0x400040c0
 40004a3c:	56b2fd        	bnez	a2, 0x40004a1b		; if ( != 0) return 1
-40004a3f:	0c02      	movi.n	a2, 0		; return 0
+40004a3f:	0c02      	movi.n	a2, 0			; return 0
 40004a41:	c821      	l32i.n	a12, a1, 8
 40004a43:	0811      	l32i.n	a0, a1, 4
 40004a45:	12c110        	addi	a1, a1, 16
@@ -8414,7 +8856,7 @@
 
   SPIWrite:
 40004a4c:	5d04      	mov.n	a5, a4
-40004a4e:	8189ff        	l32r	a8, [flashchip]	; [0x3fffc714] 0x40004874
+40004a4e:	8189ff        	l32r	a8, [flashchip]		; [0x3fffc714] 0x40004874
 40004a51:	12c1d0        	addi	a1, a1, -48
 40004a54:	c931      	s32i.n	a12, a1, 12
 40004a56:	e951      	s32i.n	a14, a1, 20
@@ -8428,7 +8870,7 @@
 40004a66:	0814      	l32i.n	a0, a4, 4		; flashchip.chip_size
 40004a68:	2a25      	add.n	a2, a5, a2		; offset + size
 40004a6a:	27b010        	bgeu	a0, a2, 0x40004a7e
-40004a6d:	0c12      	movi.n	a2, 1		; return 1
+40004a6d:	0c12      	movi.n	a2, 1			; return 1
 40004a6f:	c831      	l32i.n	a12, a1, 12
 40004a71:	d841      	l32i.n	a13, a1, 16
 40004a73:	e851      	l32i.n	a14, a1, 20
@@ -8478,7 +8920,7 @@
 40004ad3:	326107        	s32i	a3, a1, 28
 40004ad6:	ca3d      	add.n	a3, a13, a12
 40004ad8:	5d0e      	mov.n	a5, a14
-40004ada:	2166ff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+40004ada:	2166ff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 40004add:	c04241        	srli	a4, a12, 2
 40004ae0:	f044a0        	addx4	a4, a4, a15
 40004ae3:	2802      	l32i.n	a2, a2, 0
@@ -8492,7 +8934,7 @@
 40004af8:	6971      	s32i.n	a6, a1, 28
 40004afa:	6795d8        	bne	a5, a6, 0x40004ad6
 40004afd:	ca3d      	add.n	a3, a13, a12
-40004aff:	215dff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+40004aff:	215dff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 40004b02:	522100        	l32i	a5, a1, 0
 40004b05:	c04241        	srli	a4, a12, 2
 40004b08:	f044a0        	addx4	a4, a4, a15
@@ -8509,22 +8951,22 @@
 ; a4 is a byte count
 
   SPIRead:
-40004b1c:	5d04      	mov.n	a5, a4		; byte count
-40004b1e:	7d03      	mov.n	a7, a3		; buffer address
+40004b1c:	5d04      	mov.n	a5, a4			; byte count
+40004b1e:	7d03      	mov.n	a7, a3			; buffer address
 40004b20:	12c1f0        	addi	a1, a1, -16		; stack
-40004b23:	3d02      	mov.n	a3, a2		; offset in SPI
+40004b23:	3d02      	mov.n	a3, a2			; offset in SPI
 40004b25:	0901      	s32i.n	a0, a1, 0		; save return
-40004b27:	2153ff        	l32r	a2, [flashchip]	; [0x3fffc714] 0x40004874
+40004b27:	2153ff        	l32r	a2, [flashchip]		; [0x3fffc714] 0x40004874
 40004b2a:	4d07      	mov.n	a4, a7
 40004b2c:	2802      	l32i.n	a2, a2, 0		; flashchip
 40004b2e:	c577ff        	call0	0x400042ac
 40004b31:	0c04      	movi.n	a4, 0
 40004b33:	3801      	l32i.n	a3, a1, 0		; fetch return
-40004b35:	0c10      	movi.n	a0, 1		; a0 = 1
+40004b35:	0c10      	movi.n	a0, 1			; a0 = 1
 40004b37:	12c110        	addi	a1, a1, 16		; stack
 40004b3a:	200483        	moveqz	a0, a4, a2		; a0 = a4 if a2 == 0
-40004b3d:	2d00      	mov.n	a2, a0		; a2 = a0
-40004b3f:	0d03      	mov.n	a0, a3		; return
+40004b3d:	2d00      	mov.n	a2, a0			; a2 = a0
+40004b3f:	0d03      	mov.n	a0, a3			; return
 40004b41:	0df0      	ret.n
 40004b43:	00
 
@@ -8537,7 +8979,7 @@
 40004b4f:	30d320        	or	a13, a3, a3
 40004b52:	22a005        	movi	a2, 5
 40004b55:	45d9ff        	call0	0x400048ec
-40004b58:	0147ff        	l32r	a0, [flashchip]	; [0x3fffc714] 0x40004874
+40004b58:	0147ff        	l32r	a0, [flashchip]		; [0x3fffc714] 0x40004874
 40004b5b:	0800      	l32i.n	a0, a0, 0
 40004b5d:	0941      	s32i.n	a0, a1, 16
 40004b5f:	0810      	l32i.n	a0, a0, 4
@@ -8558,7 +9000,7 @@
 40004b80:	2841      	l32i.n	a2, a1, 16
 40004b82:	45cfff        	call0	0x40004878
 40004b85:	56d2fd        	bnez	a2, 0x40004b66
-40004b88:	313bff        	l32r	a3, [flashchip]	; [0x3fffc714] 0x40004874
+40004b88:	313bff        	l32r	a3, [flashchip]		; [0x3fffc714] 0x40004874
 40004b8b:	2d0c      	mov.n	a2, a12
 40004b8d:	3803      	l32i.n	a3, a3, 0
 40004b8f:	3941      	s32i.n	a3, a1, 16
@@ -8628,7 +9070,7 @@
 40004c29:	000000
 
   SPIParamCfg:
-40004c2c:	8112ff        	l32r	a8, [flashchip]	; [0x3fffc714] 0x40004874
+40004c2c:	8112ff        	l32r	a8, [flashchip]		; [0x3fffc714] 0x40004874
 40004c2f:	8808      	l32i.n	a8, a8, 0		; deref
 40004c31:	3918      	s32i.n	a3, a8, 4
 40004c33:	4928      	s32i.n	a4, a8, 8
@@ -8636,7 +9078,7 @@
 40004c37:	6948      	s32i.n	a6, a8, 16
 40004c39:	2908      	s32i.n	a2, a8, 0
 40004c3b:	7958      	s32i.n	a7, a8, 20
-40004c3d:	0c02      	movi.n	a2, 0		; always return 0
+40004c3d:	0c02      	movi.n	a2, 0			; always return 0
 40004c3f:	0df0      	ret.n
 40004c41:	000000
 
@@ -8656,9 +9098,9 @@
 ; 60000318 - disable
 
   gpio_init:
-40004c50:	22a004        	movi	a2, 4		; a2 = 4
+40004c50:	22a004        	movi	a2, 4			; a2 = 4
 40004c53:	31fcff        	l32r	a3, [0x40004e34]	; 0x40004c44
-40004c56:	0c04      	movi.n	a4, 0		; a4 = 0
+40004c56:	0c04      	movi.n	a4, 0			; a4 = 0
 40004c58:	12c1e0        	addi	a1, a1, -32		; space on stack
 40004c5b:	c911      	s32i.n	a12, a1, 4		; save 4 regs ...
 40004c5d:	d921      	s32i.n	a13, a1, 8
@@ -8669,7 +9111,7 @@
 ; GPIO is interrupt 4 (mask 0x10)
 
 40004c65:	0532fc        	call0	0x40000f88
-40004c68:	1c02      	movi.n	a2, 16		; 0x10
+40004c68:	1c02      	movi.n	a2, 16			; 0x10
 40004c6a:	c532fc        	call0	0x40000f98
 
 ; set all pins as inputs
@@ -8764,7 +9206,7 @@
 40004d07:	026100        	s32i	a0, a1, 0		; save a0
 40004d0a:	c26101        	s32i	a12, a1, 4		; save a12
 40004d0d:	d921      	s32i.n	a13, a1, 8		; save a13
-40004d0f:	cd02      	mov.n	a12, a2		; a12 = reg
+40004d0f:	cd02      	mov.n	a12, a2			; a12 = reg
 40004d11:	30d320        	or	a13, a3, a3		; a13 = val
 40004d14:	c525fc        	call0	0x40000f74
 40004d17:	21f9ff        	l32r	a2, [0x60000328]	; 0x40004cfc
@@ -8787,9 +9229,9 @@
 40004d3d:	12c110        	addi	a1, a1, 16		; stack
 40004d40:	0df0      	ret.n
 
-40004d42:	7cf9      	movi.n	a9, -1		; a9 = -1
-40004d44:	001c40        	ssl	a12		; set shift left amount
-40004d47:	0c18      	movi.n	a8, 1		; a8 = 1
+40004d42:	7cf9      	movi.n	a9, -1			; a9 = -1
+40004d44:	001c40        	ssl	a12			; set shift left amount
+40004d47:	0c18      	movi.n	a8, 1			; a8 = 1
 40004d49:	72c5f0        	addi	a7, a5, -16		; a7 = a5 -16
 40004d4c:	6807      	l32i.n	a6, a7, 0
 40004d4e:	0088a1        	sll	a8, a8
@@ -8890,6 +9332,7 @@
 40004e2b:	2914      	s32i.n	a2, a4, 4
 40004e2d:	3924      	s32i.n	a3, a4, 8
 40004e2f:	0df0      	ret.n
+
 40004e31:4e8f			unknown	; (not disassembled)
 
   gpio_pin_wakeup_enable:
@@ -9416,8 +9859,8 @@
 400053bd:	0801      	l32i.n	a0, a1, 0
 400053bf:	12c110        	addi	a1, a1, 16
 400053c2:	0df0      	ret.n
-400053c4:544b			unknown	; (not disassembled)
 
+400053c4:544b			unknown	; (not disassembled)
 
   sip_install_rx_ctrl_cb:
 4000544c:	4139ff        	l32r	a4, [0x3fffdff0]	; 0x40005130
@@ -9433,18 +9876,12 @@
 40005462:	203293        	movnez	a3, a2, a2
 40005465:	326415        	s32i	a3, a4, 84
 40005468:	0df0      	ret.n
+
 4000546a:5667			unknown	; (not disassembled)
-
-
-
 
 ; Format: "no rds"
 
-
-
-
 ; Format: "bootup , addr 0x%08x"
-
 
   sip_get_state:
 40005668:	21b2fe        	l32r	a2, [0x3fffdff0]	; 0x40005130
@@ -9688,6 +10125,7 @@
   sip_get_ptr:
 400058a8:	2122fe        	l32r	a2, [0x3fffdff0]	; 0x40005130
 400058ab:	0df0      	ret.n
+
 400058ad:5c17			unknown	; (not disassembled)
 
 
@@ -10041,9 +10479,12 @@
 40005f3c:	0c02      	movi.n	a2, 0
 40005f3e:	2924      	s32i.n	a2, a4, 8
 40005f40:	0df0      	ret.n
+
 40005f42:	0000fffffeff00002800
 40005f4c:	00008000	; l32r
+
 40005f50:600f			unknown	; (not disassembled)
+
 40006010:	ffff7fff	; l32r
 
   slc_pause_from_host:
@@ -11287,7 +11728,9 @@
 40006c10:	3fffcbe0	; l32r
 40006c14:	3fffcc20	; l32r
 40006c18:	0000096c	; l32r
+
 40006c1c:6c4b			unknown	; (not disassembled)
+
 40006c4c:	3fffcc60	; l32r
 
   rom_set_channel_freq:
@@ -11325,7 +11768,7 @@
 40006c9a:	303ca0        	addx4	a3, a12, a3
 40006c9d:	3803      	l32i.n	a3, a3, 0
 40006c9f:	e1deff        	l32r	a14, [0x0000096c]	; 0x40006c18
-40006ca2:	a00300        	jx	a3		; << JUMP table
+40006ca2:	a00300        	jx	a3			; << JUMP table
 40006ca5:	e13bfe        	l32r	a14, [0x000009b4]	; 0x40006594
 40006ca8:	16c409        	beqz	a4, 0x40006d48
 40006cab:	02a001        	movi	a0, 1
@@ -11404,14 +11847,16 @@
 40006d65:	21abff        	l32r	a2, [0x3fffcc20]	; 0x40006c14
 40006d68:	202ca0        	addx4	a2, a12, a2
 40006d6b:	2802      	l32i.n	a2, a2, 0
-40006d6d:	a00200        	jx	a2		; << JUMP table
+40006d6d:	a00200        	jx	a2			; << JUMP table
 40006d70:	024102        	s8i	a0, a1, 2
 40006d73:	32a062        	movi	a3, 98
 40006d76:	5cf4      	movi.n	a4, 95
 40006d78:	424100        	s8i	a4, a1, 0
 40006d7b:	324101        	s8i	a3, a1, 1
 40006d7e:	86d7ff        	j	0x40006ce0
+
 40006d81:6dcb			unknown	; (not disassembled)
+
 40006dcc:	1c1b      	movi.n	a11, 17
 40006dce:	6c67      	movi.n	a7, -26
 40006dd0:	62afbb        	movi	a6, -69
@@ -11425,13 +11870,14 @@
 40006de4:	919aff        	l32r	a9, [0x3fffcc60]	; 0x40006c4c
 40006de7:	909ca0        	addx4	a9, a12, a9
 40006dea:	9809      	l32i.n	a9, a9, 0
-40006dec:	a00900        	jx	a9		; << JUMP table
+40006dec:	a00900        	jx	a9			; << JUMP table
 40006def:	00
 40006df0:	024100        	s8i	a0, a1, 0
 40006df3:	a2afcc        	movi	a10, -52
 40006df6:	a24101        	s8i	a10, a1, 1
 40006df9:	a24102        	s8i	a10, a1, 2
 40006dfc:	06b8ff        	j	0x40006ce0
+
 40006dff:6f63			unknown	; (not disassembled)
 
 40006f64:	00096000	; l32r
@@ -11491,7 +11937,7 @@
 40006ffa:	51dbff        	l32r	a5, [0x3fffcca0]	; 0x40006f68
 40006ffd:	505ca0        	addx4	a5, a12, a5
 40007000:	5805      	l32i.n	a5, a5, 0
-40007002:	a00500        	jx	a5		; << JUMP table
+40007002:	a00500        	jx	a5			; << JUMP table
 40007005:	02a06a        	movi	a0, 106
 40007008:	a0a080        	add	a10, a0, a10
 4000700b:	f0aa01        	slli	a10, a10, 17
@@ -11567,6 +12013,7 @@
 400070c7:	00
 400070c8:	7c92      	movi.n	a2, -7
 400070ca:	46dfff        	j	0x4000704b
+
 400070cd:711b			unknown	; (not disassembled)
 
   rom_chip_v5_rx_init:
