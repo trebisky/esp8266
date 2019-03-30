@@ -41,7 +41,7 @@
 ; In early 2018 I got a pull request from "quietboil" that added
 ; annotation for flash erase commands.
 ; See: esp_spi_erase_sector -and- esp_spi_erase_block
-; as well as other code.
+;  search for "flashchip" also
 ;---------------------------------------------------
 ;
 ; The following is historic now that I am using the espdis script ....
@@ -8559,11 +8559,10 @@
 40004164:	0811      	l32i.n	a0, a1, 4
 40004166:	12c110        	addi	a1, a1, 16
 40004169:	0df0      	ret.n
+4000416b:	00
 
 ; trouble (end of read is beyond end of device)
 
-
-4000416b:	00
 4000416c:	20000000	; l32r
 40004170:	02000000	; l32r
 
@@ -8726,9 +8725,7 @@
 400042a3:	0811      	l32i.n	a0, a1, 4
 
 400042a5:	12c120        	addi	a1, a1, 32
-
 400042a8:	0df0      	ret.n
-
 400042aa:	0000
 
   sub_42ac:
@@ -8748,11 +8745,10 @@
 400042c8:	0801      	l32i.n	a0, a1, 0
 400042ca:	12c110        	addi	a1, a1, 16
 400042cd:	0df0      	ret.n
-
 400042cf:	000000
+
 400042d2:	30e320        	or	a14, a3, a3
 400042d5:	50d520        	or	a13, a5, a5
-
 400042d8:	051b00		call0	Wait_SPI_Idle		; 0x4000448c
 400042db:	e61d02        	bgei	a13, 1, 0x400042e1
 
@@ -8814,8 +8810,8 @@
 40004357:	202074        	extui	a2, a2, 0, 8
 4000435a:	2793d8        	bne	a3, a2, 0x40004336
 4000435d:	c61400        	j	0x400043b4
-
 40004360:	00
+
 40004361:	a6cd88        	blti	a13, 32, 0x400042ed
 40004364:	508e20        	or	a8, a14, a5
 40004367:	c02000        	memw
@@ -8857,8 +8853,8 @@
 400043bc:	0801      	l32i.n	a0, a1, 0
 400043be:	12c110        	addi	a1, a1, 16
 400043c1:	0df0      	ret.n
-
 400043c3:	00
+
 400043c4:	08000000	; l32r
 
   SPI_read_status:
@@ -9068,7 +9064,6 @@
 
 ; spin until cache empty bit is set.
 
-
   sub_4568:
 40004568:	0c46      	movi.n	a6, 4
 4000456a:	5196f2        	l32r	a5, [0x60000200]	; 0x40000fc4
@@ -9157,24 +9152,22 @@
 4000461b:	9805      	l32i.n	a9, a5, 0
 4000461d:	5679ff        	bnez	a9, 0x40004618
 40004620:	0df0      	ret.n
-
 40004622:	0000
+
 40004624:	61a6fe        	l32r	a6, [0x01000000]	; 0x400040bc
 40004627:	86dbff        	j	0x40004599
-
-
 4000462a:	0000
+
 4000462c:	618ff8        	l32r	a6, [0x00100000]	; 0x40002868
 4000462f:	86d9ff        	j	0x40004599
-
 40004632:	0000
+
 40004634:	61bafe        	l32r	a6, [0x00800000]	; 0x4000411c
 40004637:	86d7ff        	j	0x40004599
-
 4000463a:	0000
+
 4000463c:	61caff        	l32r	a6, [0x00004000]	; 0x40004564
 4000463f:	86d5ff        	j	0x40004599
-
 40004642:	0000
 
   spi_flash_attach:
@@ -9190,8 +9183,8 @@
 40004658:	0801      	l32i.n	a0, a1, 0
 4000465a:	12c110        	addi	a1, a1, 16
 4000465d:	0df0      	ret.n
-
 4000465f:	00
+
 40004660:	fffdffff	; l32r
 
 ; Cache Read Disable - disable SPI mapping via cache

@@ -110,8 +110,11 @@ bootrom.bin:
 #bootrom.dis:
 #	xtensa-lx106-elf-objdump -D -b binary -mxtensa bootrom.bin >bootrom.dis
 
+# Which do you want?  The first line disassembles just my code.
+#  The second disassembles the whole deal, incuding stuff from SDK libraries.
 dis:
-	xtensa-lx106-elf-objdump -D -mxtensa timer_blink.o >timer_blink.dis
+#	xtensa-lx106-elf-objdump -D -mxtensa timer_blink.o >timer_blink.dis
+	xtensa-lx106-elf-objdump -D -mxtensa timer_blink >timer_blink.dis
 
 syms:
 	xtensa-lx106-elf-nm timer_blink | sort >timer_blink.syms

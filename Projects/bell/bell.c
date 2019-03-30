@@ -63,6 +63,7 @@ static char red_state;
 static char bell_gpio_state;
 
 static os_timer_t timer1;
+static os_timer_t timer2;
 
 /* BIT2 blinks the little blue LED on my NodeMCU board
  * (which is labelled "D4" on the silkscreen)
@@ -91,6 +92,12 @@ static os_timer_t timer1;
 
 /* GPIO-4 stays low during reset and boot up, so we get no spurious "rings"
  */
+
+/* GPIO-5 will get connected to the doorbell button
+ * These are not bit numbers as 1,2,3,4,5,
+ *  but masks i.e. 0x01, 0x02, ... 0x10, 0x20
+ */
+#define BUTTON_BIT		BIT5	/* NodeMCU D1 */
 
 static void
 blue_on ( void )
@@ -139,6 +146,9 @@ bell_on ( void )
 
 #define PAUSE_DELAY	500
 
+#define TICK_DELAY	1000
+
+
 static int bell_count;
 static int bell_state;
 
@@ -158,11 +168,77 @@ timer_func1 ( void *arg )
 	os_timer_arm ( &timer1, PAUSE_DELAY, TIMER_ONCE );
 	return;
     }
+
     /* Otherwise ST_DELAY */
     bell_state = ST_RING;
     bell_on ();
     os_timer_arm ( &timer1, RING_DELAY, TIMER_ONCE );
 }
+
+/* Monitor the button.
+ * When GPIO 5 floats, it will "stick" at either ground
+ * or 3.3 when either input is removed.
+ * Using a 4.7K pullup to 3.3 volts and using the button
+ * to pull to ground works perfectly.
+ *
+ * Use a little state machine.
+ *  BS = button state
+ */
+
+#define BS_IDLE		0
+#define BS_WAIT1	1
+#define BS_BELL		2
+#define BS_WAIT2	3
+
+static int bs_state;
+static int bs_count;
+
+#define BSW1 5
+#define BSW2 5
+
+void
+timer_func2 ( void *arg )
+{
+    int pin;
+
+    // os_printf("timer 2\n");
+    pin = gpio_input_get () & BUTTON_BIT;
+    os_printf ( "pin: %02x\n", pin );
+
+    if ( bs_state == BS_IDLE ) {
+	if ( pin ) {
+	    bs_state = BS_WAIT1;
+	    bs_count = 1;
+	}
+    } else if ( bs_state == BS_WAIT1 ) {
+	if ( pin ) {
+	    ++bs_count;
+	    if ( bs_count >= BSW1 ) {
+		// ring_bell ();
+		os_printf ( "BELL\n" );
+		bs_state = BS_BELL;
+	    }
+	} else {
+	    bs_state = BS_IDLE;
+	}
+    } else if ( bs_state == BS_BELL ) {
+	if ( ! pin ) {
+	    bs_state = BS_WAIT2;
+	    bs_count = 1;
+	    }
+    } else { /* BS_WAIT2 */
+	if ( pin ) {
+	    bs_state = BS_BELL;
+	} else {
+	    ++bs_count;
+	    if ( bs_count >= BSW2 ) {
+		bs_state = BS_IDLE;
+	    }
+	}
+    }
+}
+
+/* ----------------------------------------- */
 
 static void
 ring_bell ( void )
@@ -496,6 +572,11 @@ user_init ( void )
 
     os_timer_disarm ( &timer1 );
     os_timer_setfn ( &timer1, timer_func1, NULL );
+
+    bs_state = BS_IDLE;
+    os_timer_disarm ( &timer2 );
+    os_timer_setfn ( &timer2, timer_func2, NULL );
+    os_timer_arm ( &timer2, TICK_DELAY, TIMER_REPEAT );
 
     /* once we fall off the end, it is all about event handlers */
 }

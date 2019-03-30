@@ -1,16 +1,16 @@
-# Makefile for ESP8266 Tmon project
+# Makefile for ESP8266 Bell project
 #
 # Tom Trebisky  12-26-2015
 # Tom Trebisky  1-25-2017
+# Tom Trebisky  3-30-2019
 #
-# For the Tmon gadget
+# For the Bell gadget
 #
 # --- to burn new code:
-# 1) remove the reset line from pin 3
-# 2) Connect via good USB cable.
-# 3) Verify proper PORT setting below
-# 4) use "make info" to verify communications
-# 5) make flash will burn the code.
+# 1) Connect via good USB cable.
+# 2) Verify proper PORT setting below
+# 3) use "make info" to verify communications
+# 4) make flash will burn the code.
 
 # tjt - be verbose
 V = 1
@@ -26,8 +26,8 @@ endif
 
 # The new python job
 ESPTOOL		= esptool
-#PORT		= /dev/ttyUSB0
-PORT		= /dev/ttyUSB1
+PORT		= /dev/ttyUSB0
+#PORT		= /dev/ttyUSB1
 
 # base directory of the ESP8266 SDK package, absolute
 ##SDK_BASE	?= /opt/Espressif/sdk/
