@@ -1,4 +1,4 @@
-/* ESP8266 sdk experiments
+/* ESP8266 doorbell handler
  *
  * This is a simple TCP server that handles requests to
  *  ring a bell via a GPIO bit that controls an SSR.
@@ -33,7 +33,13 @@
  * A datasheet for a similar device says that no heatsink is
  *  required for loads under 5 Amps.
  *
+ * At this time the remote facility always rings once.
+ * The button yields two rings.
+ * The simple job of extending the remote protocol to
+ * specify the number of rings should be tackled.
+ *
  * Tom Trebisky  8-7-2017
+ * Tom Trebisky  3-7-2019
  *
  */
 
@@ -64,6 +70,9 @@ static char bell_gpio_state;
 
 static os_timer_t timer1;
 static os_timer_t timer2;
+
+/* prototypes */
+static void ring_bell ( int );
 
 /* BIT2 blinks the little blue LED on my NodeMCU board
  * (which is labelled "D4" on the silkscreen)
@@ -146,8 +155,8 @@ bell_on ( void )
 
 #define PAUSE_DELAY	500
 
-#define TICK_DELAY	1000
-
+/* Run timer 2 at 10 Hz */
+#define TICK_DELAY	100
 
 static int bell_count;
 static int bell_state;
@@ -201,9 +210,8 @@ timer_func2 ( void *arg )
 {
     int pin;
 
-    // os_printf("timer 2\n");
     pin = gpio_input_get () & BUTTON_BIT;
-    os_printf ( "pin: %02x\n", pin );
+    // os_printf ( "pin: %02x\n", pin );
 
     if ( bs_state == BS_IDLE ) {
 	if ( pin ) {
@@ -214,7 +222,7 @@ timer_func2 ( void *arg )
 	if ( pin ) {
 	    ++bs_count;
 	    if ( bs_count >= BSW1 ) {
-		// ring_bell ();
+		ring_bell ( 2 );
 		os_printf ( "BELL\n" );
 		bs_state = BS_BELL;
 	    }
@@ -241,13 +249,13 @@ timer_func2 ( void *arg )
 /* ----------------------------------------- */
 
 static void
-ring_bell ( void )
+ring_bell ( int count )
 {
     if ( bell_state != ST_IDLE )
 	return;
 
     bell_on ();
-    bell_count = 2;
+    bell_count = count;
     bell_state = ST_RING;
 
     /* delay in milliseconds.  */
@@ -379,7 +387,7 @@ do_cmd ( void *arg, char *buf )
 	bell_off ();
 	my_reply ( arg, "OK" );
     } else if ( strcmp ( buf, "bell" ) == 0 ) {
-        ring_bell ();
+        ring_bell ( 1 );
         my_reply ( arg, "OK" );
     } else
 	my_reply ( arg, "ERR" );
