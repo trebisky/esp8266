@@ -41,6 +41,11 @@ server = TCPServer.open myport
 puts "Listening on port #{myport}"
 STDOUT.flush
 
+# 3-21-2020
+# How can we have this thing tell us when it isn't getting data
+# (as when the battery is dead on the ESP unit).
+# This thing will sit in accept for eternit.
+
 loop {
     #puts "Listening ..."
     x = server.accept()
