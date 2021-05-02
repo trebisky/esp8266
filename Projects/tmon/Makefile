@@ -6,7 +6,7 @@
 # For the Tmon gadget
 #
 # --- to burn new code:
-# 1) remove the reset line from pin 3
+# 1) remove the reset line from pin 3 !!! ***
 # 2) Connect via good USB cable.
 # 3) Verify proper PORT setting below
 # 4) use "make info" to verify communications
@@ -26,8 +26,8 @@ endif
 
 # The new python job
 ESPTOOL		= esptool
-#PORT		= /dev/ttyUSB0
-PORT		= /dev/ttyUSB1
+PORT		= /dev/ttyUSB0
+#PORT		= /dev/ttyUSB1
 
 # base directory of the ESP8266 SDK package, absolute
 ##SDK_BASE	?= /opt/Espressif/sdk/

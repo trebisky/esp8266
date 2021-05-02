@@ -15,8 +15,8 @@ endif
 
 # The new python job
 ESPTOOL		= esptool
-#PORT		= /dev/ttyUSB0
-PORT		= /dev/ttyUSB1
+PORT		= /dev/ttyUSB0
+#PORT		= /dev/ttyUSB1
 
 # base directory of the ESP8266 SDK package, absolute
 ##SDK_BASE	?= /opt/Espressif/sdk/
@@ -104,6 +104,9 @@ dis:
 
 term:
 	picocom -b 115200 $(PORT)
+
+term2:
+	picocom -b 9600 $(PORT)
 
 clean:
 	$(Q) rm -f $(TARGET)

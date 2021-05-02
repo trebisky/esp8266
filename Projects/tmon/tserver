@@ -21,14 +21,14 @@ require 'socket'
 require 'timeout'
 
 myport = 2001
-$tmo = 2.0
+$tmo = 10.0
 
 # We expect data every 60 seconds.
 # If this many seconds goes by without data, we squawk.
-max_stale = 10.0
+max_stale = 5 * 60.0
 
 # We don't want a flood of messages when the battery goes dead
-$msg_interval = 10.0
+$msg_interval = 60.0
 $msg_wait = 0.0
 
 $stale = 0.0

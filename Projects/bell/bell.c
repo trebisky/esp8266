@@ -202,7 +202,10 @@ timer_func1 ( void *arg )
 static int bs_state;
 static int bs_count;
 
+/* The person must hold the button this long.
 #define BSW1 5
+ */
+#define BSW1 2
 #define BSW2 5
 
 void

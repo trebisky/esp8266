@@ -84,7 +84,8 @@ $(TARGET): $(TARGET).o
 # This loads our code into the flash on the device itself
 flash:	$(TARGET)
 	$(ESPTOOL) elf2image $(TARGET)
-	-$(ESPTOOL) --port $(PORT) write_flash $(FLOPS) 0x00000 $(TARGET)-0x00000.bin 0x40000 $(TARGET)-0x40000.bin
+	#$(ESPTOOL) --port $(PORT) write_flash $(FLOPS) 0x00000 $(TARGET)-0x00000.bin 0x40000 $(TARGET)-0x40000.bin
+	$(ESPTOOL) --port $(PORT) --no-stub write_flash $(FLOPS) 0x00000 $(TARGET)-0x00000.bin 0x40000 $(TARGET)-0x40000.bin
 
 # This is a good way to verify that the boot loader on the ESP8266 is running
 info:

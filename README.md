@@ -14,3 +14,7 @@ People have found my tcp_server code useful:
 The Bootrom disassembly is here:
 
     reverse/bootrom/boot.txt
+
+In April of 2021, I began some more work with the bootrom disassembly and realized that
+I had pushed a badly messed up copy of boot.txt back in 2018 when I used my new disassembler.
+That is fixed now, and my apologies to anyone who was inconvenienced over those 3 years.
