@@ -1,0 +1,19 @@
+#!/bin/ruby
+
+# reduce all sequences of blank lines to a single
+# blank line
+
+first_blank = true
+
+while l = gets
+    l.chomp!
+    if l =~ /^$/
+        if first_blank
+            puts l
+            first_blank = false
+        end
+    else
+        puts l
+        first_blank = true
+    end
+end

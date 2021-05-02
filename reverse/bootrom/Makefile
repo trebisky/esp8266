@@ -56,13 +56,17 @@ showsym:	bootsym.elf
 
 # ------------------------------------------
 # Run new multipass disassembler 7-7-2018
+# get rid of tabs and convert to spaces 5-2-2021
 
 new.dis:  hints espdis
-	./espdis all >new.dis
+#	./espdis all >new.dis
+	./espdis all | expand >new.dis
 
-# This became boot.txt
-#mergeit:
-#	./merge_dis >boot_NEW.txt
+# This will become the new boot.txt
+# we rename it to boot.txt, then tack on
+# the end section by hand.
+merge:
+	./merge_dis >boot_NEW.txt
 
 # ------------------------------------------
 # Do the following:

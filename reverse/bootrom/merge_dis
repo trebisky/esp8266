@@ -48,24 +48,83 @@ class Line
 	end
 
 	def initialize ( x )
-	    @raw = x
+	    @raw = x.chomp
+        @guts = @raw
 	    @chatter = nil
 	    @eof = x == nil
 	    @is_dis = false
 	    @not_dis = true
-	    @comment = false
+	    @comment = nil
+        @comment2 = nil
+        @is_l32r = false
+
 	    if x =~ /^4000....:/
-		@is_dis = true
-		@not_dis = false
+            @is_dis = true
+            @not_dis = false
 	    end
+
 	    if @is_dis
-		@addr = x.hex
-		if x =~ /;/
-		    @comment = x.sub /^[^;]*/, ""
-		end
+            @addr = x.hex
+            if x =~ /;/
+                @guts = x.sub /\ *;.*/, ""
+                @comment = x.sub /^[^;]*/, ""
+            end
+            w = x.split
+            if w[2] == "l32r"
+                @is_l32r = true
+            end
 	    end
 	end
+    def append_comment ( ll )
+        #print "append_comment from #{ll.raw}\n"
+        return if @is_l32r
+        if ll.comment
+            #print "appending from #{ll.comment}\n"
+            @comment2 = ll.comment
+        end
+    end
+    def chatter_out
+        @chatter.each { |c|
+            # avoid old style labels
+            # only in old file chatter
+            puts c if c !~ />:/
+        }
+    end
+
+    #  @raw already includes our own comment if any
+    #  @comment2 has been handed us from "old".
+    # Augmented 5-2-2021 to be smarter about tabs
+    def line_out
+        if @comment && @comment2
+            #puts "BOTH"
+            #puts @comment
+            #puts @comment2
+            comment = @comment
+            comment += @comment2.sub /;/," -"
+        elsif @comment
+            comment = @comment
+        elsif @comment2
+            comment = @comment2
+        else
+            comment = nil
+        end
+
+        print @guts
+        rawlen = @guts.length
+        if comment
+            print "\t" if rawlen < 40
+            print "\t" if rawlen < 48
+            print "\t" if rawlen < 56
+            #print " " if rawlen >= 56
+            print "\t"
+            #print "%02d" % rawlen
+            print comment
+        end
+        print "\n"
+    end
 end
+
+# ----------------------------------------
 
 # Avoid chomping the nil that indicates EOF
 def reader ( file )
@@ -103,39 +162,57 @@ def get_new
 	return new
 end
 
+# We stash any chatter prior to the line so we can output it
+# right before (and along with) the line in question
+def get_old
+	chatter = Array.new
+
+	old = r_old
+	while old.not_dis
+	    chatter << old.raw
+	    old = r_old
+	end
+
+
+	old.chatter = chatter
+	return old
+end
+
 # Move through old file, copying comments
 # return with next old instruction
-def old_comments
+def old_comments_OLD
 	# copy comments
 	loop {
 	    $old_line = r_old
 	    break if $old_line.eof
 
-		# copy all comments, but skip labels
+            # copy all comments, but skip labels
 	    if $old_line.not_dis
-		if $old_line.raw !~ />:/
-		    puts $old_line.raw
-		end
-		next
+            if $old_line.raw !~ />:/
+                puts $old_line.raw
+            end
+            next
 	    end
 
 	    break if $old_line.addr >= $new_line.addr
 	}
 end
 
-def add_comment
+def add_comment_OLD
 
 	# A mismatch usually indicates a mangled section
 	# in the old file, so we ignore the bogus comment,
 	# and write the new line as is.
 	if $old_line.addr != $new_line.addr
-#	    puts "Whaa - OLD: " + $old_line.raw
-#	    puts "Whaa - NEW: " + $new_line.raw
-	    return $new_line.raw
+	    #puts "Whaa - OLD: " + $old_line.raw
+	    #puts "Whaa - NEW: " + $new_line.raw
+	    puts $new_line.raw
+            return
 	end
 
 	unless $old_line.comment
-	    return $new_line.raw
+	    puts $new_line.raw
+            return
 	end
 
 	# Skip old style l32r annotations
@@ -144,35 +221,101 @@ def add_comment
 	if $old_line.comment =~ /^; \( /
 	    extra = $old_line.comment.sub /^;.*\)/,""
 	    if extra == ""
-		return $new_line.raw
+		puts $new_line.raw
+                return
 	    end
 	    #print "EXTRA: " + $new_line.raw + " -- " + extra + "\n"
-	    return $new_line.raw + " -- " + extra + "\n"
+	    puts $new_line.raw + " -- " + extra + "\n"
+            return
 	end
 
 	# Append the old comment
-	return $new_line.raw + "\t\t" + $old_line.comment + "\n"
+    puts $new_line.raw + "\t\t" + $old_line.comment + "\n"
+        return
 end
 
-def write_line
+# This drifts out of synch and makes a mess
+def old_and_broken
+  end_address = 0x4000e326
+  #end_address = 0x40000220
+
+  # Let the new file drive the process.
+  loop {
+	$new_line = get_new
+
+	break if $new_line.addr > end_address
+
+	old_comments_OLD
+
 	$new_line.chatter.each { |c|
 	    puts c
 	}
-	puts add_comment
+
+    # ??
+    break if $old_line.eof
+    break if $new_line.eof
+
+    #print "CLICK "
+    #print " (old = #{$old_line.addr.hex},  new = #{$new_line.addr.hex}"
+    #print "\n"
+
+	add_comment_OLD
+  }
+end
+
+# this works great
+def new_process
+    end_address = 0x4000e326
+    #end_address = 0x40000220
+
+    $new_line = get_new
+    $old_line = get_old
+
+    loop {
+        break if $new_line.addr > end_address
+
+        if $new_line.addr < $old_line.addr
+            $new_line.chatter_out
+            $new_line.line_out
+            $new_line = get_new
+            next
+        end
+
+        if $old_line.addr < $new_line.addr
+            $old_line.chatter_out
+            $new_line.append_comment $old_line
+            $old_line = get_old
+            next
+        end
+
+        # Fall thru to here when addresses match
+        $old_line.chatter_out
+        $new_line.append_comment $old_line
+        $new_line.chatter_out
+        $new_line.line_out
+
+        $new_line = get_new
+        $old_line = get_old
+    }
+
+end
+
+# generate demo of tabs with various line lengths
+# not called now, but was useful in figuring out tabs
+def tab_gen
+    (2..60).each { |len|
+        gen = len - 2
+        print "%02d" % len
+        print "X" * gen
+        print "\t\t; comment"
+        print "\n"
+    }
 end
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
-# Let the new file drive the process.
-
-loop {
-	$new_line = get_new
-	break if $new_line.addr > 0x4000e326
-
-	old_comments
-
-	write_line
-}
+#old_and_broken
+new_process
 
 # THE END
