@@ -1,7 +1,9 @@
 ; Annotated ESP8266 bootrom disassembly.
 ;
 ; **********************
-;  This is the OLD file as of 7/7/2018.
+;  On 5/2/2021, I found I had to redo the transfer of my comments
+;   to the new disassembly that I generated back in July of 2018.
+;
 ;  On 7/7/2018, I redid the entire disassembly using my
 ;  espdis script that I developed for the esp32 bootrom.
 ;  This fixes lots of problems with this disassembly,
@@ -16,16 +18,14 @@
 ;	Tom Trebisky 1-24-2016 migrated to my own disassembly
 ;	Tom Trebisky 2-28-2017 busy with this again.
 ;	Tom Trebisky 7-5-2018 pull request by quietboil
+;	Tom Trebisky 7-7-2018 redo entire disassembly with "espdis"
+;	Tom Trebisky 5-2-2021 redo comment transfer to new disassembly
 ;
 ; This is the ESP8266 bootrom -- 64K in size.
 ;
-; I began with the bin file and made multiple passes to get
-; this into an initial form that I liked.  Then I began adding
-; annotation in the form of comments (like this one).
-;
 ; TODO --
 ; 1 - Use my esp32 disassembler to redo this since it should clean
-;    up many sections that are now badly mangled.
+;    up many sections that are now badly mangled. (DONE)
 ; 2 - Get a firm understanding of ESP8266 interrupts.
 ;
 ;---------------------------------------------------
@@ -34,6 +34,13 @@
 ; See: esp_spi_erase_sector -and- esp_spi_erase_block
 ; as well as other code.
 ;---------------------------------------------------
+;
+;   The following comments are obsolete and historical given the new disassembly.
+;
+; I began with the bin file and made multiple passes to get
+; this into an initial form that I liked.  Then I began adding
+; annotation in the form of comments (like this one).
+;
 ;
 ; I did a couple of special things to generate the initial disassembly.
 ; - I converted the ".bin" file to a ".elf" file using a C program
@@ -56,6 +63,8 @@
 ; I still find it necessary to "polish" the disassembly by
 ;  hand, finding improperly disassmbled sections of code and
 ;  so forth.
+;
+; ---------------------------------------------------------------
 ;
 ; I was first inspired by the work done by "Kongo"
 ;	http://dflund.se/~kongo/esp8266.bin/iram0.txt
@@ -152,18 +161,15 @@
 ; Early on, it sets the vector base to 0x40000000 (right here!!)
 ; Which means there is no way for software to mess with the basic vector table.
 
-
   Vec_base:
 40000000:       00000000000000000000000000000000
 
 ; This sets the interrupt level to 2 and then sits here waiting
 ; for an interrupt, and spins in a loop doing this.
 
-
   _DebugExceptionVector:
 40000010:       007200          waiti   2
 40000013:       46feff          j       0x40000010
-
 
 40000016:       00000000000000000000
 
@@ -174,20 +180,16 @@
 ; Effectively, it looks to me like if an NMI happens,
 ;  we ignore it and return immediately.
 
-
   _NMIExceptionVector:
 40000020:       103300          rfi     3
-
 
 40000023:       00000000000000000000000000
 
 ; spin with break exception
 
-
   _KernelExceptionVector:
 40000030:       004100          break   1, 0			; breakpoint exception
 40000033:       46feff          j       0x40000030
-
 
 40000036:       0000
 40000038:       00000000
@@ -246,7 +248,6 @@
 ; Note 3fffdaac holds 3fffc000
 ; There is a jump table, initially as shown above
 
-
   _UserExceptionVector:
 40000050:       12d1ff          addmi   a1, a1, 0xffffff00	; stack adjust -256
 40000053:       2951            s32i.n  a2, a1, 20		; save a2
@@ -258,22 +259,18 @@
 40000062:       4971            s32i.n  a4, a1, 28		; save a4
 40000064:       a00300          jx      a3			; << dispatch via JUMP table
 
-
 40000067:       000000000000000000
 
 ; spin with break exception
-
 
   _DoubleExceptionVector:
 40000070:       404100          break   1, 4			; breakpoint exception
 40000073:       46feff          j       0x40000070
 
-
 40000076:       00000000000000000000
 
 ; Reset apparently sets the PC to 0x40000080, so we end up here
 ; and immediately jump to _ResetHandler
-
 
   _ResetVector:
 40000080:       060800          j       0x400000a4
@@ -339,7 +336,6 @@
 
 4000009c:       0000000000000000
 
-
   _ResetHandler:
 400000a4:       0c00            movi.n  a0, 0			; a0 = 0
 400000a6:       00e413          wsr.intenable   a0		; write to interrupt enable register
@@ -365,7 +361,6 @@
 400000d4:       7d02            mov.n   a7, a2			; old interrut level
 400000d6:       506610          and     a6, a6, a5
 400000d9:       860500          j       0x400000f3		; jump !!
-
 
 400000dc:       00000000
 
@@ -441,7 +436,6 @@
 40000136:       4b33            addi.n  a3, a3, 4		; ++
 40000138:       4733f4          bltu    a3, a4, 0x40000130
 4000013b:       46f9ff          j       0x40000124
-
 
 4000013e:       0000
 
@@ -659,7 +653,6 @@
 ;  This sets the interrupt level to 0 (enables all interrupts)
 ;  And it sets the EXCM bit to 1 (exception mode).
 
-
   _start:
 4000042c:       0c00            movi.n  a0, 0
 4000042e:       11d4ff          l32r    a1, [Vec_base]		; [0x40000000] 0x40000380
@@ -694,7 +687,6 @@
 ; 4000dbf8 is _xtos_p_none (stub routine)
 ; 4000dc44 is _xtos_unhandled_exception
 
-
   _xtos_set_exception_handler:
 40000454:       f6d22e          bgeui   a2, 64, 0x40000486	; in range ?
 40000457:       0c09            movi.n  a9, 0			; a9 = 0
@@ -716,14 +708,12 @@
 40000481:       a02983          moveqz  a2, a9, a10		; a2 = a9 if a10 == 0
 40000484:       0df0            ret.n
 
-
 40000486:       0c02            movi.n  a2, 0			; return 0 (out of range)
 40000488:       0df0            ret.n
 
 4000048a:       0000
 
 ; referenced in rom_store table
-
 
   _xtos_l1int_handler:
 4000048c:       5981            s32i.n  a5, a1, 32
@@ -793,7 +783,6 @@
 40000533:       c00313          wsr.sar a12
 40000536:       a00000          jx      a0			; indirect jump to _xtos_return_from_exc
 
-
 40000539:       d0ff40          nsau    a13, a15
 4000053c:       c19bff          l32r    a12, [0x3fffc180]	; 0x400003a8
 4000053f:       c0cdb0          addx8   a12, a13, a12
@@ -813,7 +802,6 @@
 
 40000569:       000000
 
-
   _xtos_restore_intlevel:
 4000056c:       20e613          wsr.ps  a2
 4000056f:       102000          rsync
@@ -823,8 +811,6 @@
 ;  idata[1] = mask
 ;  intenable = idata[0] & mask
 ; never called
-
-
 
   _xtos_set_vpri:
 40000574:       3d02            mov.n   a3, a2
@@ -839,14 +825,11 @@
 4000058b:       102000          rsync
 4000058e:       0df0            ret.n
 
-
-
   _xtos_cause3_handler:
 40000590:       0c32            movi.n  a2, 3
 40000592:       860000          j       0x40000598
 
 40000595:       000000
-
 
   _xtos_c_wrapper_handler:
 40000598:       5981            s32i.n  a5, a1, 32
@@ -890,7 +873,6 @@
 ; never called, but here it is.
 ; rand is used.
 
-
   srand:
 400005f0:       4170ff          l32r    a4, [0x3fffc6f8]	; 0x400003b0
 400005f3:       4804            l32i.n  a4, a4, 0
@@ -900,7 +882,6 @@
 400005fd:       0df0            ret.n
 
 400005ff:       00
-
 
   rand:
 40000600:       516dff          l32r    a5, [0x5851f42d]	; 0x400003b4
@@ -927,7 +908,6 @@
 40000637:       12c110          addi    a1, a1, 16
 4000063a:       0df0            ret.n
 
-
 4000063c:       22602a          s32i    a2, a0, 168		; save seed
 4000063f:       32602b          s32i    a3, a0, 172		; save seed Z
 40000642:       215eff          l32r    a2, [0x7fffffff]	; 0x400003bc
@@ -949,7 +929,6 @@
 ; __divdi3 does long = long / long
 ; __udivdi3 does u_long = u_long / u_long
 ; __umoddi3 does u_long = u_long % u_long
-
 
   __muldi3:
 40000650:       12c1d0          addi    a1, a1, -48
@@ -980,7 +959,6 @@
 
 ; oddly, this routine and the next (xthal_memcpy)
 ; bounce back and forth between each other.
-
 
   xthal_bcopy:
 40000688:       12c1e0          addi    a1, a1, -32
@@ -1014,7 +992,6 @@
 
 400006c2:       0000
 
-
   xthal_memcpy:
 400006c4:       12c1e0          addi    a1, a1, -32
 400006c7:       c941            s32i.n  a12, a1, 16
@@ -1026,7 +1003,6 @@
 400006d5:       c841            l32i.n  a12, a1, 16
 400006d7:       12c120          addi    a1, a1, 32
 400006da:       0df0            ret.n
-
 
 400006dc:       206014          extui   a6, a2, 0, 2
 400006df:       5656fb          bnez    a6, 0x40000698
@@ -1075,7 +1051,6 @@
 40000747:       0df0            ret.n
 
 40000749:       000000
-
 
   xthal_copy123:
 4000074c:       161404          beqz    a4, 0x40000791
@@ -1164,7 +1139,6 @@
 
 ; never called ??
 
-
   cmd_parse:
 40000814:       12c190          addi    a1, a1, -112
 40000817:       026113          s32i    a0, a1, 76
@@ -1200,7 +1174,6 @@
 40000860:       626114          s32i    a6, a1, 80
 40000863:       462a00          j       0x40000910
 
-
 40000866:       21d7fe          l32r    a2, [0x00000064]	; 0x400003c4
 40000869:       2a21            add.n   a2, a1, a2
 4000086b:       2802            l32i.n  a2, a2, 0
@@ -1216,7 +1189,6 @@
 40000883:       0c14            movi.n  a4, 1
 40000885:       426114          s32i    a4, a1, 80
 40000888:       062100          j       0x40000910
-
 
 4000088b:       922110          l32i    a9, a1, 64
 4000088e:       926111          s32i    a9, a1, 68
@@ -1244,7 +1216,6 @@
 400008cb:       0c12            movi.n  a2, 1
 400008cd:       226114          s32i    a2, a1, 80
 400008d0:       060f00          j       0x40000910
-
 
 400008d3:       81befe          l32r    a8, [0x0000006c]	; 0x400003cc
 400008d6:       8a81            add.n   a8, a1, a8
@@ -1278,7 +1249,6 @@
 
 4000091b:       00
 
-
   get_first_seg:
 4000091c:       12c1e0          addi    a1, a1, -32
 4000091f:       0911            s32i.n  a0, a1, 4
@@ -1305,7 +1275,6 @@
 4000094f:       420400          l8ui    a4, a4, 0
 40000952:       579402          bne     a4, a5, 0x40000958
 40000955:       462100          j       0x400009de
-
 
 40000958:       0cd6            movi.n  a6, 13
 4000095a:       5801            l32i.n  a5, a1, 0
@@ -1339,7 +1308,6 @@
 4000099f:       990a            s32i.n  a9, a10, 0
 400009a1:       460700          j       0x400009c2
 
-
 400009a4:       618cfe          l32r    a6, [0x00000014]	; 0x400003d4
 400009a7:       6a61            add.n   a6, a1, a6
 400009a9:       6806            l32i.n  a6, a6, 0
@@ -1353,7 +1321,6 @@
 400009bb:       0c02            movi.n  a2, 0
 400009bd:       2921            s32i.n  a2, a1, 8
 400009bf:       860d00          j       0x400009f9
-
 
 400009c2:       0c08            movi.n  a8, 0
 400009c4:       7801            l32i.n  a7, a1, 0
@@ -1385,7 +1352,6 @@
 40000a00:       0df0            ret.n
 
 40000a02:       0000
-
 
   remove_head_space:
 40000a04:       12c1e0          addi    a1, a1, -32
@@ -1428,7 +1394,6 @@
 40000a5c:       0df0            ret.n
 
 40000a5e:       0000
-
 
   convert_para_str:
 40000a60:       12c1e0          addi    a1, a1, -32
@@ -1520,7 +1485,6 @@
 40000b20:       0df0            ret.n
 
 40000b22:       0000
-
 
   conv_str_decimal:
 40000b24:       12c1d0          addi    a1, a1, -48
@@ -1699,7 +1663,6 @@
 
 40000cb5:       000000
 
-
   conv_str_hex:
 40000cb8:       12c1d0          addi    a1, a1, -48
 40000cbb:       0931            s32i.n  a0, a1, 12
@@ -1821,7 +1784,6 @@
 
 ; Set idle callback
 
-
   ets_set_idle_cb:
 40000dc0:       41ffff          l32r    a4, [0x3fffdab0]	; 0x40000dbc
 40000dc3:       2904            s32i.n  a2, a4, 0
@@ -1831,7 +1793,6 @@
 40000dc9:       000000
 
 40000dcc:       3fffdac0				; l32r
-
 
   ets_task:
 40000dd0:       0c16            movi.n  a6, 1
@@ -1857,14 +1818,12 @@
 ; Cute little stub routine
 ;  called just below in ets_run()
 
-
   sub_dfc:
 40000dfc:       0df0            ret.n
 
 40000dfe:       0000
 
 40000e00:       3fffc6fc				; l32r
-
 
   ets_run:
 40000e04:       12c1f0          addi    a1, a1, -16		; stack
@@ -1879,7 +1838,6 @@
 40000e1f:       0df0            ret.n
 
 40000e21:       000000
-
 
   ets_post:
 40000e24:       12c1f0          addi    a1, a1, -16
@@ -1925,7 +1883,6 @@
 40000e8c:       12c110          addi    a1, a1, 16
 40000e8f:       0df0            ret.n
 
-
 40000e91:       51caff          l32r    a5, [0x3fffdab0]	; 0x40000dbc
 40000e94:       42203f          l32i    a4, a0, 252		; read 3fffdac0 + 252
 40000e97:       622502          l32i    a6, a5, 8		; read 3fffdab8
@@ -1949,8 +1906,6 @@
 
 ; called only from one place below ...
 
-
-
   sub_ebc:
 40000ebc:       30f240          nsau    a3, a2			; a3 = shift to normalize a2
 40000ebf:       2c02            movi.n  a2, 32			; a2 = 32
@@ -1962,7 +1917,6 @@
 
 ; called by ets_run above (and only from ets_run)
 ; this is the "heart" of ets_run
-
 
   sub_ecc:
 40000ecc:       12c1e0          addi    a1, a1, -32		; stack
@@ -1976,7 +1930,6 @@
 40000edc:       c1b8ff          l32r    a12, [0x3fffdab0]	; 0x40000dbc
 40000edf:       d20d00          l8ui    a13, a13, 0		; fetch from 3fffc6fc
 40000ee2:       461a00          j       0x40000f4f
-
 
 40000ee5:       e1b9ff          l32r    a14, [0x3fffdac0]	; 0x40000dcc
 40000ee8:       c0f211          slli    a15, a2, 4
@@ -2044,7 +1997,6 @@
 ; then it sets ps.intlevel to the specified value.
 ; interrupts at and below the specified level are disabled.
 
-
   ets_intr_lock:
 40000f74:       206300          rsil    a2, 3
 40000f77:       31feff          l32r    a3, [0x3fffdcc0]	; 0x40000f70
@@ -2052,7 +2004,6 @@
 40000f7c:       0df0            ret.n
 
 40000f7e:       0000
-
 
   ets_intr_unlock:
 40000f80:       206000          rsil    a2, 0
@@ -2064,7 +2015,6 @@
 ;
 ; As an example for the Uart == ets_isr_attach ( 5, uart_rx_intr_handler, 3fffde28 )
 ;
-
 
   ets_isr_attach:
 40000f88:       12c1f0          addi    a1, a1, -16
@@ -2082,7 +2032,6 @@
 ;
 ; mask is 1 << int_no
 
-
   ets_isr_mask:
 40000f98:       12c1f0          addi    a1, a1, -16
 40000f9b:       0901            s32i.n  a0, a1, 0
@@ -2095,7 +2044,6 @@
 
 ; ets_isr_unmask ( mask )
 ;  simply calls _xtos_ints_on ( mask ) - could be a macro or alias
-
 
   ets_isr_unmask:
 40000fa8:       12c1f0          addi    a1, a1, -16
@@ -2111,7 +2059,6 @@
 
 ; This just saves its argument (in a2) to location 3fffdcd0
 ; It will be fetched from there and branched to when the time comes.
-
 
   ets_set_user_start:
 40000fbc:       31ffff          l32r    a3, [0x3fffdcd0]	; 0x40000fb8
@@ -2133,7 +2080,6 @@
 
 ; Aha ... here is main()
 ; *** MAIN ***
-
 
   main:
 40000fec:       12c1f0          addi    a1, a1, -16
@@ -2257,12 +2203,10 @@
 4000107e:       b67d02          bltui   a13, 7, 0x40001084
 40001081:       c62a00          j       0x40001130		; << unknown reset
 
-
 40001084:       f65d02          bgeui   a13, 5, 0x4000108a
 40001087:       462900          j       0x40001130		; << unknown reset
 
 ; uart_loader will come here when done
-
 
 4000108a:       c02000          memw
 4000108d:       722c46          l32i    a7, a12, 0x118
@@ -2389,7 +2333,6 @@
 
 ; Here if boot bits match 100
 
-
 40001150:       0c22            movi.n  a2, 2
 40001152:       855204          call0   sip_init_attach		; 0x4000567c
 40001155:       46bcff          j       0x4000104a
@@ -2398,13 +2341,11 @@
 ;
 ; ****************************************
 
-
 40001158:       00000000
 4000115c:       60000600				; l32r
 
 ; subroutine - called from below in one place
 ; fiddles with IOMUX_SD_DATA1 (60000824)
-
 
   sub_1160:
 40001160:       12c1f0          addi    a1, a1, -16		; stack space
@@ -2443,7 +2384,6 @@
 ; "uart_loader"
 ; argument is a pointer where we are expected to return something
 ; (the something seems to be an address)
-
 
   uart_loader:
 400011ac:       12c1e0          addi    a1, a1, -32		; stack space
@@ -2533,9 +2473,7 @@
 40001260:       12c120          addi    a1, a1, 32		; restore stack
 40001263:       0df0            ret.n
 
-
 40001265:       c6daff          j       0x400011d4
-
 
 40001268:       0811            l32i.n  a0, a1, 4		; from stack
 4000126a:       c1cfff          l32r    a12, [0x40100000]	; 0x400011a8
@@ -2555,7 +2493,6 @@
 40001289:       c57402          call0   uart_div_modify		; 0x400039d8
 4000128c:       0c20            movi.n  a0, 2
 4000128e:       06dcff          j       0x40001202
-
 
 40001291:       222102          l32i    a2, a1, 8
 40001294:       c57702          call0   Uart_Init		; 0x40003a14
@@ -2580,7 +2517,6 @@
 400012be:       4905            s32i.n  a4, a5, 0
 400012c0:       12c120          addi    a1, a1, 32
 400012c3:       0df0            ret.n
-
 
 400012c5:       85f601          call0   UartConnCheck		; 0x40003230
 400012c8:       206074          extui   a6, a2, 0, 8
@@ -2612,7 +2548,6 @@
 ; This seems to be what is called to load an app
 ;  from flash and get it ready to run.
 
-
   sub_1308:
 40001308:       22a000          movi    a2, 0			; a2 = 0
 4000130b:       42a010          movi    a4, 16			; a4 = 16
@@ -2642,7 +2577,6 @@
 40001341:       08e1            l32i.n  a0, a1, 56
 40001343:       12c160          addi    a1, a1, 96
 40001346:       0df0            ret.n
-
 
 40001348:       220102          l8ui    a2, a1, 2		; flash mode
 4000134b:       055a03          call0   SPIReadModeCnfig	; 0x400048ec
@@ -2724,7 +2658,6 @@
 400013ee:       0c38            movi.n  a8, 3
 400013f0:       578802          bany    a8, a5, 0x400013f6
 400013f3:       467700          j       0x400015d4
-
 
 400013f6:       e26115          s32i    a14, a1, 84
 400013f9:       a61543          blti    a5, 1, 0x40001440
@@ -2823,7 +2756,6 @@
 400014e7:       078402          bany    a4, a0, 0x400014ed
 400014ea:       866500          j       0x40001684
 
-
 400014ed:       a6104b          blti    a0, 1, 0x4000153c
 400014f0:       3d00            mov.n   a3, a0
 400014f2:       0c0e            movi.n  a14, 0
@@ -2871,7 +2803,6 @@
 40001556:       f0f074          extui   a15, a15, 0, 8
 40001559:       f68f02          bgeui   a15, 8, 0x4000155f
 4000155c:       467000          j       0x40001721
-
 
 4000155f:       7861            l32i.n  a7, a1, 24
 40001561:       8b8e            addi.n  a8, a14, 8
@@ -2926,7 +2857,6 @@
 400015da:       509241          srli    a9, a5, 2
 400015dd:       e61902          bgei    a9, 1, 0x400015e3
 400015e0:       0697ff          j       0x40001440
-
 
 400015e3:       0c0e            movi.n  a14, 0
 400015e5:       0c18            movi.n  a8, 1
@@ -2991,12 +2921,10 @@
 4000167f:       12c160          addi    a1, a1, 96		; restore stack
 40001682:       0df0            ret.n
 
-
 40001684:       1640eb          beqz    a0, 0x4000153c
 40001687:       008241          srli    a8, a0, 2
 4000168a:       e61802          bgei    a8, 1, 0x40001690
 4000168d:       c6aaff          j       0x4000153c
-
 
 40001690:       0c0e            movi.n  a14, 0
 40001692:       0c19            movi.n  a9, 1
@@ -3048,7 +2976,6 @@
 4000170c:       8bff            addi.n  a15, a15, 8
 4000170e:       879eb4          bne     a14, a8, 0x400016c6
 40001711:       c689ff          j       0x4000153c
-
 
 40001714:       e991            s32i.n  a14, a1, 36
 40001716:       406074          extui   a6, a4, 0, 8
@@ -3135,7 +3062,6 @@
 400017c6:       45d000          call0   ets_printf		; 0x400024cc
 400017c9:       067bff          j       0x400015b9
 
-
 400017cc:       00000000
 
 400017d0:       3fffdce0				; l32r
@@ -3144,7 +3070,6 @@
 400017dc:       3fffd7cc				; l32r
 
 ; Subroutine, set as exception handler
-
 
   sub_17e0:
 400017e0:       12c1f0          addi    a1, a1, -16
@@ -3215,7 +3140,6 @@
 
 ; gets installed as exception handler
 
-
   sub_1878:
 40001878:       30e803          rsr.exccause    a3
 
@@ -3237,8 +3161,6 @@
 4000189f:       12c110          addi    a1, a1, 16
 400018a2:       0df0            ret.n
 
-
-
   ets_memset:
 400018a4:       12c1f0          addi    a1, a1, -16
 400018a7:       0901            s32i.n  a0, a1, 0
@@ -3248,7 +3170,6 @@
 400018b1:       0df0            ret.n
 
 400018b3:       00
-
 
   ets_memcpy:
 400018b4:       12c1f0          addi    a1, a1, -16
@@ -3260,7 +3181,6 @@
 
 400018c3:       00
 
-
   ets_memmove:
 400018c4:       12c1f0          addi    a1, a1, -16
 400018c7:       0901            s32i.n  a0, a1, 0
@@ -3270,7 +3190,6 @@
 400018d1:       0df0            ret.n
 
 400018d3:       00
-
 
   ets_memcmp:
 400018d4:       12c1f0          addi    a1, a1, -16
@@ -3282,7 +3201,6 @@
 
 400018e3:       00
 400018e4:       3fffdd30				; l32r
-
 
   sub_18e8:
 400018e8:       720200          l8ui    a7, a2, 0
@@ -3382,7 +3300,6 @@
 400019db:       0df0            ret.n
 
 400019dd:       000000
-
 
   mem_free:
 400019e0:       12c1f0          addi    a1, a1, -16
@@ -3527,7 +3444,6 @@
 
 40001b3f:       00
 
-
   mem_malloc:
 40001b40:       12c1f0          addi    a1, a1, -16
 40001b43:       16520a          beqz    a2, 0x40001bec
@@ -3623,7 +3539,6 @@
 
 40001c2b:       00
 
-
   mem_calloc:
 40001c2c:       12c1f0          addi    a1, a1, -16
 40001c2f:       026101          s32i    a0, a1, 4
@@ -3645,7 +3560,6 @@
 
 40001c57:       00
 
-
   mem_zalloc:
 40001c58:       3d02            mov.n   a3, a2
 40001c5a:       12c1f0          addi    a1, a1, -16
@@ -3657,7 +3571,6 @@
 40001c69:       0df0            ret.n
 
 40001c6b:       00
-
 
   mem_realloc:
 40001c6c:       9d02            mov.n   a9, a2
@@ -3696,7 +3609,6 @@
 40001cb0:       3fffdd3c				; l32r
 40001cb4:       0000fff2				; l32r
 
-
   eprintf_init_buf:
 40001cb8:       41feff          l32r    a4, [0x3fffdd3c]	; 0x40001cb0
 40001cbb:       5812            l32i.n  a5, a2, 4
@@ -3716,7 +3628,6 @@
 40001cd8:       3fffd82c				; l32r
 
 ; subroutine referenced by eprintf below.
-
 
   sub_1cdc:
 40001cdc:       12c1f0          addi    a1, a1, -16
@@ -3749,7 +3660,6 @@
 
 ; many calls to this -- apparently to print debug only
 
-
   eprintf:
 40001d14:       9d03            mov.n   a9, a3			; a9 = a3 (second arg)
 40001d16:       12c1d0          addi    a1, a1, -48		; make space on stack
@@ -3778,7 +3688,6 @@
 40001d47:       00
 
 ; never called
-
 
   eprintf_to_host:
 40001d48:       41daff          l32r    a4, [0x3fffdd3c]	; 0x40001cb0
@@ -3822,7 +3731,6 @@
 ; Note that the first pointer is not in the bootrom, but in
 ;   application code.
 
-
   ets_write_char:
 40001da0:       12c1f0          addi    a1, a1, -16		; space on stack
 40001da3:       0901            s32i.n  a0, a1, 0		; save return
@@ -3849,7 +3757,6 @@
 
 ; installed by ets_install_uart_printf()
 
-
   sub_1dcc:
 40001dcc:       12c1f0          addi    a1, a1, -16		; space on stack
 40001dcf:       0901            s32i.n  a0, a1, 0		; save return
@@ -3872,7 +3779,6 @@
 40001df5:       0df0            ret.n
 
 40001df7:       00
-
 
   sub_1df8:
 40001df8:       12c180          addi    a1, a1, -128
@@ -3979,7 +3885,6 @@
 40001ef8:       3fffd85c				; l32r
 40001efc:       3fffd83c				; l32r
 
-
   ets_vprintf:
 40001f00:       72a090          movi    a7, 144
 40001f03:       7011c0          sub     a1, a1, a7
@@ -4035,7 +3940,6 @@
 40001f87:       2cf0            movi.n  a0, 47
 40001f89:       461a00          j       0x40001ff6
 
-
 40001f8c:       3c0a            movi.n  a10, 48
 40001f8e:       f20400          l8ui    a15, a4, 0
 40001f91:       0c1b            movi.n  a11, 1
@@ -4066,7 +3970,6 @@
 40001fd4:       b80b            l32i.n  a11, a11, 0
 40001fd6:       a00b00          jx      a11			; indirect jump
 
-
 40001fd9:       0c00            movi.n  a0, 0
 40001fdb:       026110          s32i    a0, a1, 64
 40001fde:       5c42            movi.n  a2, 84
@@ -4076,7 +3979,6 @@
 40001fe9:       3030a0          addx4   a3, a0, a3
 40001fec:       3803            l32i.n  a3, a3, 0
 40001fee:       a00300          jx      a3			; indirect jump
-
 
 40001ff1:       3c94            movi.n  a4, 57
 40001ff3:       f734bf          bltu    a4, a15, 0x40001fb6
@@ -4090,8 +3992,6 @@
 4000200a:       f730e3          bltu    a0, a15, 0x40001ff1
 4000200d:       46e9ff          j       0x40001fb6
 
-
-
   sub_2010:
 40002010:       0c1a            movi.n  a10, 1
 40002012:       16e92f          beqz    a9, 0x40002314
@@ -4104,7 +4004,6 @@
 40002023:       82611a          s32i    a8, a1, 104
 40002026:       87a702          bge     a7, a8, 0x4000202c
 40002029:       464b00          j       0x4000215a
-
 
 4000202c:       022111          l32i    a0, a1, 68
 4000202f:       064d00          j       0x40002167
@@ -4121,8 +4020,6 @@
 40002041:       622120          l32i    a6, a1, 128
 40002044:       2bcc            addi.n  a12, a12, 2
 40002046:       461f00          j       0x400020c7
-
-
 
   sub_2049:
 40002049:       dd06            mov.n   a13, a6
@@ -4213,7 +4110,6 @@
 4000212a:       e61002          bgei    a0, 1, 0x40002130
 4000212d:       0686ff          j       0x40001f49
 
-
 40002130:       2c02            movi.n  a2, 32
 40002132:       c00e00          callx0  a14
 40002135:       1bcc            addi.n  a12, a12, 1
@@ -4221,7 +4117,6 @@
 40002139:       0bff            addi.n  a15, a15, -1
 4000213b:       e61af1          bgei    a10, 1, 0x40002130
 4000213e:       c681ff          j       0x40001f49
-
 
 40002141:       022114          l32i    a0, a1, 80
 40002144:       d22116          l32i    a13, a1, 88
@@ -4261,7 +4156,6 @@
 
 4000219a:       0000
 
-
   sub_219c:
 4000219c:       626120          s32i    a6, a1, 128
 4000219f:       3c02            movi.n  a2, 48
@@ -4275,7 +4169,6 @@
 400021b3:       02cfbc          addi    a0, a15, -68
 400021b6:       273002          bltu    a0, a2, 0x400021bc
 400021b9:       c6c1ff          j       0x400020c4
-
 
 400021bc:       314cff          l32r    a3, [0x3fffcac0]	; 0x40001eec
 400021bf:       3030a0          addx4   a3, a0, a3
@@ -4295,7 +4188,6 @@
 400021df:       0c1a            movi.n  a10, 1
 400021e1:       c678ff          j       0x40001fc8
 
-
 400021e4:       62211c          l32i    a6, a1, 112
 400021e7:       2c0d            movi.n  a13, 32
 400021e9:       5646f0          bnez    a6, 0x400020f1
@@ -4303,7 +4195,6 @@
 400021ee:       0bff            addi.n  a15, a15, -1
 400021f0:       e61002          bgei    a0, 1, 0x400021f6
 400021f3:       86beff          j       0x400020f1
-
 
 400021f6:       2d0d            mov.n   a2, a13
 400021f8:       c00e00          callx0  a14
@@ -4326,14 +4217,11 @@
 4000221d:       f73802          bltu    a8, a15, 0x40002223
 40002220:       0666ff          j       0x40001fbc
 
-
 40002223:       3c9b            movi.n  a11, 57
 40002225:       f73b02          bltu    a11, a15, 0x4000222b
 40002228:       063500          j       0x40002300
 
 4000222b:       4663ff          j       0x40001fbc
-
-
 
   sub_222e:
 4000222e:       f2211a          l32i    a15, a1, 104
@@ -4344,8 +4232,6 @@
 4000223a:       f72d2c          blt     a13, a15, 0x4000226a
 4000223d:       022111          l32i    a0, a1, 68
 40002240:       c60c00          j       0x40002277
-
-
 
   sub_2243:
 40002243:       626120          s32i    a6, a1, 128
@@ -4359,7 +4245,6 @@
 40002258:       c61500          j       0x400022b3
 
 4000225b:       006261202c52c00e006221200697ff
-
 
 4000226a:       1c84            movi.n  a4, 24
 4000226c:       072404          blt     a4, a0, 0x40002274
@@ -4397,14 +4282,12 @@
 400022be:       c00e00          callx0  a14
 400022c1:       4620ff          j       0x40001f46
 
-
 400022c4:       22211d          l32i    a2, a1, 116
 400022c7:       0c0a            movi.n  a10, 0
 400022c9:       32211e          l32i    a3, a1, 120
 400022cc:       0c00            movi.n  a0, 0
 400022ce:       e61302          bgei    a3, 1, 0x400022d4
 400022d1:       c63800          j       0x400023b8
-
 
 400022d4:       16a0eb          beqz    a0, 0x40002192
 400022d7:       52211d          l32i    a5, a1, 116
@@ -4419,7 +4302,6 @@
 400022ef:       508a83          moveqz  a8, a10, a5
 400022f2:       82611e          s32i    a8, a1, 120
 400022f5:       4639ff          j       0x40001fde
-
 
 400022f8:       3c90            movi.n  a0, 57
 400022fa:       f7b002          bgeu    a0, a15, 0x40002300
@@ -4463,7 +4345,6 @@
 
 40002352:       0000
 
-
   sub_2354:
 40002354:       32211e          l32i    a3, a1, 120
 40002357:       22211d          l32i    a2, a1, 116
@@ -4474,8 +4355,6 @@
 40002364:       622120          l32i    a6, a1, 128
 40002367:       dd02            mov.n   a13, a2
 40002369:       c655ff          j       0x400020c4
-
-
 
   sub_236c:
 4000236c:       32211e          l32i    a3, a1, 120
@@ -4488,8 +4367,6 @@
 4000237f:       dd02            mov.n   a13, a2
 40002381:       c64fff          j       0x400020c4
 
-
-
   sub_2384:
 40002384:       32211e          l32i    a3, a1, 120
 40002387:       22211d          l32i    a2, a1, 116
@@ -4500,7 +4377,6 @@
 40002394:       622120          l32i    a6, a1, 128
 40002397:       dd02            mov.n   a13, a2
 40002399:       c649ff          j       0x400020c4
-
 
 4000239c:       f20500          l8ui    a15, a5, 0
 4000239f:       0c19            movi.n  a9, 1
@@ -4520,7 +4396,6 @@
 400023b8:       164306          beqz    a3, 0x40002420
 400023bb:       0c10            movi.n  a0, 1
 400023bd:       c6c4ff          j       0x400022d4
-
 
 400023c0:       52211a          l32i    a5, a1, 104
 400023c3:       1c84            movi.n  a4, 24
@@ -4547,7 +4422,6 @@
 400023f4:       a2611e          s32i    a10, a1, 120
 400023f7:       0660ff          j       0x4000217b
 
-
 400023fa:       0c02            movi.n  a2, 0
 400023fc:       c22115          l32i    a12, a1, 84
 400023ff:       d22116          l32i    a13, a1, 88
@@ -4557,7 +4431,6 @@
 4000240b:       022114          l32i    a0, a1, 80
 4000240e:       3a11            add.n   a1, a1, a3
 40002410:       0df0            ret.n
-
 
 40002412:       0c0d            movi.n  a13, 0
 40002414:       c62bff          j       0x400020c7
@@ -4582,7 +4455,6 @@
 ; ets_install_putc1 ( arg )
 ; only called from ets_install_uart_printf() below
 
-
   ets_install_putc1:
 4000242c:       3121fe          l32r    a3, [0x3fffdd3c]	; 0x40001cb0
 4000242f:       2933            s32i.n  a2, a3, 12
@@ -4591,7 +4463,6 @@
 40002433:       00
 
 40002434:       40001dcc				; l32r
-
 
   ets_install_uart_printf:
 40002438:       21ffff          l32r    a2, [sub_1dcc]		; [0x40001dcc] 0x40002434
@@ -4605,7 +4476,6 @@
 4000244b:       00
 
 4000244c:       400024a8				; l32r
-
 
   ets_install_external_printf:
 40002450:       12c1f0          addi    a1, a1, -16
@@ -4623,7 +4493,6 @@
 4000246f:       12c110          addi    a1, a1, 16
 40002472:       0df0            ret.n
 
-
 40002474:       21f6ff          l32r    a2, [sub_24a8]		; [0x400024a8] 0x4000244c
 40002477:       450100          call0   ets_install_putc2	; 0x4000248c
 4000247a:       022101          l32i    a0, a1, 4
@@ -4635,7 +4504,6 @@
 
 4000248b:       00
 
-
   ets_install_putc2:
 4000248c:       3109fe          l32r    a3, [0x3fffdd3c]	; 0x40001cb0
 4000248f:       2943            s32i.n  a2, a3, 16
@@ -4643,13 +4511,10 @@
 
 40002493:       00
 
-
   est_get_printf_buf_remain_len:
 40002494:       2107fe          l32r    a2, [0x3fffdd3c]	; 0x40001cb0
 40002497:       22120e          l16ui   a2, a2, 28
 4000249a:       0df0            ret.n
-
-
 
   est_reset_printf_buf_len:
 4000249c:       3105fe          l32r    a3, [0x3fffdd3c]	; 0x40001cb0
@@ -4660,7 +4525,6 @@
 400024a6:       0000
 
 ; subroutine, installed as "putc2" just above.
-
 
   sub_24a8:
 400024a8:       6102fe          l32r    a6, [0x3fffdd3c]	; 0x40001cb0
@@ -4676,13 +4540,11 @@
 
 400024c0:       0df0            ret.n
 
-
 400024c2:       0000
 400024c4:       3fffdd5c				; l32r
 400024c8:       40001da0				; l32r
 
 ; ets_printf -- many calls to this
-
 
   ets_printf:
 400024cc:       12c1c0          addi    a1, a1, -64		; space on stack
@@ -4729,12 +4591,10 @@
 40002528:       12c140          addi    a1, a1, 64		; restore stack
 4000252b:       0df0            ret.n
 
-
 4000252d:       c841            l32i.n  a12, a1, 16		; restore a12
 4000252f:       0831            l32i.n  a0, a1, 12		; return address
 40002531:       12c140          addi    a1, a1, 64		; restore stack
 40002534:       0df0            ret.n
-
 
 40002536:       0c02            movi.n  a2, 0			; return ( 0 );
 40002538:       c841            l32i.n  a12, a1, 16		; restore a12
@@ -4743,7 +4603,6 @@
 4000253f:       0df0            ret.n
 
 40002541:       000000
-
 
   ets_uart_printf:
 40002544:       9d03            mov.n   a9, a3
@@ -4773,7 +4632,6 @@
 40002577:       00
 
 ; never called
-
 
   ets_external_printf:
 40002578:       a1cefd          l32r    a10, [0x3fffdd3c]	; 0x40001cb0
@@ -4827,7 +4685,6 @@
 ; Called once during startup.
 ; 60000700 are RTC registers
 
-
   rtc_get_reset_reason:
 400025e0:       41dffa          l32r    a4, [0x60000600]	; 0x4000115c
 400025e3:       c02000          memw
@@ -4863,7 +4720,6 @@
 40002630:       926442          s32i    a9, a4, 0x108		; RTC
 40002633:       0df0            ret.n
 
-
 40002635:       31e9ff          l32r    a3, [0xffdfffff]	; 0x400025dc
 40002638:       0c62            movi.n  a2, 6
 4000263a:       c02000          memw
@@ -4878,7 +4734,6 @@
 ; Interesting, we get a soft reset by setting a bit
 ;  in 0x60000700 (the first RTC clock register)
 
-
   software_reset:
 4000264c:       4156f7          l32r    a4, [0x80000000]	; 0x400003a4
 4000264f:       31c3fa          l32r    a3, [0x60000600]	; 0x4000115c
@@ -4892,7 +4747,6 @@
 40002663:       00
 
 40002664:       000186a0				; l32r
-
 
   rtc_set_sleep_mode:
 40002668:       61bdfa          l32r    a6, [0x60000600]	; 0x4000115c
@@ -4916,7 +4770,6 @@
 
 40002698:       3fffdd64				; l32r
 
-
   dtm_params_init:
 4000269c:       42a044          movi    a4, 68
 4000269f:       12c1f0          addi    a1, a1, -16
@@ -4937,14 +4790,12 @@
 
 400026c5:       000000
 
-
   dtm_set_intr_mask:
 400026c8:       31f4ff          l32r    a3, [0x3fffdd64]	; 0x40002698
 400026cb:       29e3            s32i.n  a2, a3, 56
 400026cd:       0df0            ret.n
 
 400026cf:       00
-
 
   dtm_get_intr_mask:
 400026d0:       21f2ff          l32r    a2, [0x3fffdd64]	; 0x40002698
@@ -5014,7 +4865,6 @@
 40002756:       91d0ff          l32r    a9, [0x3fffdd64]	; 0x40002698
 40002759:       46ecff          j       0x4000270e
 
-
 4000275c:       05eafd          call0   rand			; 0x40000600
 4000275f:       05b90b          call0   __floatsidf		; 0x4000e2f0
 40002762:       20d220          or      a13, a2, a2
@@ -5047,14 +4897,12 @@
 
 400027a1:       000000
 
-
   save_rxbcn_mactime:
 400027a4:       31bdff          l32r    a3, [0x3fffdd64]	; 0x40002698
 400027a7:       2963            s32i.n  a2, a3, 24
 400027a9:       0df0            ret.n
 
 400027ab:       00
-
 
   save_tsf_us:
 400027ac:       31bbff          l32r    a3, [0x3fffdd64]	; 0x40002698
@@ -5064,7 +4912,6 @@
 400027b3:       00
 
 400027b4:       40002870				; l32r - rtc_enter_sleep
-
 
   ets_enter_sleep:
 400027b8:       21ffff          l32r    a2, [rtc_enter_sleep]	; [0x40002870] 0x400027b4
@@ -5079,7 +4926,6 @@
 400027cf:       00
 
 400027d0:       400027b8				; l32r
-
 
   sub_27d4:
 400027d4:       12c1e0          addi    a1, a1, -32
@@ -5148,7 +4994,6 @@
 40002864:       fffed400				; l32r
 40002868:       00100000				; l32r
 4000286c:       3fe00000				; l32r
-
 
   rtc_enter_sleep:
 40002870:       42a000          movi    a4, 0
@@ -5299,7 +5144,6 @@
 
 400029eb:       00
 
-
   rtc_intr_handler:
 400029ec:       12c1f0          addi    a1, a1, -16
 400029ef:       0911            s32i.n  a0, a1, 4
@@ -5364,7 +5208,6 @@
 
 40002a85:       000000
 
-
   ets_strcpy:
 40002a88:       12c1f0          addi    a1, a1, -16
 40002a8b:       0901            s32i.n  a0, a1, 0
@@ -5374,7 +5217,6 @@
 40002a95:       0df0            ret.n
 
 40002a97:       00
-
 
   ets_strncpy:
 40002a98:       12c1f0          addi    a1, a1, -16
@@ -5386,7 +5228,6 @@
 
 40002aa7:       00
 
-
   ets_strcmp:
 40002aa8:       12c1f0          addi    a1, a1, -16
 40002aab:       0901            s32i.n  a0, a1, 0
@@ -5396,7 +5237,6 @@
 40002ab5:       0df0            ret.n
 
 40002ab7:       00
-
 
   ets_strncmp:
 40002ab8:       12c1f0          addi    a1, a1, -16
@@ -5408,7 +5248,6 @@
 
 40002ac7:       00
 
-
   ets_strlen:
 40002ac8:       12c1f0          addi    a1, a1, -16
 40002acb:       0901            s32i.n  a0, a1, 0
@@ -5418,7 +5257,6 @@
 40002ad5:       0df0            ret.n
 
 40002ad7:       00
-
 
   ets_strstr:
 40002ad8:       12c1f0          addi    a1, a1, -16
@@ -5430,7 +5268,6 @@
 
 40002ae7:       00
 
-
   ets_bzero:
 40002ae8:       12c1f0          addi    a1, a1, -16
 40002aeb:       0901            s32i.n  a0, a1, 0
@@ -5440,7 +5277,6 @@
 40002af5:       0df0            ret.n
 
 40002af7:       00
-
 
   ets_str2macaddr:
 40002af8:       12c1e0          addi    a1, a1, -32
@@ -5496,7 +5332,6 @@
 
 40002b72:       0000
 
-
   ets_char2xdigit:
 40002b74:       52a039          movi    a5, 57
 40002b77:       62a02f          movi    a6, 47
@@ -5536,7 +5371,6 @@
 
 40002bcb:       00
 
-
   ets_getc:
 40002bcc:       12c1f0          addi    a1, a1, -16
 40002bcf:       226100          s32i    a2, a1, 0
@@ -5551,7 +5385,6 @@
 40002be5:       000000
 
 ; ets_putc - just a wrapper around uart_tx_one_char()
-
 
   ets_putc:
 40002be8:       12c1f0          addi    a1, a1, -16		; Space on stack
@@ -5576,7 +5409,6 @@
 ; +c = intack
 ; +10 = alarm (only timer 2 has this)
 
-
   sub_2bf8:
 40002bf8:       3159f9          l32r    a3, [0x60000600]	; 0x4000115c
 40002bfb:       c02000          memw
@@ -5590,7 +5422,6 @@
 ;  -- from timer_insert (just below)
 ; it fiddles around and then calls the above routine to load
 ; a value into the Timer 2 alarm register
-
 
   sub_2c04:
 40002c04:       12c1f0          addi    a1, a1, -16		; stack
@@ -5637,7 +5468,6 @@
 ; p + 12 = a
 ; p + 16 = b
 
-
   ets_timer_setfn:
 40002c48:       3932            s32i.n  a3, a2, 12
 40002c4a:       4942            s32i.n  a4, a2, 16
@@ -5651,11 +5481,9 @@
 ; timer_insert ( arg )
 ; Called from 2 places
 
-
 40002c58:       3fffddb0				; l32r
 40002c5c:       3fffd6b8				; l32r
 40002c60:       3fffd878				; l32r
-
 
   timer_insert:
 40002c64:       51fdff          l32r    a5, [0x3fffddb0]	; 0x40002c58
@@ -5721,10 +5549,8 @@
 ;  note that timer_setfn sets the first field to -1,
 ;   which makes the object palatable to this routine
 
-
 40002cbc:       000030ce				; l32r
 40002cc0:       0004c4b4				; l32r
-
 
   ets_timer_arm:
 40002cc4:       12c1f0          addi    a1, a1, -16		; stack
@@ -5749,7 +5575,6 @@
 40002ce5:       06ffff          j       0x40002ce5		; spin !!!
 
 ; Here when we are satified with the timer object
-
 
 40002ce8:       16c204          beqz    a2, 0x40002d38		; is rate == 0 ?
 40002ceb:       41f4ff          l32r    a4, [0x000030ce]	; 0x40002cbc
@@ -5792,7 +5617,6 @@
 ;  set a0 = 1 + (r*312500)/1000
 ; Note that 80000000 / 256 = 312500
 
-
 40002d25:       41e6ff          l32r    a4, [0x0004c4b4]	; 0x40002cc0
 40002d28:       32a3e8          movi    a3, 0x3e8		; a3 = 1000
 40002d2b:       402282          mull    a2, a2, a4		; a2 *= 312500
@@ -5801,14 +5625,12 @@
 40002d33:       1b02            addi.n  a0, a2, 1		; a0 = 1 + a2
 40002d35:       86f3ff          j       0x40002d07
 
-
 40002d38:       0c00            movi.n  a0, 0			; here when rate == 0
 40002d3a:       46f2ff          j       0x40002d07
 
 40002d3d:       000000
 
 ; called with a pointer to ....
-
 
   ets_timer_disarm:
 40002d40:       71c6ff          l32r    a7, [0x3fffddb0]	; 0x40002c58
@@ -5822,7 +5644,6 @@
 40002d50:       5655ff          bnez    a5, 0x40002d49
 40002d53:       c60700          j       0x40002d76
 
-
 40002d56:       9cc5            beqz.n  a5, 0x40002d76
 40002d58:       8cc6            beqz.n  a6, 0x40002d68
 40002d5a:       0c03            movi.n  a3, 0
@@ -5833,7 +5654,6 @@
 40002d64:       3922            s32i.n  a3, a2, 8
 40002d66:       0df0            ret.n
 
-
 40002d68:       0c08            movi.n  a8, 0
 40002d6a:       7cf9            movi.n  a9, -1
 40002d6c:       a805            l32i.n  a10, a5, 0
@@ -5842,14 +5662,11 @@
 40002d72:       8922            s32i.n  a8, a2, 8
 40002d74:       0df0            ret.n
 
-
 40002d76:       0c0b            movi.n  a11, 0
 40002d78:       7cf3            movi.n  a3, -1
 40002d7a:       3902            s32i.n  a3, a2, 0
 40002d7c:       b922            s32i.n  a11, a2, 8
 40002d7e:       0df0            ret.n
-
-
 
   ets_timer_done:
 40002d80:       12c1f0          addi    a1, a1, -16
@@ -5864,7 +5681,6 @@
 40002d93:       8573ff          call0   ets_printf		; 0x400024cc
 40002d96:       06ffff          j       0x40002d96
 
-
 40002d99:       0c03            movi.n  a3, 0
 40002d9b:       0c04            movi.n  a4, 0
 40002d9d:       85eaff          call0   ets_timer_setfn		; 0x40002c48
@@ -5873,7 +5689,6 @@
 40002da5:       0df0            ret.n
 
 40002da7:       00
-
 
   ets_timer_handler_isr:
 40002da8:       12c1f0          addi    a1, a1, -16
@@ -5930,7 +5745,6 @@
 40002e1d:       45e4ff          call0   timer_insert		; 0x40002c64
 40002e20:       06efff          j       0x40002de0
 
-
 40002e23:       00
 
   sub_2e24:
@@ -5947,8 +5761,6 @@
 ; The little routine that follows is referenced below
 ; and passed as an argument to ets_task
 
-
-
   sub_2e3c:
 40002e3c:       12c1f0          addi    a1, a1, -16		; stack
 40002e3f:       0901            s32i.n  a0, a1, 0		; return
@@ -5958,19 +5770,16 @@
 40002e47:       12c110          addi    a1, a1, 16
 40002e4a:       0df0            ret.n
 
-
 40002e4c:       0c02            movi.n  a2, 0
 40002e4e:       85f5ff          call0   ets_timer_handler_isr	; 0x40002da8
 40002e51:       0801            l32i.n  a0, a1, 0
 40002e53:       12c110          addi    a1, a1, 16
 40002e56:       0df0            ret.n
 
-
 40002e58:       40002e24				; l32r
 40002e5c:       3feffe00				; l32r - Poochie
 40002e60:       40002e3c				; l32r
 40002e64:       3fffddc0				; l32r
-
 
   ets_timer_init:
 40002e68:       22a00a          movi    a2, 10			; a2 = 10
@@ -6018,7 +5827,6 @@
 
 40002ec8:       3fffc704				; l32r
 
-
   ets_delay_us:
 40002ecc:       12c1f0          addi    a1, a1, -16		; stack
 40002ecf:       d26102          s32i    a13, a1, 8		; save a13
@@ -6050,14 +5858,12 @@
 
 ; Note that 3fffxxxx is in ETS system memory
 
-
   ets_update_cpu_frequency:
 40002f04:       31f1ff          l32r    a3, [0x3fffc704]	; 0x40002ec8
 40002f07:       2903            s32i.n  a2, a3, 0
 40002f09:       0df0            ret.n
 
 40002f0b:       00
-
 
   ets_get_cpu_frequency:
 40002f0c:       21efff          l32r    a2, [0x3fffc704]	; 0x40002ec8
@@ -6076,7 +5882,6 @@
 ;
 ; call this wdt_map(arg)
 
-
   sub_2f14:
 40002f14:       26320e          beqi    a2, 3, 0x40002f26
 40002f17:       26620f          beqi    a2, 6, 0x40002f2a
@@ -6088,10 +5893,8 @@
 40002f21:       402383          moveqz  a2, a3, a4		; a2 = a3 if a4 == 0
 40002f24:       0df0            ret.n
 
-
 40002f26:       0cb2            movi.n  a2, 11			; return 11
 40002f28:       0df0            ret.n
-
 
 40002f2a:       0cc2            movi.n  a2, 12			; return 12
 40002f2c:       0df0            ret.n
@@ -6115,7 +5918,6 @@
 
 40002f30:       3fffc708				; l32r - wdt_info
 
-
   ets_wdt_get_mode:
 40002f34:       21ffff          l32r    a2, [0x3fffc708]	; 0x40002f30
 40002f37:       2802            l32i.n  a2, a2, 0		; return wdt_info.mode
@@ -6125,7 +5927,6 @@
 
 ; called from wrapper below, used as an ISR.
 ; wdt_xxx ( arg )
-
 
   sub_2f3c:
 40002f3c:       12c1f0          addi    a1, a1, -16
@@ -6177,7 +5978,6 @@
 ;
 ; Note that the WDT interrupt is 8 ( with mask 0x100 )
 
-
   sub_2f88:
 40002f88:       12c1f0          addi    a1, a1, -16
 40002f8b:       0901            s32i.n  a0, a1, 0
@@ -6194,7 +5994,6 @@
 40002f9c:       3fffdde0				; l32r - wdt_timer
 
 ; ets_wdt_enable ( mode, y, z )
-
 
   ets_wdt_enable:
 40002fa0:       12c1f0          addi    a1, a1, -16		; stack
@@ -6365,7 +6164,6 @@
 ; sets wdt_info.mode = 0;
 ; returns old value of wdt_info.mode
 
-
   ets_wdt_disable:
 400030f0:       7ce6            movi.n  a6, -2			; a6 = -2 = 0xfff..ffe
 400030f2:       12c1f0          addi    a1, a1, -16		; stack
@@ -6406,7 +6204,6 @@
 4000313f:       12c110          addi    a1, a1, 16
 40003142:       0df0            ret.n
 
-
 40003144:       22a100          movi    a2, 0x100
 40003147:       05e5fd          call0   ets_isr_mask		; 0x40000f98 - disable interrupts
 4000314a:       c02c20          or      a2, a12, a12		; return mode
@@ -6420,7 +6217,6 @@
 ; otherwise calls ets_wdt_enable ( mode, Y, Z )
 
 ; Not called in bootrom
-
 
   ets_wdt_restore:
 40003158:       12c1f0          addi    a1, a1, -16		; save
@@ -6436,8 +6232,6 @@
 
 ; ets_wdt_init ( void )
 ; Not called in bootrom
-
-
 
   ets_wdt_init:
 40003170:       12c1f0          addi    a1, a1, -16		; stack
@@ -6473,15 +6267,12 @@
 
 ; **************************** END of wdt section
 
-
   roundup2:
 400031b4:       304060          neg     a4, a3
 400031b7:       3a22            add.n   a2, a2, a3
 400031b9:       0b22            addi.n  a2, a2, -1
 400031bb:       402210          and     a2, a2, a4
 400031be:       0df0            ret.n
-
-
 
   multofup:
 400031c0:       12c1f0          addi    a1, a1, -16
@@ -6494,7 +6285,6 @@
 400031d1:       0df0            ret.n
 
 400031d3:       00
-
 
   sub_31d4:
 400031d4:       12c1f0          addi    a1, a1, -16
@@ -6531,14 +6321,12 @@
 4000321f:       12c110          addi    a1, a1, 16
 40003222:       0df0            ret.n
 
-
 40003224:       3fffde10				; l32r
 40003228:       3fff9f80				; l32r
 4000322c:       3fffde00				; l32r
 
 ; 3fffde10 UartDev
 ; This is some kind of Uart control block
-
 
   UartConnCheck:
 40003230:       21fdff          l32r    a2, [UartDev]		; [0x3fffde10] 0x40003224
@@ -6564,7 +6352,6 @@
 4000325f:       0821            l32i.n  a0, a1, 8		; return
 40003261:       12c110          addi    a1, a1, 16		; stack
 40003264:       0df0            ret.n
-
 
 40003266:       22a001          movi    a2, 1
 40003269:       32a001          movi    a3, 1
@@ -6636,7 +6423,6 @@
 40003310:       12c110          addi    a1, a1, 16
 40003313:       0df0            ret.n
 
-
 40003315:       c02000          memw
 40003318:       9191f7          l32r    a9, [0x60000600]	; 0x4000115c
 4000331b:       322988          l32i    a3, a9, 0x220
@@ -6664,13 +6450,11 @@
 4000335b:       12c110          addi    a1, a1, 16
 4000335e:       0df0            ret.n
 
-
 40003360:       3fffde04				; l32r
 40003364:       3fffcba0				; l32r
 
 ; This seems to be what handles serial download
 ; returns 1 on problem
-
 
   UartDwnLdProc:
 40003368:       12c1c0          addi    a1, a1, -64
@@ -6748,7 +6532,6 @@
 
 ; bad return, return 1
 
-
 4000340a:       22a020          movi    a2, 32			; 0x20
 4000340d:       85b8fd          call0   ets_isr_mask		; 0x40000f98
 40003410:       22a001          movi    a2, 1
@@ -6791,8 +6574,6 @@
 ; Table index 5
 ;   start memory download
 
-
-
   sub_3440:
 40003440:       e02e20          or      a2, a14, a14
 40003443:       32c11c          addi    a3, a1, 28
@@ -6805,8 +6586,6 @@
 ; Table index 11
 ;	new flash parameters
 
-
-
   sub_3455:
 40003455:       2d0e            mov.n   a2, a14
 40003457:       32c11c          addi    a3, a1, 28
@@ -6817,9 +6596,8 @@
 
 40003465:       000000
 
-; Table index 10
+; Table index 10 (0xa)
 ;	Read register
-
 
   sub_3468:
 40003468:       e02e20          or      a2, a14, a14
@@ -6833,8 +6611,6 @@
 ; Table index 9
 ;	Write register
 
-
-
   sub_347d:
 4000347d:       2d0e            mov.n   a2, a14
 4000347f:       32c11c          addi    a3, a1, 28
@@ -6845,8 +6621,6 @@
 
 ; Table index 8
 ;	Connect (Sync)
-
-
 
   sub_348d:
 4000348d:       e02e20          or      a2, a14, a14
@@ -6862,7 +6636,6 @@
 ; Table index 7
 ;	memory data
 
-
   sub_34a3:
 400034a3:       e02e20          or      a2, a14, a14
 400034a6:       32c11c          addi    a3, a1, 28
@@ -6877,7 +6650,6 @@
 ; Table index 6
 ;	end of memory download
 
-
   sub_34b9:
 400034b9:       e02e20          or      a2, a14, a14
 400034bc:       32c11c          addi    a3, a1, 28
@@ -6890,8 +6662,6 @@
 
 ; Table index 4
 ;	end of flash download
-
-
 
   sub_34d0:
 400034d0:       e02e20          or      a2, a14, a14
@@ -6908,8 +6678,6 @@
 ; Table index 3
 ;	flash data
 
-
-
   sub_34eb:
 400034eb:       e02e20          or      a2, a14, a14
 400034ee:       32c11c          addi    a3, a1, 28
@@ -6922,8 +6690,6 @@
 ; Table index 2
 ;	start of flash download
 
-
-
   sub_3500:
 40003500:       051401          call0   spi_flash_attach	; 0x40004644
 40003503:       e02e20          or      a2, a14, a14
@@ -6935,8 +6701,6 @@
 40003515:       86c8ff          j       0x4000343b
 
 ; all done -- return 1
-
-
 
   sub_3518:
 40003518:       22a020          movi    a2, 32			; 0x20
@@ -6953,7 +6717,6 @@
 40003531:       000000
 
 40003534:       00001800				; l32r
-
 
   FlashDwnLdStartMsgProc:
 40003538:       12c1f0          addi    a1, a1, -16
@@ -7005,7 +6768,6 @@
 4000359a:       0000
 
 4000359c:       00001810				; l32r
-
 
   FilePacketSendReqMsgProc:
 400035a0:       12c1e0          addi    a1, a1, -32
@@ -7094,7 +6856,6 @@
 
 40003655:       000000
 
-
   FlashDwnLdStopReqMsgProc:
 40003658:       12c1f0          addi    a1, a1, -16
 4000365b:       0c26            movi.n  a6, 2
@@ -7121,7 +6882,6 @@
 
 4000368b:       00
 
-
   FlashDwnLdParamCfgMsgProc:
 4000368c:       7d02            mov.n   a7, a2
 4000368e:       12c1f0          addi    a1, a1, -16
@@ -7136,7 +6896,6 @@
 400036a3:       12c110          addi    a1, a1, 16
 400036a6:       0df0            ret.n
 
-
 400036a8:       222702          l32i    a2, a7, 8
 400036ab:       322703          l32i    a3, a7, 12
 400036ae:       422704          l32i    a4, a7, 16
@@ -7150,7 +6909,6 @@
 400036c1:       0df0            ret.n
 
 400036c3:       00
-
 
   MemDwnLdStartMsgProc:
 400036c4:       521201          l16ui   a5, a2, 2
@@ -7174,8 +6932,6 @@
 400036ea:       2934            s32i.n  a2, a4, 12
 400036ec:       2944            s32i.n  a2, a4, 16
 400036ee:       0df0            ret.n
-
-
 
   MemPacketSendReqMsgProc:
 400036f0:       12c1e0          addi    a1, a1, -32
@@ -7244,7 +7000,6 @@
 
 40003779:       000000
 
-
   MemDwnLdStopReqMsgProc:
 4000377c:       721201          l16ui   a7, a2, 2
 4000377f:       0c86            movi.n  a6, 8
@@ -7271,8 +7026,6 @@
 ; uart1 base is at 0x60000f00
 ; both are 128 bytes in size
 
-
-
   UartConnectProc:
 400037a0:       2822            l32i.n  a2, a2, 8
 400037a2:       2904            s32i.n  a2, a4, 0
@@ -7281,7 +7034,6 @@
 400037a8:       0df0            ret.n
 
 400037aa:       0000
-
 
   UartRegWriteProc:
 400037ac:       12c1e0          addi    a1, a1, -32
@@ -7323,7 +7075,6 @@
 40003803:       12c120          addi    a1, a1, 32
 40003806:       0df0            ret.n
 
-
 40003808:       0801            l32i.n  a0, a1, 0
 4000380a:       c811            l32i.n  a12, a1, 4
 4000380c:       d821            l32i.n  a13, a1, 8
@@ -7334,7 +7085,6 @@
 40003817:       0df0            ret.n
 
 40003819:       000000
-
 
   UartRegReadProc:
 4000381c:       2822            l32i.n  a2, a2, 8
@@ -7381,7 +7131,6 @@
 
 ; The above block lives at 3fffde10
 ; It is followed at efffde60 by a 256 byte buffer
-
 
   uartAttach:
 4000383c:       32a001          movi    a3, 1			; a3 = 1
@@ -7435,7 +7184,6 @@
 40003898:       00000f00				; l32r
 4000389c:       5ffffe00				; l32r
 400038a0:       0000ffff				; l32r
-
 
   uart_buff_switch:
 400038a4:       12c1f0          addi    a1, a1, -16
@@ -7491,14 +7239,12 @@
 4000391b:       12c110          addi    a1, a1, 16
 4000391e:       0df0            ret.n
 
-
 40003920:       00000801				; l32r
 
 ; The usual business of setting the uart base address to 5ffffe00 and
 ;  then adding offsets of 0x200 to get 60000000
 ;
 ;  0x18 is the autobaud register
-
 
   uart_baudrate_detect:
 40003924:       41deff          l32r    a4, [0x5ffffe00]	; 0x4000389c
@@ -7601,7 +7347,6 @@
 ; offset 0x20 is uart_conf0 register
 ;	this holds many bits, here we reset the fifos.
 
-
   uart_div_modify:
 400039d8:       51b0ff          l32r    a5, [0x00000f00]	; 0x40003898
 400039db:       61b0ff          l32r    a6, [0x5ffffe00]	; 0x4000389c
@@ -7641,7 +7386,6 @@
 ; uartAttach ();
 ; Uart_Init ( 0 );
 ; ets_install_uart_printf ();
-
 
   Uart_Init:
 40003a14:       42aecf          movi    a4, 0xfffffecf
@@ -7772,7 +7516,6 @@
 ; uart1 base is at 0x60000f00
 ;
 
-
   uart_tx_one_char:
 40003b30:       5132f2          l32r    a5, [0x00ff0000]	; 0x400003f8
 40003b33:       81bcfd          l32r    a8, [UartDev]		; [0x3fffde10] 0x40003224
@@ -7812,7 +7555,6 @@
 
 40003b62:       0000
 
-
   uart_rx_one_char_block:
 40003b64:       52a0ff          movi    a5, 255
 40003b67:       41affd          l32r    a4, [UartDev]		; [0x3fffde10] 0x40003224
@@ -7836,8 +7578,6 @@
 ;  returns 0 on success, 1 if nothing to read
 ;  does not spin or block
 
-
-
   uart_rx_one_char:
 40003b8c:       61a6fd          l32r    a6, [UartDev]		; [0x3fffde10] 0x40003224
 40003b8f:       4142ff          l32r    a4, [0x00000f00]	; 0x40003898
@@ -7855,12 +7595,10 @@
 40003bb1:       0c02            movi.n  a2, 0			; return 0
 40003bb3:       0df0            ret.n
 
-
 40003bb5:       0c12            movi.n  a2, 1			; return 1
 40003bb7:       0df0            ret.n
 
 40003bb9:       000000
-
 
   uart_rx_intr_handler:
 40003bbc:       0c18            movi.n  a8, 1
@@ -7909,7 +7647,6 @@
 
 40003c2e:       0000
 
-
   UartRxString:
 40003c30:       12c1e0          addi    a1, a1, -32
 40003c33:       d921            s32i.n  a13, a1, 8
@@ -7949,8 +7686,6 @@
 ; -----------------------------------------------------------
 
 ;  called once from below
-
-
 
   send_packet:
 40003c80:       12c1e0          addi    a1, a1, -32
@@ -8004,7 +7739,6 @@
 ; wrapper on send_packet
 ; (which is silly as this is the only thing that calls send_packet)
 
-
   SendMsg:
 40003cf4:       12c1f0          addi    a1, a1, -16
 40003cf7:       0901            s32i.n  a0, a1, 0
@@ -8015,7 +7749,6 @@
 40003d03:       0df0            ret.n
 
 40003d05:       000000
-
 
   recv_packet:
 40003d08:       0c17            movi.n  a7, 1
@@ -8054,7 +7787,6 @@
 40003d57:       0841            l32i.n  a0, a1, 16
 40003d59:       12c130          addi    a1, a1, 48
 40003d5c:       0df0            ret.n
-
 
 40003d5e:       8c6d            beqz.n  a13, 0x40003d68
 40003d60:       28ef            l32i.n  a2, a15, 56
@@ -8112,7 +7844,6 @@
 40003dd9:       071b02          beq     a11, a0, 0x40003ddf
 40003ddc:       46dbff          j       0x40003d4d
 
-
 40003ddf:       c6d6ff          j       0x40003d3e
 
 40003de2:       0000
@@ -8122,7 +7853,6 @@
 40003de9:       2821            l32i.n  a2, a1, 8
 40003deb:       663402          bnei    a4, 3, 0x40003df1
 40003dee:       062400          j       0x40003e82
-
 
 40003df1:       224100          s8i     a2, a1, 0
 40003df4:       32a0dc          movi    a3, 220
@@ -8137,7 +7867,6 @@
 40003e0c:       02a0db          movi    a0, 219
 40003e0f:       024100          s8i     a0, a1, 0
 40003e12:       460100          j       0x40003e1b
-
 
 40003e15:       02a0c0          movi    a0, 192
 40003e18:       024100          s8i     a0, a1, 0
@@ -8198,7 +7927,6 @@
 40003e95:       48ef            l32i.n  a4, a15, 56
 40003e97:       46d6ff          j       0x40003df4
 
-
 40003e9a:       0841            l32i.n  a0, a1, 16
 40003e9c:       c851            l32i.n  a12, a1, 20
 40003e9e:       d861            l32i.n  a13, a1, 24
@@ -8213,7 +7941,6 @@
 ; RcvMsg
 ; calls recv_packet, returns 0 if OK, 1 if bad
 ; (which is silly as this is the only thing that calls recv_packet)
-
 
   RcvMsg:
 40003eac:       12c1f0          addi    a1, a1, -16		; space on stack
@@ -8231,7 +7958,6 @@
 40003ec6:       0000
 
 ; called by recv_packet and UartGetCmdLn
-
 
   uart_rx_readbuff:
 40003ec8:       6832            l32i.n  a6, a2, 12
@@ -8255,14 +7981,12 @@
 40003eea:       0c02            movi.n  a2, 0			; return 0
 40003eec:       0df0            ret.n
 
-
 40003eee:       0c02            movi.n  a2, 0			; return 0
 40003ef0:       0df0            ret.n
 
 40003ef2:       0000
 
 ; never called that I have found
-
 
   UartGetCmdLn:
 40003ef4:       12c1f0          addi    a1, a1, -16
@@ -8275,7 +7999,6 @@
 40003f05:       0831            l32i.n  a0, a1, 12
 40003f07:       12c110          addi    a1, a1, 16
 40003f0a:       0df0            ret.n
-
 
 40003f0c:       21c6fc          l32r    a2, [UartDev]		; [0x3fffde10] 0x40003224
 40003f0f:       3d01            mov.n   a3, a1
@@ -8291,7 +8014,6 @@
 40003f27:       29b3            s32i.n  a2, a3, 44
 40003f29:       12c110          addi    a1, a1, 16
 40003f2c:       0df0            ret.n
-
 
 40003f2e:       2811            l32i.n  a2, a1, 4
 40003f30:       5821            l32i.n  a5, a1, 8
@@ -8310,7 +8032,6 @@
 ;  Uart control block
 ;  never used in the bootrom, so this is for external use.
 
-
   GetUartDevice:
 40003f4c:       21b6fc          l32r    a2, [UartDev]		; [0x3fffde10] 0x40003224
 40003f4f:       0df0            ret.n
@@ -8318,7 +8039,6 @@
 40003f51:       000000
 
 40003f54:       60000a00				; l32r
-
 
   SelectSpiFunction:
 40003f58:       82aecf          movi    a8, 0xfffffecf
@@ -8423,7 +8143,6 @@
 
 4000407e:       0000
 
-
   esp_spi_erase_chip:
 40004080:       12c1f0          addi    a1, a1, -16
 40004083:       c911            s32i.n  a12, a1, 4
@@ -8450,10 +8169,8 @@
 400040b6:       12c110          addi    a1, a1, 16
 400040b9:       0df0            ret.n
 
-
 400040bb:       00
 400040bc:       01000000				; l32r
-
 
   esp_spi_erase_sector:
 400040c0:       12c1f0          addi    a1, a1, -16
@@ -8468,7 +8185,6 @@
 400040d4:       0811            l32i.n  a0, a1, 4
 400040d6:       12c110          addi    a1, a1, 16
 400040d9:       0df0            ret.n
-
 
 400040db:       00
 
@@ -8537,7 +8253,6 @@
 
 4000416c:       20000000				; l32r
 40004170:       02000000				; l32r
-
 
   sub_4174:
 40004174:       12c1e0          addi    a1, a1, -32
@@ -8681,7 +8396,6 @@
 ;               - must have space for extra bytes - 1..3 - if byte_count % 4 != 0
 ;	  a5 = byte count
 
-
   sub_42ac:
 400042ac:       12c1f0          addi    a1, a1, -16		; stack
 400042af:       d921            s32i.n  a13, a1, 8		; save a13
@@ -8712,7 +8426,6 @@
 400042d8:       051b00          call0   Wait_SPI_Idle		; 0x4000448c
 400042db:       e61d02          bgei    a13, 1, 0x400042e1	; byte_count >= 1
 400042de:       863400          j       0x400043b4		; goto return 0
-
 
 400042e1:       0138f3          l32r    a0, [0x60000200]	; 0x40000fc4
 400042e4:       51a2ff          l32r    a5, [0x20000000]	; 0x4000416c
@@ -8829,10 +8542,8 @@
 400043be:       12c110          addi    a1, a1, 16
 400043c1:       0df0            ret.n
 
-
 400043c3:       00
 400043c4:       08000000				; l32r
-
 
   SPI_read_status:
 400043c8:       61ffff          l32r    a6, [0x08000000]	; 0x400043c4
@@ -8857,9 +8568,7 @@
 400043f8:       0c02            movi.n  a2, 0
 400043fa:       0df0            ret.n
 
-
 400043fc:       04000000				; l32r
-
 
   SPI_write_status:
 40004400:       12c1f0          addi    a1, a1, -16
@@ -8884,12 +8593,10 @@
 40004430:       12c110          addi    a1, a1, 16
 40004433:       0df0            ret.n
 
-
 40004435:       000000
 40004438:       40000000				; l32r
 
 ; Called with one argument, a pointer to the SPI-param block
-
 
   SPI_write_enable:
 4000443c:       12c1f0          addi    a1, a1, -16		; stack space
@@ -8931,7 +8638,6 @@
 
 ; Bit 9 in the SPI_READY register indicates SPI ready/idle status
 
-
   Wait_SPI_Idle:
 4000448c:       12c1f0          addi    a1, a1, -16
 4000448f:       0911            s32i.n  a0, a1, 4		; save return
@@ -8956,7 +8662,6 @@
 400044bb:       0df0            ret.n
 
 400044bd:       000000
-
 
   sub_44c0:
 400044c0:       12c1f0          addi    a1, a1, -16
@@ -8991,7 +8696,6 @@
 40004504:       0df0            ret.n
 
 40004506:       0000
-
 
   sub_4508:
 40004508:       12c1f0          addi    a1, a1, -16
@@ -9124,7 +8828,6 @@
 
 40004642:       0000
 
-
   spi_flash_attach:
 40004644:       12c1f0          addi    a1, a1, -16
 40004647:       0901            s32i.n  a0, a1, 0
@@ -9157,7 +8860,6 @@
 ; 0x0002 - cache is empty
 ; 0x0100 - (bit 8) undocumented, but gets lots of attention here.
 ; 0x0200 - (bit 9) SPI is ready/idle
-
 
   Cache_Read_Enable:
 40004678:       82a100          movi    a8, 0x100		; used way down below
@@ -9294,7 +8996,6 @@
 400047a8:       326789          s32i    a3, a7, 0x224		; SPI__bank
 400047ab:       86f3ff          j       0x4000477d
 
-
 400047ae:       0000
 400047b0:       b1b0ff          l32r    a11, [0xfeffffff]	; 0x40004670
 400047b3:       c02000          memw
@@ -9323,7 +9024,6 @@
 400047ed:       000000
 
 ; Cache Read Disable - disable SPI mapping via cache
-
 
   Cache_Read_Disable:
 400047f0:       319bf9          l32r    a3, [0x3feffe00]	; 0x40002e5c
@@ -9405,7 +9105,6 @@
 ;  3fffc728:	00000100	; + 16
 ;  3fffc72c:	0000ffff	; + 20
 
-
   SPIUnlock:
 40004878:       21ffff          l32r    a2, [flashchip]		; [0x3fffc714] 0x40004874
 4000487b:       12c1f0          addi    a1, a1, -16
@@ -9418,7 +9117,6 @@
 4000488c:       12c110          addi    a1, a1, 16
 4000488f:       0df0            ret.n
 
-
 40004891:       21f8ff          l32r    a2, [flashchip]		; [0x3fffc714] 0x40004874
 40004894:       0c03            movi.n  a3, 0
 40004896:       222200          l32i    a2, a2, 0		; deref
@@ -9428,8 +9126,6 @@
 400048a1:       0801            l32i.n  a0, a1, 0
 400048a3:       12c110          addi    a1, a1, 16
 400048a6:       0df0            ret.n
-
-
 
   SPILock:
 400048a8:       21f3ff          l32r    a2, [flashchip]		; [0x3fffc714] 0x40004874
@@ -9453,13 +9149,11 @@
 400048d3:       12c110          addi    a1, a1, 16
 400048d6:       0df0            ret.n
 
-
 400048d8:       fe6f9fff				; l32r
 400048dc:       01002000				; l32r
 400048e0:       00102000				; l32r
 400048e4:       00802000				; l32r
 400048e8:       00006000				; l32r
-
 
   SPIReadModeCnfig:
 400048ec:       12c1f0          addi    a1, a1, -16
@@ -9514,23 +9208,19 @@
 40004964:       12c110          addi    a1, a1, 16
 40004967:       0df0            ret.n
 
-
 40004969:       61ddff          l32r    a6, [0x00102000]	; 0x400048e0
 4000496c:       6901            s32i.n  a6, a1, 0
 4000496e:       46ebff          j       0x4000491f
 
-
 40004971:       71dcff          l32r    a7, [0x00802000]	; 0x400048e4
 40004974:       7901            s32i.n  a7, a1, 0
 40004976:       46e9ff          j       0x4000491f
-
 
 40004979:       81dbff          l32r    a8, [0x00006000]	; 0x400048e8
 4000497c:       8901            s32i.n  a8, a1, 0
 4000497e:       46e7ff          j       0x4000491f
 
 40004981:       000000
-
 
   SPIEraseChip:
 40004984:       21bcff          l32r    a2, [flashchip]		; [0x3fffc714] 0x40004874
@@ -9553,8 +9243,6 @@
 400049ad:       0801            l32i.n  a0, a1, 0
 400049af:       12c110          addi    a1, a1, 16
 400049b2:       0df0            ret.n
-
-
 
   SPIEraseBlock:
 400049b4:       31b0ff          l32r    a3, [flashchip]		; [0x3fffc714] 0x40004874
@@ -9591,7 +9279,6 @@
 
 400049fe:       0000
 
-
   SPIEraseSector:
 40004a00:       319dff          l32r    a3, [flashchip]		; [0x3fffc714] 0x40004874
 40004a03:       12c1f0          addi    a1, a1, -16
@@ -9627,7 +9314,6 @@
 
 40004a4a:       0000
 
-
   SPIWrite:
 40004a4c:       5d04            mov.n   a5, a4
 40004a4e:       8189ff          l32r    a8, [flashchip]		; [0x3fffc714] 0x40004874
@@ -9652,7 +9338,6 @@
 40004a77:       0821            l32i.n  a0, a1, 8
 40004a79:       12c130          addi    a1, a1, 48
 40004a7c:       0df0            ret.n
-
 
 40004a7e:       4981            s32i.n  a4, a1, 32
 40004a80:       2d0d            mov.n   a2, a13
@@ -9727,7 +9412,6 @@
 ; a3 is the address to read to
 ; a4 is a byte count
 
-
   SPIRead:
 40004b1c:       5d04            mov.n   a5, a4			; byte count
 40004b1e:       7d03            mov.n   a7, a3			; buffer address
@@ -9748,7 +9432,6 @@
 40004b41:       0df0            ret.n
 
 40004b43:       00
-
 
   SPIEraseArea:
 40004b44:       12c1e0          addi    a1, a1, -32
@@ -9851,7 +9534,6 @@
 
 40004c29:       000000
 
-
   SPIParamCfg:
 40004c2c:       8112ff          l32r    a8, [flashchip]		; [0x3fffc714] 0x40004874
 40004c2f:       8808            l32i.n  a8, a8, 0		; deref
@@ -9880,7 +9562,6 @@
 ; 60000310 - enable
 ; 60000314 - disable
 ; 60000318 - disable
-
 
   gpio_init:
 40004c50:       22a004          movi    a2, 4			; a2 = 4
@@ -9944,7 +9625,6 @@
 40004cca:       12c120          addi    a1, a1, 32		; restore stack
 40004ccd:       0df0            ret.n
 
-
 40004ccf:       00
 
 ; This is advertised in the SDK document --
@@ -9959,7 +9639,6 @@
 ; to set high:  gpio_output_set ( m, 0, m, 0 )
 ; to set low:  gpio_output_set ( 0, m, m, 0 )
 ; for input:  gpio_output_set ( 0, 0, 0, m )
-
 
   gpio_output_set:
 40004cd0:       61bdf0          l32r    a6, [0x60000200]	; 0x40000fc4
@@ -9977,7 +9656,6 @@
 
 ; simply reads from 0x60000318
 
-
   gpio_input_get:
 40004cf0:       21b5f0          l32r    a2, [0x60000200]	; 0x40000fc4
 40004cf3:       c02000          memw
@@ -9990,7 +9668,6 @@
 40004d00:       3fffdfe0				; l32r
 
 ; call as gpio_register_set ( reg, val )
-
 
   gpio_register_set:
 40004d04:       12c1f0          addi    a1, a1, -16		; stack
@@ -10020,7 +9697,6 @@
 40004d3d:       12c110          addi    a1, a1, 16		; stack
 40004d40:       0df0            ret.n
 
-
 40004d42:       7cf9            movi.n  a9, -1			; a9 = -1
 40004d44:       001c40          ssl     a12			; set shift left amount
 40004d47:       0c18            movi.n  a8, 1			; a8 = 1
@@ -10031,8 +9707,6 @@
 40004d54:       806610          and     a6, a6, a8
 40004d57:       6907            s32i.n  a6, a7, 0
 40004d59:       c6f5ff          j       0x40004d34
-
-
 
   gpio_register_get:
 40004d5c:       51e8ff          l32r    a5, [0x60000328]	; 0x40004cfc
@@ -10055,14 +9729,12 @@
 
 40004d86:       0000
 
-
   gpio_intr_pending:
 40004d88:       21b0ff          l32r    a2, [0x3fffdfd0]	; 0x40004c48
 40004d8b:       2802            l32i.n  a2, a2, 0
 40004d8d:       0df0            ret.n
 
 40004d8f:       00
-
 
   gpio_pin_intr_state_set:
 40004d90:       12c1f0          addi    a1, a1, -16
@@ -10088,7 +9760,6 @@
 40004dc9:       0df0            ret.n
 
 40004dcb:       00
-
 
   gpio_intr_ack:
 40004dcc:       12c1f0          addi    a1, a1, -16
@@ -10128,7 +9799,6 @@
 40004e24:       0df0            ret.n
 
 40004e26:       0000
-
 
   gpio_intr_handler_register:
 40004e28:       4188ff          l32r    a4, [0x3fffdfd0]	; 0x40004c48
@@ -10181,7 +9851,6 @@
 
 40004e8f:       00
 
-
   gpio_pin_wakeup_enable:
 40004e90:       12c1f0          addi    a1, a1, -16
 40004e93:       226100          s32i    a2, a1, 0
@@ -10209,7 +9878,6 @@
 
 40004ed1:       000000
 
-
   gpio_pin_wakeup_disable:
 40004ed4:       0c03            movi.n  a3, 0
 40004ed6:       413bf0          l32r    a4, [0x60000200]	; 0x40000fc4
@@ -10227,7 +9895,6 @@
 40004ef9:       0df0            ret.n
 
 40004efb:       00
-
 
   gpio_intr_test:
 40004efc:       12c1f0          addi    a1, a1, -16
@@ -10264,7 +9931,6 @@
 
 40004f38:       ff000fff				; l32r
 40004f3c:       0000f000				; l32r
-
 
   lldesc_build_chain:
 40004f40:       3d06            mov.n   a3, a6
@@ -10372,8 +10038,6 @@
 4000504b:       12c130          addi    a1, a1, 48
 4000504e:       0df0            ret.n
 
-
-
   lldesc_num2link:
 40005050:       0b53            addi.n  a5, a3, -1
 40005052:       5030f4          extui   a3, a5, 0, 16
@@ -10395,7 +10059,6 @@
 40005079:       0df0            ret.n
 
 4000507b:       00
-
 
   lldesc_set_owner:
 4000507c:       407004          extui   a7, a4, 0, 1
@@ -10443,9 +10106,7 @@
 400050f3:       56a3fc          bnez    a3, 0x400050c1
 400050f6:       0df0            ret.n
 
-
 400050f8:       3fffe050				; l32r
-
 
   sip_post:
 400050fc:       12c1f0          addi    a1, a1, -16
@@ -10474,7 +10135,6 @@
 
 40005130:       3fffdff0				; l32r
 40005134:       3fffe090				; l32r
-
 
   sub_5138:
 40005138:       21feff          l32r    a2, [0x3fffdff0]	; 0x40005130
@@ -10507,7 +10167,6 @@
 4000517c:       0df0            ret.n
 
 4000517e:       0000
-
 
   sip_alloc_to_host_evt:
 40005180:       12c1e0          addi    a1, a1, -32
@@ -10584,7 +10243,6 @@
 
 40005233:       00
 
-
   sip_to_host_evt_send_done:
 40005234:       12c1f0          addi    a1, a1, -16
 40005237:       026100          s32i    a0, a1, 0
@@ -10638,7 +10296,6 @@
 
 400052be:       0000
 
-
   sip_reclaim_tx_data_pkt:
 400052c0:       12c1f0          addi    a1, a1, -16
 400052c3:       0901            s32i.n  a0, a1, 0
@@ -10688,9 +10345,7 @@
 40005341:       12c110          addi    a1, a1, 16
 40005344:       0df0            ret.n
 
-
 40005346:       000000000000
-
 
   sip_reclaim_from_host_cmd:
 4000534c:       12c1f0          addi    a1, a1, -16
@@ -10735,7 +10390,6 @@
 400053bf:       12c110          addi    a1, a1, 16
 400053c2:       0df0            ret.n
 
-
   sub_53c4:
 400053c4:       12c1f0          addi    a1, a1, -16
 400053c7:       2d01            mov.n   a2, a1
@@ -10776,7 +10430,6 @@
 40005422:       12c110          addi    a1, a1, 16
 40005425:       0df0            ret.n
 
-
 40005427:       0000
 40005429:       22a01d          movi    a2, 29
 4000542c:       32a000          movi    a3, 0
@@ -10794,7 +10447,6 @@
 
 4000544b:       00
 
-
   sip_install_rx_ctrl_cb:
 4000544c:       4139ff          l32r    a4, [0x3fffdff0]	; 0x40005130
 4000544f:       322414          l32i    a3, a4, 80
@@ -10803,7 +10455,6 @@
 40005458:       0df0            ret.n
 
 4000545a:       0000
-
 
   sip_install_rx_data_cb:
 4000545c:       4135ff          l32r    a4, [0x3fffdff0]	; 0x40005130
@@ -10862,7 +10513,6 @@
 400054c8:       3fffd89c				; l32r
 400054cc:       3fffd884				; l32r
 
-
   sub_54d0:
 400054d0:       12c1e0          addi    a1, a1, -32
 400054d3:       c951            s32i.n  a12, a1, 20
@@ -10907,7 +10557,6 @@
 40005531:       85f9fc          call0   ets_printf		; 0x400024cc
 40005534:       86f4ff          j       0x4000550a
 
-
 40005537:       000000
 
 4000553a:       322103          l32i    a3, a1, 12
@@ -10929,7 +10578,6 @@
 40005567:       2d03            mov.n   a2, a3
 40005569:       c52900          call0   sip_send		; 0x40005808
 4000556c:       86e6ff          j       0x4000550a
-
 
 4000556f:       00
 40005570:       82020d          l8ui    a8, a2, 13
@@ -11022,9 +10670,7 @@
 4000565e:       4525fc          call0   ets_memcpy		; 0x400018b4
 40005661:       46a9ff          j       0x4000550a
 
-
 40005664:       00000000
-
 
   sip_get_state:
 40005668:       21b2fe          l32r    a2, [0x3fffdff0]	; 0x40005130
@@ -11046,7 +10692,6 @@
 ;  the acronym is "SLC = SDIO/SPI Link Connection"?
 ;
 ; SLC involves DMA with SDIO and I2S interfaces.
-
 
   sip_init_attach:
 4000567c:       31feff          l32r    a3, [sub_546c]		; [0x4000546c] 0x40005674
@@ -11075,12 +10720,10 @@
 400056b5:       12c110          addi    a1, a1, 16		; restore stack
 400056b8:       0df0            ret.n
 
-
 400056ba:       0000
 
 400056bc:       40005bbc				; l32r
 400056c0:       3fffe190				; l32r
-
 
   sip_post_init:
 400056c4:       32a01d          movi    a3, 29
@@ -11099,7 +10742,6 @@
 400056e7:       0df0            ret.n
 
 400056e9:       000000
-
 
   sub_56ec:
 400056ec:       12c1f0          addi    a1, a1, -16
@@ -11207,7 +10849,6 @@
 
 40005806:       0000
 
-
   sip_send:
 40005808:       414afe          l32r    a4, [0x3fffdff0]	; 0x40005130
 4000580b:       12c1f0          addi    a1, a1, -16
@@ -11234,7 +10875,6 @@
 40005844:       12c110          addi    a1, a1, 16
 40005847:       0df0            ret.n
 
-
 40005849:       00
 4000584a:       82a001          movi    a8, 1
 4000584d:       824044          s8i     a8, a0, 68
@@ -11246,7 +10886,6 @@
 4000585f:       0df0            ret.n
 
 40005861:       000000
-
 
   sip_to_host_chain_append:
 40005864:       9133fe          l32r    a9, [0x3fffdff0]	; 0x40005130
@@ -11279,7 +10918,6 @@
 
 400058a5:       000000
 
-
   sip_get_ptr:
 400058a8:       2122fe          l32r    a2, [0x3fffdff0]	; 0x40005130
 400058ab:       0df0            ret.n
@@ -11288,7 +10926,6 @@
 
 400058b0:       3fffd8b8				; l32r
 400058b4:       3fffd8a4				; l32r
-
 
   sub_58b8:
 400058b8:       12c1e0          addi    a1, a1, -32
@@ -11424,7 +11061,6 @@
 400059e9:       12c120          addi    a1, a1, 32
 400059ec:       0df0            ret.n
 
-
 400059ee:       0000
 400059f0:       024d44          s8i     a0, a13, 68
 400059f3:       c558fb          call0   ets_intr_unlock		; 0x40000f80
@@ -11436,7 +11072,6 @@
 40005a00:       3fffd8f0				; l32r
 40005a04:       3fffd8dc				; l32r
 40005a08:       3fffd8cc				; l32r
-
 
   sub_5a0c:
 40005a0c:       12c1e0          addi    a1, a1, -32
@@ -11614,7 +11249,6 @@
 40005bb7:       12c120          addi    a1, a1, 32
 40005bba:       0df0            ret.n
 
-
   sub_5bbc:
 40005bbc:       12c1f0          addi    a1, a1, -16
 40005bbf:       0901            s32i.n  a0, a1, 0
@@ -11649,7 +11283,6 @@
 
 40005bff:       00
 
-
   sub_5c00:
 40005c00:       0c02            movi.n  a2, 0
 40005c02:       0c53            movi.n  a3, 5
@@ -11662,9 +11295,7 @@
 40005c13:       12c110          addi    a1, a1, 16
 40005c16:       0df0            ret.n
 
-
 40005c18:       3fffe1d0				; l32r
-
 
   slc_reattach:
 40005c1c:       51ffff          l32r    a5, [0x3fffe1d0]	; 0x40005c18
@@ -11686,7 +11317,6 @@
 40005c44:       02321007				; l32r
 40005c48:       02320007				; l32r
 40005c4c:       00002003				; l32r
-
 
   slc_init_attach:
 40005c50:       61f6ff          l32r    a6, [0x3fffe1e4]	; 0x40005c28
@@ -11822,7 +11452,6 @@
 40005d88:       40005f50				; l32r
 40005d8c:       002a8400				; l32r
 
-
   slc_enable:
 40005d90:       0c12            movi.n  a2, 1
 40005d92:       31fdff          l32r    a3, [sub_5f50]		; [0x40005f50] 0x40005d88
@@ -11842,15 +11471,12 @@
 
 40005db7:       00
 
-
   slc_select_tohost_gpio_mode:
 40005db8:       3198ff          l32r    a3, [0x3fffe1d0]	; 0x40005c18
 40005dbb:       29a3            s32i.n  a2, a3, 40
 40005dbd:       0df0            ret.n
 
-
 40005dbf:       00
-
 
   slc_select_tohost_gpio:
 40005dc0:       f6b210          bgeui   a2, 16, 0x40005dd4
@@ -11869,7 +11495,6 @@
 
 40005dde:       0000
 40005de0:       00010000				; l32r
-
 
   slc_send_to_host_chain:
 40005de4:       615cf8          l32r    a6, [0x60000a00]	; 0x40003f54
@@ -11942,8 +11567,6 @@
 40005e8f:       12c110          addi    a1, a1, 16
 40005e92:       0df0            ret.n
 
-
-
   slc_from_host_chain_recycle:
 40005e94:       12c1e0          addi    a1, a1, -32
 40005e97:       326101          s32i    a3, a1, 4
@@ -11995,7 +11618,6 @@
 
 40005f0d:       000000
 
-
   slc_to_host_chain_recycle:
 40005f10:       5142ff          l32r    a5, [0x3fffe1d0]	; 0x40005c18
 40005f13:       5825            l32i.n  a5, a5, 8
@@ -12005,8 +11627,6 @@
 40005f1d:       422452          l32i    a4, a4, 0x148
 40005f20:       4903            s32i.n  a4, a3, 0
 40005f22:       0df0            ret.n
-
-
 
   slc_from_host_chain_fetch:
 40005f24:       613dff          l32r    a6, [0x3fffe1d0]	; 0x40005c18
@@ -12103,7 +11723,6 @@
 4000600f:       00
 40006010:       ffff7fff				; l32r
 
-
   slc_pause_from_host:
 40006014:       6101ff          l32r    a6, [0x3fffe1d0]	; 0x40005c18
 40006017:       0c05            movi.n  a5, 0
@@ -12120,7 +11739,6 @@
 40006037:       0df0            ret.n
 
 40006039:       000000
-
 
   slc_resume_from_host:
 4000603c:       61f7fe          l32r    a6, [0x3fffe1d0]	; 0x40005c18
@@ -12140,7 +11758,6 @@
 40006061:       000000
 40006064:       fffff7c0				; l32r
 
-
   slc_set_host_io_max_window:
 40006068:       21bbf7          l32r    a2, [0x60000a00]	; 0x40003f54
 4000606b:       c02000          memw
@@ -12157,7 +11774,6 @@
 
 4000608b:       00
 
-
   slc_init_credit:
 4000608c:       12c1f0          addi    a1, a1, -16
 4000608f:       0901            s32i.n  a0, a1, 0
@@ -12173,7 +11789,6 @@
 
 400060a9:       000000
 
-
   slc_add_credits:
 400060ac:       412ef9          l32r    a4, [0x00004000]	; 0x40004564
 400060af:       2030b4          extui   a3, a2, 0, 12
@@ -12182,8 +11797,6 @@
 400060b8:       c02000          memw
 400060bb:       32644d          s32i    a3, a4, 0x134
 400060be:       0df0            ret.n
-
-
 
   rom_abs_temp:
 400060c0:       204060          neg     a4, a2
@@ -12208,7 +11821,6 @@
 400060e7:       00
 400060e8:       efffffff				; l32r
 
-
   rom_chip_v5_enable_cca:
 400060ec:       41ffff          l32r    a4, [0xefffffff]	; 0x400060e8
 400060ef:       31f7ff          l32r    a3, [0x60009a00]	; 0x400060cc
@@ -12222,7 +11834,6 @@
 40006103:       00
 40006104:       0001fc00				; l32r
 40006108:       fffe03ff				; l32r
-
 
   rom_chip_v5_sense_backoff:
 4000610c:       31ffff          l32r    a3, [0xfffe03ff]	; 0x40006108
@@ -12254,7 +11865,6 @@
 
 40006156:       0000
 40006158:       3fffc730				; l32r
-
 
   rom_dc_iq_est:
 4000615c:       12c1f0          addi    a1, a1, -16
@@ -12294,7 +11904,6 @@
 
 400061b3:       00
 400061b4:       ff7fffff				; l32r
-
 
   rom_en_pwdet:
 400061b8:       12c1f0          addi    a1, a1, -16
@@ -12350,7 +11959,6 @@
 
 40006236:       0000
 
-
   rom_get_bb_atten:
 40006238:       0c04            movi.n  a4, 0
 4000623a:       8b52            addi.n  a5, a2, 8
@@ -12369,7 +11977,6 @@
 4000625c:       0df0            ret.n
 
 4000625e:       0000
-
 
   rom_get_corr_power:
 40006260:       7159eb          l32r    a7, [0x60000200]	; 0x40000fc4
@@ -12417,7 +12024,6 @@
 400062d7:       0df0            ret.n
 
 400062d9:       000000
-
 
   rom_get_fm_sar_dout:
 400062dc:       12c1e0          addi    a1, a1, -32
@@ -12490,7 +12096,6 @@
 
 40006391:       000000
 
-
   rom_get_noisefloor:
 40006394:       214eff          l32r    a2, [0x60009a00]	; 0x400060cc
 40006397:       c02000          memw
@@ -12503,7 +12108,6 @@
 400063ac:       0df0            ret.n
 
 400063ae:       0000
-
 
   rom_get_power_db:
 400063b0:       12c1f0          addi    a1, a1, -16
@@ -12541,7 +12145,6 @@
 400063fb:       00
 400063fc:       fffa0001				; l32r
 
-
   rom_iq_est_disable:
 40006400:       71ffff          l32r    a7, [0xfffa0001]	; 0x400063fc
 40006403:       6164ed          l32r    a6, [0x00001000]	; 0x40001994
@@ -12561,7 +12164,6 @@
 4000642c:       0df0            ret.n
 
 4000642e:       0000
-
 
   rom_iq_est_enable:
 40006430:       0c19            movi.n  a9, 1
@@ -12594,7 +12196,6 @@
 
 4000647f:       00
 40006480:       3fffcbd0				; l32r
-
 
   rom_linear_to_db:
 40006484:       42a010          movi    a4, 16
@@ -12653,7 +12254,6 @@
 
 4000650b:       00
 
-
   rom_set_txclk_en:
 4000650c:       0c03            movi.n  a3, 0
 4000650e:       1cc4            movi.n  a4, 28
@@ -12685,7 +12285,6 @@
 4000654c:       0df0            ret.n
 
 4000654e:       0000
-
 
   rom_set_rxclk_en:
 40006550:       0c03            movi.n  a3, 0
@@ -12723,7 +12322,6 @@
 40006598:       000009b3				; l32r
 4000659c:       fffff699				; l32r
 400065a0:       fffff630				; l32r
-
 
   rom_mhz2ieee:
 400065a4:       61fdff          l32r    a6, [0x000009b3]	; 0x40006598
@@ -12780,7 +12378,6 @@
 
 40006621:       000000
 40006624:       3fffd8fc				; l32r
-
 
   rom_rxiq_get_mis:
 40006628:       12c1d0          addi    a1, a1, -48
@@ -12892,7 +12489,6 @@
 
 40006737:       00
 
-
   rom_sar_init:
 40006738:       12c1f0          addi    a1, a1, -16
 4000673b:       0901            s32i.n  a0, a1, 0
@@ -12929,7 +12525,6 @@
 
 4000678b:       00
 
-
   rom_set_ana_inf_tx_scale:
 4000678c:       12c1f0          addi    a1, a1, -16
 4000678f:       0901            s32i.n  a0, a1, 0
@@ -12959,7 +12554,6 @@
 400067c5:       0df0            ret.n
 
 400067c7:       00
-
 
   rom_set_loopback_gain:
 400067c8:       12c1e0          addi    a1, a1, -32
@@ -13009,7 +12603,6 @@
 
 4000682c:       fffd7ffd				; l32r
 
-
   rom_set_noise_floor:
 40006830:       92ae00          movi    a9, 0xfffffe00
 40006833:       f08211          slli    a8, a2, 1
@@ -13037,7 +12630,6 @@
 4000686c:       fffff000				; l32r
 40006870:       00028002				; l32r
 
-
   rom_start_noisefloor:
 40006874:       91feff          l32r    a9, [0xfffff000]	; 0x4000686c
 40006877:       72a1a0          movi    a7, 0x1a0
@@ -13061,7 +12653,6 @@
 
 400068ac:       f0000000				; l32r
 400068b0:       e0000000				; l32r
-
 
   rom_start_tx_tone:
 400068b4:       12c1e0          addi    a1, a1, -32
@@ -13150,7 +12741,6 @@
 
 40006988:       fffbffff				; l32r
 
-
   rom_stop_tx_tone:
 4000698c:       12c1f0          addi    a1, a1, -16
 4000698f:       41feff          l32r    a4, [0xfffbffff]	; 0x40006988
@@ -13208,7 +12798,6 @@
 
 40006a1a:       0000
 
-
   rom_txtone_linear_pwr:
 40006a1c:       12c1e0          addi    a1, a1, -32
 40006a1f:       0911            s32i.n  a0, a1, 4
@@ -13263,7 +12852,6 @@
 40006a92:       0000
 40006a94:       3ff20a00				; l32r
 
-
   rom_tx_mac_disable:
 40006a98:       31ffff          l32r    a3, [0x3ff20a00]	; 0x40006a94
 40006a9b:       c02000          memw
@@ -13288,7 +12876,6 @@
 
 40006ad1:       000000
 
-
   rom_tx_mac_enable:
 40006ad4:       31f0ff          l32r    a3, [0x3ff20a00]	; 0x40006a94
 40006ad7:       c02000          memw
@@ -13309,15 +12896,12 @@
 40006b03:       2263a5          s32i    a2, a3, 0x294
 40006b06:       0df0            ret.n
 
-
-
   phy_get_romfuncs:
 40006b08:       2194fd          l32r    a2, [0x3fffc730]	; 0x40006158
 40006b0b:       2802            l32i.n  a2, a2, 0
 40006b0d:       0df0            ret.n
 
 40006b0f:       00
-
 
   rom_ana_inf_gating_en:
 40006b10:       12c1e0          addi    a1, a1, -32
@@ -13443,7 +13027,6 @@
 40006c44:       00000976				; l32r
 40006c48:       00000971				; l32r
 40006c4c:       3fffcc60				; l32r
-
 
   rom_set_channel_freq:
 40006c50:       12c1d0          addi    a1, a1, -48
@@ -13572,65 +13155,52 @@
 40006d7b:       324101          s8i     a3, a1, 1
 40006d7e:       86d7ff          j       0x40006ce0
 
-
   sub_6d81:
 40006d81:       c6c8ff          j       0x40006ca8
-
 
   sub_6d84:
 40006d84:       e1a6ff          l32r    a14, [0x000009a8]	; 0x40006c1c
 40006d87:       46c7ff          j       0x40006ca8
 
-
   sub_6d8a:
 40006d8a:       e1a5ff          l32r    a14, [0x000009a3]	; 0x40006c20
 40006d8d:       c6c5ff          j       0x40006ca8
-
 
   sub_6d90:
 40006d90:       e1a5ff          l32r    a14, [0x0000099e]	; 0x40006c24
 40006d93:       46c4ff          j       0x40006ca8
 
-
   sub_6d96:
 40006d96:       e1a4ff          l32r    a14, [0x00000999]	; 0x40006c28
 40006d99:       c6c2ff          j       0x40006ca8
-
 
   sub_6d9c:
 40006d9c:       e1a4ff          l32r    a14, [0x00000994]	; 0x40006c2c
 40006d9f:       46c1ff          j       0x40006ca8
 
-
   sub_6da2:
 40006da2:       e1a3ff          l32r    a14, [0x0000098f]	; 0x40006c30
 40006da5:       c6bfff          j       0x40006ca8
-
 
   sub_6da8:
 40006da8:       e1a3ff          l32r    a14, [0x0000098a]	; 0x40006c34
 40006dab:       46beff          j       0x40006ca8
 
-
   sub_6dae:
 40006dae:       e1a2ff          l32r    a14, [0x00000985]	; 0x40006c38
 40006db1:       c6bcff          j       0x40006ca8
-
 
   sub_6db4:
 40006db4:       e1a2ff          l32r    a14, [0x00000980]	; 0x40006c3c
 40006db7:       46bbff          j       0x40006ca8
 
-
   sub_6dba:
 40006dba:       e1a1ff          l32r    a14, [0x0000097b]	; 0x40006c40
 40006dbd:       c6b9ff          j       0x40006ca8
 
-
   sub_6dc0:
 40006dc0:       e1a1ff          l32r    a14, [0x00000976]	; 0x40006c44
 40006dc3:       46b8ff          j       0x40006ca8
-
 
   sub_6dc6:
 40006dc6:       e1a0ff          l32r    a14, [0x00000971]	; 0x40006c48
@@ -13658,14 +13228,12 @@
 40006df9:       a24102          s8i     a10, a1, 2
 40006dfc:       06b8ff          j       0x40006ce0
 
-
   sub_6dff:
 40006dff:       524100          s8i     a5, a1, 0
 40006e02:       a24102          s8i     a10, a1, 2
 40006e05:       b2afb1          movi    a11, -79
 40006e08:       b24101          s8i     a11, a1, 1
 40006e0b:       46b4ff          j       0x40006ce0
-
 
   sub_6e0e:
 40006e0e:       424100          s8i     a4, a1, 0
@@ -13675,14 +13243,12 @@
 40006e19:       c24102          s8i     a12, a1, 2
 40006e1c:       06b0ff          j       0x40006ce0
 
-
   sub_6e1f:
 40006e1f:       424100          s8i     a4, a1, 0
 40006e22:       b24101          s8i     a11, a1, 1
 40006e25:       4c80            movi.n  a0, 72
 40006e27:       024102          s8i     a0, a1, 2
 40006e2a:       86acff          j       0x40006ce0
-
 
   sub_6e2d:
 40006e2d:       424100          s8i     a4, a1, 0
@@ -13692,14 +13258,12 @@
 40006e38:       224102          s8i     a2, a1, 2
 40006e3b:       46a8ff          j       0x40006ce0
 
-
   sub_6e3e:
 40006e3e:       424100          s8i     a4, a1, 0
 40006e41:       0c05            movi.n  a5, 0
 40006e43:       524101          s8i     a5, a1, 1
 40006e46:       524102          s8i     a5, a1, 2
 40006e49:       c6a4ff          j       0x40006ce0
-
 
   sub_6e4c:
 40006e4c:       624100          s8i     a6, a1, 0
@@ -13708,7 +13272,6 @@
 40006e55:       724101          s8i     a7, a1, 1
 40006e58:       06a1ff          j       0x40006ce0
 
-
   sub_6e5b:
 40006e5b:       624100          s8i     a6, a1, 0
 40006e5e:       d24102          s8i     a13, a1, 2
@@ -13716,14 +13279,12 @@
 40006e64:       824101          s8i     a8, a1, 1
 40006e67:       469dff          j       0x40006ce0
 
-
   sub_6e6a:
 40006e6a:       624100          s8i     a6, a1, 0
 40006e6d:       a24101          s8i     a10, a1, 1
 40006e70:       1c39            movi.n  a9, 19
 40006e72:       924102          s8i     a9, a1, 2
 40006e75:       c699ff          j       0x40006ce0
-
 
   sub_6e78:
 40006e78:       324100          s8i     a3, a1, 0
@@ -13733,14 +13294,12 @@
 40006e83:       a24102          s8i     a10, a1, 2
 40006e86:       8695ff          j       0x40006ce0
 
-
   sub_6e89:
 40006e89:       324100          s8i     a3, a1, 0
 40006e8c:       d24101          s8i     a13, a1, 1
 40006e8f:       c2afcb          movi    a12, -53
 40006e92:       c24102          s8i     a12, a1, 2
 40006e95:       c691ff          j       0x40006ce0
-
 
   sub_6e98:
 40006e98:       324100          s8i     a3, a1, 0
@@ -13749,14 +13308,12 @@
 40006ea0:       d24102          s8i     a13, a1, 2
 40006ea3:       468eff          j       0x40006ce0
 
-
   sub_6ea6:
 40006ea6:       324100          s8i     a3, a1, 0
 40006ea9:       b24102          s8i     a11, a1, 2
 40006eac:       3c40            movi.n  a0, 52
 40006eae:       024101          s8i     a0, a1, 1
 40006eb1:       c68aff          j       0x40006ce0
-
 
   sub_6eb4:
 40006eb4:       524100          s8i     a5, a1, 0
@@ -13766,13 +13323,11 @@
 40006ebf:       224102          s8i     a2, a1, 2
 40006ec2:       8686ff          j       0x40006ce0
 
-
   sub_6ec5:
 40006ec5:       524100          s8i     a5, a1, 0
 40006ec8:       424101          s8i     a4, a1, 1
 40006ecb:       424102          s8i     a4, a1, 2
 40006ece:       8683ff          j       0x40006ce0
-
 
   sub_6ed1:
 40006ed1:       024100          s8i     a0, a1, 0
@@ -13780,13 +13335,11 @@
 40006ed7:       424102          s8i     a4, a1, 2
 40006eda:       8680ff          j       0x40006ce0
 
-
   sub_6edd:
 40006edd:       024100          s8i     a0, a1, 0
 40006ee0:       a24101          s8i     a10, a1, 1
 40006ee3:       624102          s8i     a6, a1, 2
 40006ee6:       867dff          j       0x40006ce0
-
 
   sub_6ee9:
 40006ee9:       024100          s8i     a0, a1, 0
@@ -13794,13 +13347,11 @@
 40006eef:       b24102          s8i     a11, a1, 2
 40006ef2:       867aff          j       0x40006ce0
 
-
   sub_6ef5:
 40006ef5:       324100          s8i     a3, a1, 0
 40006ef8:       724101          s8i     a7, a1, 1
 40006efb:       424102          s8i     a4, a1, 2
 40006efe:       8677ff          j       0x40006ce0
-
 
   sub_6f01:
 40006f01:       324100          s8i     a3, a1, 0
@@ -13808,13 +13359,11 @@
 40006f07:       624102          s8i     a6, a1, 2
 40006f0a:       8674ff          j       0x40006ce0
 
-
   sub_6f0d:
 40006f0d:       324100          s8i     a3, a1, 0
 40006f10:       d24101          s8i     a13, a1, 1
 40006f13:       b24102          s8i     a11, a1, 2
 40006f16:       8671ff          j       0x40006ce0
-
 
   sub_6f19:
 40006f19:       324100          s8i     a3, a1, 0
@@ -13822,13 +13371,11 @@
 40006f1f:       424102          s8i     a4, a1, 2
 40006f22:       866eff          j       0x40006ce0
 
-
   sub_6f25:
 40006f25:       324100          s8i     a3, a1, 0
 40006f28:       a24101          s8i     a10, a1, 1
 40006f2b:       624102          s8i     a6, a1, 2
 40006f2e:       866bff          j       0x40006ce0
-
 
   sub_6f31:
 40006f31:       324100          s8i     a3, a1, 0
@@ -13836,20 +13383,17 @@
 40006f37:       b24102          s8i     a11, a1, 2
 40006f3a:       8668ff          j       0x40006ce0
 
-
   sub_6f3d:
 40006f3d:       524100          s8i     a5, a1, 0
 40006f40:       724101          s8i     a7, a1, 1
 40006f43:       424102          s8i     a4, a1, 2
 40006f46:       8665ff          j       0x40006ce0
 
-
   sub_6f49:
 40006f49:       524100          s8i     a5, a1, 0
 40006f4c:       624101          s8i     a6, a1, 1
 40006f4f:       624102          s8i     a6, a1, 2
 40006f52:       8662ff          j       0x40006ce0
-
 
   sub_6f55:
 40006f55:       524100          s8i     a5, a1, 0
@@ -13867,7 +13411,6 @@
 40006f78:       40e99999				; l32r
 40006f7c:       60009600				; l32r
 40006f80:       c0000000				; l32r
-
 
   rom_chip_50_set_channel:
 40006f84:       12c1e0          addi    a1, a1, -32
@@ -13985,7 +13528,6 @@
 400070b3:       12c120          addi    a1, a1, 32
 400070b6:       0df0            ret.n
 
-
 400070b8:       0c82            movi.n  a2, 8
 400070ba:       46e3ff          j       0x4000704b
 
@@ -13999,73 +13541,59 @@
 400070c8:       7c92            movi.n  a2, -7
 400070ca:       46dfff          j       0x4000704b
 
-
   sub_70cd:
 400070cd:       02a2e1          movi    a0, 0x2e1
 400070d0:       06cdff          j       0x40007008
-
 
   sub_70d3:
 400070d3:       02a0d1          movi    a0, 209
 400070d6:       86cbff          j       0x40007008
 
-
   sub_70d9:
 400070d9:       02a0fc          movi    a0, 252
 400070dc:       06caff          j       0x40007008
-
 
   sub_70df:
 400070df:       02a127          movi    a0, 0x127
 400070e2:       86c8ff          j       0x40007008
 
-
   sub_70e5:
 400070e5:       02a153          movi    a0, 0x153
 400070e8:       06c7ff          j       0x40007008
-
 
   sub_70eb:
 400070eb:       02a17e          movi    a0, 0x17e
 400070ee:       86c5ff          j       0x40007008
 
-
   sub_70f1:
 400070f1:       02a1aa          movi    a0, 0x1aa
 400070f4:       06c4ff          j       0x40007008
-
 
   sub_70f7:
 400070f7:       02a1d6          movi    a0, 0x1d6
 400070fa:       86c2ff          j       0x40007008
 
-
   sub_70fd:
 400070fd:       02a202          movi    a0, 0x202
 40007100:       06c1ff          j       0x40007008
-
 
   sub_7103:
 40007103:       02a22e          movi    a0, 0x22e
 40007106:       86bfff          j       0x40007008
 
-
   sub_7109:
 40007109:       02a25a          movi    a0, 0x25a
 4000710c:       06beff          j       0x40007008
 
-
   sub_710f:
 4000710f:       02a287          movi    a0, 0x287
 40007112:       86bcff          j       0x40007008
-
 
   sub_7115:
 40007115:       02a2b4          movi    a0, 0x2b4
 40007118:       06bbff          j       0x40007008
 
 4000711b:       00
-
 
   rom_chip_v5_rx_init:
 4000711c:       22a061          movi    a2, 97
@@ -14113,7 +13641,6 @@
 40007189:       0df0            ret.n
 
 4000718b:       00
-
 
   rom_chip_v5_tx_init:
 4000718c:       22a06b          movi    a2, 107
@@ -14222,8 +13749,6 @@
 ;  for the i2c registers is actually 0x60000d00
 ; These calls use register "4" at offset 16, i.e. at 0x60000d10
 
-
-
   rom_i2c_readReg:
 40007268:       813bf3          l32r    a8, [0x60000a00]	; 0x40003f54
 4000726b:       806411          slli    a6, a4, 8		; a6 = reg << 8
@@ -14247,7 +13772,6 @@
 40007299:       0df0            ret.n
 
 4000729b:       00
-
 
   rom_i2c_readReg_Mask:
 4000729c:       12c1f0          addi    a1, a1, -16		; allocate 16 bytes on stack
@@ -14278,7 +13802,6 @@
 
 ;  rom_i2c_writeReg ( cmd, ctl, reg, val )
 
-
   rom_i2c_writeReg:
 400072d8:       008511          slli    a8, a5, 16		; a8 = val << 16
 400072db:       807411          slli    a7, a4, 8		; a7 = reg << 8
@@ -14299,8 +13822,6 @@
 40007304:       9222c0          l32i    a9, a2, 0x300		; a9 <- addr
 40007307:       97f9f6          bbsi    a9, 25, 0x40007301	; spin until clear
 4000730a:       0df0            ret.n
-
-
 
   rom_i2c_writeReg_Mask:
 4000730c:       12c1e0          addi    a1, a1, -32
@@ -14351,7 +13872,6 @@
 40007379:       0df0            ret.n
 
 4000737b:       00
-
 
   rom_pbus_debugmode:
 4000737c:       12c1f0          addi    a1, a1, -16
@@ -14410,8 +13930,6 @@
 4000740b:       12c110          addi    a1, a1, 16
 4000740e:       0df0            ret.n
 
-
-
   rom_pbus_enter_debugmode:
 40007410:       12c1f0          addi    a1, a1, -16
 40007413:       026101          s32i    a0, a1, 4
@@ -14436,7 +13954,6 @@
 
 40007445:       000000
 
-
   rom_pbus_exit_debugmode:
 40007448:       12c1f0          addi    a1, a1, -16
 4000744b:       0901            s32i.n  a0, a1, 0
@@ -14459,7 +13976,6 @@
 40007477:       00
 
 40007478:       ffff0001				; l32r
-
 
   rom_pbus_force_test:
 4000747c:       209311          slli    a9, a3, 14
@@ -14495,7 +14011,6 @@
 
 400074d0:       3fffcce0				; l32r
 400074d4:       600005a4				; l32r
-
 
   rom_pbus_rd:
 400074d8:       12c1f0          addi    a1, a1, -16
@@ -14545,7 +14060,6 @@
 40007548:       86f0ff          j       0x4000750e
 
 4000754b:       00
-
 
   rom_pbus_set_rxgain:
 4000754c:       0c23            movi.n  a3, 2
@@ -14624,8 +14138,6 @@
 4000760b:       12c120          addi    a1, a1, 32
 4000760e:       0df0            ret.n
 
-
-
   rom_pbus_set_txgain:
 40007610:       0c13            movi.n  a3, 1
 40007612:       204714          extui   a4, a2, 7, 2
@@ -14676,8 +14188,6 @@
 40007683:       12c110          addi    a1, a1, 16
 40007686:       0df0            ret.n
 
-
-
   rom_pbus_xpd_rx_off:
 40007688:       12c1f0          addi    a1, a1, -16
 4000768b:       0901            s32i.n  a0, a1, 0
@@ -14708,7 +14218,6 @@
 
 400076c9:       000000
 
-
   rom_pbus_xpd_rx_on:
 400076cc:       12c1f0          addi    a1, a1, -16
 400076cf:       0901            s32i.n  a0, a1, 0
@@ -14729,8 +14238,6 @@
 400076f5:       0801            l32i.n  a0, a1, 0
 400076f7:       12c110          addi    a1, a1, 16
 400076fa:       0df0            ret.n
-
-
 
   rom_pbus_xpd_tx_off:
 400076fc:       12c1f0          addi    a1, a1, -16
@@ -14761,7 +14268,6 @@
 4000773b:       0df0            ret.n
 
 4000773d:       000000
-
 
   rom_pbus_xpd_tx_on:
 40007740:       0c13            movi.n  a3, 1
@@ -14805,7 +14311,6 @@
 4000779b:       0df0            ret.n
 
 4000779d:       000000
-
 
   rom_pbus_xpd_tx_on__low_gain:
 400077a0:       0c13            movi.n  a3, 1
@@ -14852,7 +14357,6 @@
 
 40007800:       c3ffffff				; l32r
 
-
   rom_phy_reset_req:
 40007804:       41ffff          l32r    a4, [0xc3ffffff]	; 0x40007800
 40007807:       3155e6          l32r    a3, [0x60000600]	; 0x4000115c
@@ -14864,7 +14368,6 @@
 40007819:       0df0            ret.n
 
 4000781b:       00
-
 
   rom_restart_cal:
 4000781c:       22a062          movi    a2, 98
@@ -14898,7 +14401,6 @@
 40007865:       0df0            ret.n
 
 40007867:       00
-
 
   rom_rfpll_reset:
 40007868:       22a062          movi    a2, 98
@@ -14996,13 +14498,11 @@
 4000794f:       12c110          addi    a1, a1, 16
 40007952:       0df0            ret.n
 
-
 40007954:       c0400000				; l32r
 40007958:       40080000				; l32r
 4000795c:       40da0000				; l32r
 40007960:       43800000				; l32r
 40007964:       40e40000				; l32r
-
 
   rom_rfpll_set_freq:
 40007968:       12c1e0          addi    a1, a1, -32
@@ -15253,13 +14753,11 @@
 40007bd7:       12c130          addi    a1, a1, 48
 40007bda:       0df0            ret.n
 
-
 40007bdc:       3fffc850				; l32r
 40007be0:       3fffd920				; l32r
 40007be4:       3fffd92c				; l32r
 40007be8:       3fffd934				; l32r
 40007bec:       3fffd96c				; l32r
-
 
   rom_pbus_dco___SA2:
 40007bf0:       8d02            mov.n   a8, a2
@@ -15534,7 +15032,6 @@
 40007e9e:       2a11            add.n   a1, a1, a2
 40007ea0:       0df0            ret.n
 
-
 40007ea2:       0c40            movi.n  a0, 4
 40007ea4:       06e4ff          j       0x40007e38
 
@@ -15546,7 +15043,6 @@
 40007ead:       000000
 
 40007eb0:       3fffd970				; l32r
-
 
   rom_rfcal_pwrctrl:
 40007eb4:       12c1a0          addi    a1, a1, -96
@@ -15714,7 +15210,6 @@
 40008047:       0df0            ret.n
 
 40008049:       000000
-
 
   rom_rfcal_rxiq:
 4000804c:       9d05            mov.n   a9, a5
@@ -15938,7 +15433,6 @@
 
 40008262:       0000
 
-
   rom_rfcal_rxiq_set_reg:
 40008264:       1cf7            movi.n  a7, 31
 40008266:       12c1e0          addi    a1, a1, -32
@@ -16061,7 +15555,6 @@
 
 40008380:       3fffd9a8				; l32r
 40008384:       3fffd9c4				; l32r
-
 
   rom_rfcal_txcap:
 40008388:       9d02            mov.n   a9, a2
@@ -16609,13 +16102,11 @@
 4000889f:       29d1            s32i.n  a2, a1, 52
 400088a1:       06cfff          j       0x400087e1
 
-
 400088a4:       002c0000				; l32r
 400088a8:       f0ffffff				; l32r
 400088ac:       3fffd9f4				; l32r
 400088b0:       3fffd9f8				; l32r
 400088b4:       3fffda08				; l32r
-
 
   rom_rfcal_txiq_cover:
 400088b8:       12c1c0          addi    a1, a1, -64
@@ -16802,7 +16293,6 @@
 
 40008a6d:       000000
 
-
   rom_rfcal_txiq_set_reg:
 40008a70:       12c1e0          addi    a1, a1, -32
 40008a73:       c921            s32i.n  a12, a1, 8
@@ -16912,7 +16402,6 @@
 
 40008b6a:       0000
 
-
   rom_rxiq_cover_mg_mp:
 40008b6c:       001240          ssl     a2
 40008b6f:       ad03            mov.n   a10, a3
@@ -17014,7 +16503,6 @@
 40008c61:       000000
 40008c64:       3fffda18				; l32r
 40008c68:       3fffd9bc				; l32r
-
 
   rom_set_txbb_atten:
 40008c6c:       12c1e0          addi    a1, a1, -32
@@ -17161,7 +16649,6 @@
 40008dc8:       3fffccf0				; l32r
 40008dcc:       3fffd100				; l32r
 
-
   rijndaelKeySetupDec:
 40008dd0:       12c1f0          addi    a1, a1, -16
 40008dd3:       c911            s32i.n  a12, a1, 4
@@ -17249,7 +16736,6 @@
 40008e9e:       0000
 40008ea0:       3fffea80				; l32r
 
-
   aes_decrypt_init:
 40008ea4:       12c1f0          addi    a1, a1, -16
 40008ea7:       0901            s32i.n  a0, a1, 0
@@ -17269,7 +16755,6 @@
 40008ec6:       0df0            ret.n
 
 40008ec8:       3fffd500				; l32r
-
 
   sub_8ecc:
 40008ecc:       12c1c0          addi    a1, a1, -64
@@ -17649,8 +17134,6 @@
 400092cf:       12c140          addi    a1, a1, 64
 400092d2:       0df0            ret.n
 
-
-
   aes_decrypt:
 400092d4:       12c1f0          addi    a1, a1, -16
 400092d7:       0901            s32i.n  a0, a1, 0
@@ -17660,7 +17143,6 @@
 400092e1:       0df0            ret.n
 
 400092e3:       00
-
 
   aes_decrypt_deinit:
 400092e4:       32a000          movi    a3, 0
@@ -17674,7 +17156,6 @@
 
 400092fb:       00
 400092fc:       3fffd0f0				; l32r
-
 
   rijndaelKeySetupEnc:
 40009300:       913edc          l32r    a9, [0x00ff0000]	; 0x400003f8
@@ -17779,7 +17260,6 @@
 
 4000940e:       0000
 
-
   aes_unwrap:
 40009410:       12c1b0          addi    a1, a1, -80
 40009413:       f9c1            s32i.n  a15, a1, 48
@@ -17880,7 +17360,6 @@
 
 400094f5:       000000
 400094f8:       3fffd600				; l32r
-
 
   base64_encode:
 400094fc:       12c1e0          addi    a1, a1, -32
@@ -18015,8 +17494,6 @@
 4000963f:       b20b00          l8ui    a11, a11, 0
 40009642:       b24001          s8i     a11, a0, 1
 40009645:       86edff          j       0x400095ff
-
-
 
   base64_decode:
 40009648:       40a420          or      a10, a4, a4
@@ -18157,7 +17634,6 @@
 
 400097a9:       000000
 
-
   md5_vector:
 400097ac:       12c190          addi    a1, a1, -112
 400097af:       326116          s32i    a3, a1, 88
@@ -18199,7 +17675,6 @@
 40009810:       98badcfe				; l32r
 40009814:       10325476				; l32r
 
-
   MD5Init:
 40009818:       31ffff          l32r    a3, [0x10325476]	; 0x40009814
 4000981b:       41fdff          l32r    a4, [0x98badcfe]	; 0x40009810
@@ -18213,8 +17688,6 @@
 4000982e:       4922            s32i.n  a4, a2, 8
 40009830:       3932            s32i.n  a3, a2, 12
 40009832:       0df0            ret.n
-
-
 
   MD5Update:
 40009834:       12c1d0          addi    a1, a1, -48
@@ -18303,7 +17776,6 @@
 
 400098ff:       00
 
-
   MD5Final:
 40009900:       42a03f          movi    a4, 63
 40009903:       12c1f0          addi    a1, a1, -16
@@ -18357,7 +17829,6 @@
 40009975:       0811            l32i.n  a0, a1, 4
 40009977:       12c110          addi    a1, a1, 16
 4000997a:       0df0            ret.n
-
 
 4000997c:       d76aa478				; l32r
 40009980:       e8c7b756				; l32r
@@ -18423,7 +17894,6 @@
 40009a70:       bd3af235				; l32r
 40009a74:       2ad7d2bb				; l32r
 40009a78:       eb86d391				; l32r
-
 
   sub_9a7c:
 40009a7c:       12c1e0          addi    a1, a1, -32
@@ -19124,8 +18594,6 @@
 4000a15b:       12c120          addi    a1, a1, 32
 4000a15e:       0df0            ret.n
 
-
-
   hmac_md5_vector:
 4000a160:       82a0d0          movi    a8, 208
 4000a163:       8011c0          sub     a1, a1, a8
@@ -19267,8 +18735,6 @@
 4000a2c8:       3a11            add.n   a1, a1, a3
 4000a2ca:       0df0            ret.n
 
-
-
   hmac_md5:
 4000a2cc:       7d06            mov.n   a7, a6
 4000a2ce:       9d05            mov.n   a9, a5
@@ -19285,7 +18751,6 @@
 4000a2e9:       0df0            ret.n
 
 4000a2eb:       00
-
 
   sha1_vector:
 4000a2ec:       12c180          addi    a1, a1, -128
@@ -21021,7 +20486,6 @@
 
 4000b580:       c3d2e1f0				; l32r
 
-
   SHA1Init:
 4000b584:       31ffff          l32r    a3, [0xc3d2e1f0]	; 0x4000b580
 4000b587:       41a3f8          l32r    a4, [0x10325476]	; 0x40009814
@@ -21039,7 +20503,6 @@
 4000b5a3:       0df0            ret.n
 
 4000b5a5:       000000
-
 
   SHA1Update:
 4000b5a8:       12c1e0          addi    a1, a1, -32
@@ -21107,7 +20570,6 @@
 
 4000b640:       3fffda20				; l32r
 4000b644:       3fffd644				; l32r
-
 
   SHA1Final:
 4000b648:       12c1e0          addi    a1, a1, -32
@@ -21209,7 +20671,6 @@
 
 4000b73d:       000000
 
-
   sub_b740:
 4000b740:       82a090          movi    a8, 144
 4000b743:       8011c0          sub     a1, a1, a8
@@ -21308,7 +20769,6 @@
 
 4000b83e:       0000
 
-
   pbkdf2_sha1:
 4000b840:       12c1b0          addi    a1, a1, -80
 4000b843:       f9c1            s32i.n  a15, a1, 48
@@ -21363,7 +20823,6 @@
 4000b8b1:       0df0            ret.n
 
 4000b8b3:       00
-
 
   hmac_sha1_vector:
 4000b8b4:       82a0e0          movi    a8, 224
@@ -21508,8 +20967,6 @@
 4000ba24:       3a11            add.n   a1, a1, a3
 4000ba26:       0df0            ret.n
 
-
-
   hmac_sha1:
 4000ba28:       7d06            mov.n   a7, a6
 4000ba2a:       9d05            mov.n   a9, a5
@@ -21526,7 +20983,6 @@
 4000ba45:       0df0            ret.n
 
 4000ba47:       00
-
 
   sha1_prf:
 4000ba48:       12c180          addi    a1, a1, -128
@@ -21624,7 +21080,6 @@
 
 4000bb34:       00269ec3				; l32r
 4000bb38:       000343fd				; l32r
-
 
   wepkey_64:
 4000bb3c:       12c1f0          addi    a1, a1, -16
@@ -21733,7 +21188,6 @@
 
 4000bc3c:       3fffda24				; l32r
 
-
   wepkey_128:
 4000bc40:       20b220          or      a11, a2, a2
 4000bc43:       62a0e0          movi    a6, 224
@@ -21829,7 +21283,6 @@
 ; a4 - arg
 ;  -- always returns 0
 
-
   _xtos_set_interrupt_handler_arg:
 4000bd28:       960203          bltz    a2, 0x4000bd5c
 4000bd2b:       0ce5            movi.n  a5, 14
@@ -21851,10 +21304,8 @@
 4000bd57:       902693          movnez  a2, a6, a9
 4000bd5a:       0df0            ret.n
 
-
 4000bd5c:       0c02            movi.n  a2, 0			; return 0
 4000bd5e:       0df0            ret.n
-
 
 4000bd60:       32671c          s32i    a3, a7, 112
 4000bd63:       42671d          s32i    a4, a7, 116
@@ -21864,8 +21315,6 @@
 4000bd6e:       0df0            ret.n
 
 ; call the above with 0 argument
-
-
 
   _xtos_set_interrupt_handler:
 4000bd70:       4d02            mov.n   a4, a2
@@ -21880,7 +21329,6 @@
 
 ; alias for ets_isr_unmask ( mask )
 ; mask is in a2
-
 
   _xtos_ints_on:
 4000bd84:       4187d1          l32r    a4, [0x3fffc200]	; 0x400003a0
@@ -21901,7 +21349,6 @@
 ; alias for ets_isr_mask ( mask )
 ; mask is in a2
 
-
   _xtos_ints_off:
 4000bda4:       417fd1          l32r    a4, [0x3fffc200]	; 0x400003a0
 4000bda7:       706200          rsil    a7, 2
@@ -21918,7 +21365,6 @@
 4000bdc4:       0df0            ret.n
 
 4000bdc6:       0000
-
 
   strcmp:
 4000bdc8:       820200          l8ui    a8, a2, 0
@@ -22028,7 +21474,6 @@
 
 4000bec7:       00
 
-
   strcpy:
 4000bec8:       ad02            mov.n   a10, a2
 4000beca:       42a0ff          movi    a4, 255
@@ -22092,7 +21537,6 @@
 
 4000bf4b:       00
 
-
   strlen:
 4000bf4c:       32c2fc          addi    a3, a2, -4
 4000bf4f:       42a0ff          movi    a4, 255
@@ -22137,7 +21581,6 @@
 4000bfa5:       0df0            ret.n
 
 4000bfa7:       00
-
 
   strncmp:
 4000bfa8:       12c1f0          addi    a1, a1, -16
@@ -22249,7 +21692,6 @@
 
 4000c09f:       00
 
-
   strncpy:
 4000c0a0:       20a220          or      a10, a2, a2
 4000c0a3:       1664ff          beqz    a4, 0x4000c09d
@@ -22352,7 +21794,6 @@
 
 4000c17d:       000000
 
-
   __addsf3:
 4000c180:       61a4d0          l32r    a6, [0x7f800000]	; 0x40000410
 4000c183:       307230          xor     a7, a2, a3
@@ -22453,7 +21894,6 @@
 4000c262:       c6c8ff          j       0x4000c189
 
 4000c265:       000000
-
 
   __subsf3:
 4000c268:       616ad0          l32r    a6, [0x7f800000]	; 0x40000410
@@ -22606,8 +22046,6 @@
 4000c3d6:       702320          or      a2, a3, a7
 4000c3d9:       462600          j       0x4000c476
 
-
-
   __mulsf3:
 4000c3dc:       12c1e0          addi    a1, a1, -32
 4000c3df:       c941            s32i.n  a12, a1, 16
@@ -22702,7 +22140,6 @@
 
 4000c4c1:       000000
 
-
   __fixunssfsi:
 4000c4c4:       61d3cf          l32r    a6, [0x7f800000]	; 0x40000410
 4000c4c7:       674225          ball    a2, a6, 0x4000c4f0
@@ -22758,7 +22195,6 @@
 4000c532:       c65600          j       0x4000c691
 
 4000c535:       000000
-
 
   __adddf3:
 4000c538:       61b9cf          l32r    a6, [0x7ff00000]	; 0x4000041c
@@ -22902,7 +22338,6 @@
 4000c682:       c6aeff          j       0x4000c541
 
 4000c685:       000000
-
 
   __subdf3:
 4000c688:       6165cf          l32r    a6, [0x7ff00000]	; 0x4000041c
@@ -23154,7 +22589,6 @@
 4000c8eb:       c65300          j       0x4000ca3e
 
 4000c8ee:       0000
-
 
   __muldf3:
 4000c8f0:       12c1e0          addi    a1, a1, -32
@@ -23429,7 +22863,6 @@
 
 4000cb92:       0000
 
-
   __divdf3:
 4000cb94:       6122ce          l32r    a6, [0x7ff00000]	; 0x4000041c
 4000cb97:       507330          xor     a7, a3, a5
@@ -23547,7 +22980,6 @@
 
 4000ccb7:       00
 
-
   __fixdfsi:
 4000ccb8:       61d9cd          l32r    a6, [0x7ff00000]	; 0x4000041c
 4000ccbb:       674325          ball    a3, a6, 0x4000cce4
@@ -23577,8 +23009,6 @@
 
 4000ccfc:       0c02            movi.n  a2, 0
 4000ccfe:       0df0            ret.n
-
-
 
   __fixunsdfsi:
 4000cd00:       61c7cd          l32r    a6, [0x7ff00000]	; 0x4000041c
@@ -23622,7 +23052,6 @@
 4000cd57:       0df0            ret.n
 
 4000cd59:       000000
-
 
   __truncdfsf2:
 4000cd5c:       41b3cd          l32r    a4, [0x38000000]	; 0x40000428
@@ -23687,8 +23116,6 @@
 4000cdf7:       102201          slli    a2, a2, 31
 4000cdfa:       0df0            ret.n
 
-
-
   __extendsfdf2:
 4000cdfc:       205f05          extui   a5, a2, 31, 1
 4000cdff:       105501          slli    a5, a5, 31
@@ -23734,7 +23161,6 @@
 
 ; gcc long division
 ; long = long / long
-
 
   __divdi3:
 4000ce60:       8d04            mov.n   a8, a4
@@ -23785,7 +23211,6 @@
 4000cecf:       c2212a          l32i    a12, a1, 168
 4000ced2:       4a11            add.n   a1, a1, a4
 4000ced4:       0df0            ret.n
-
 
 4000ced6:       0000
 4000ced8:       826126          s32i    a8, a1, 152
@@ -23902,7 +23327,6 @@
 4000d010:       c2211b          l32i    a12, a1, 108
 4000d013:       0bcc            addi.n  a12, a12, -1
 4000d015:       46a6ff          j       0x4000ceb2
-
 
 4000d018:       7cfd            movi.n  a13, -1
 4000d01a:       d0c330          xor     a12, a3, a13
@@ -24181,7 +23605,6 @@
 4000d30f:       00
 
 ; does u_long = u_long / u_long
-
 
   __udivdi3:
 4000d310:       8d02            mov.n   a8, a2
@@ -24619,8 +24042,6 @@
 
 ; does u_long = u_long % u_long
 
-
-
   __umoddi3:
 4000d770:       62a0b0          movi    a6, 176
 4000d773:       6011c0          sub     a1, a1, a6
@@ -25046,13 +24467,10 @@
 4000dbdc:       4a11            add.n   a1, a1, a4
 4000dbde:       0df0            ret.n
 
-
-
   _xtos_alloca_handler:
 4000dbe0:       003000          rfe
 
 4000dbe3:       00
-
 
   _xtos_syscall_handler:
 4000dbe4:       30b103          rsr.epc1        a3
@@ -25064,13 +24482,10 @@
 4000dbf2:       12d101          addmi   a1, a1, 0x100
 4000dbf5:       003000          rfe
 
-
-
   _xtos_p_none:
 4000dbf8:       0df0            ret.n
 
 4000dbfa:       0000
-
 
   _xtos_set_intlevel:
 4000dbfc:       30e603          rsr.ps  a3
@@ -25084,7 +24499,6 @@
 4000dc13:       0df0            ret.n
 
 4000dc15:       000000
-
 
   _xtos_set_min_intlevel:
 4000dc18:       30e603          rsr.ps  a3
@@ -25102,13 +24516,11 @@
 
 4000dc3a:       0000
 
-
   _xtos_unhandled_interrupt:
 4000dc3c:       f04100          break   1, 15			; breakpoint exception
 4000dc3f:       0df0            ret.n
 
 4000dc41:       000000
-
 
   _xtos_unhandled_exception:
 4000dc44:       2851            l32i.n  a2, a1, 20
@@ -25121,7 +24533,6 @@
 
 ; Used by the following to return from an exception.
 ;	_xtos_l1int_handler
-
 
   xtos_return_from_exc:
 4000dc54:       0841            l32i.n  a0, a1, 16
@@ -25148,8 +24559,6 @@
 4000dc85:       003000          rfe
 
 ; does int = int / int
-
-
 
   __divsi3:
 4000dc88:       307230          xor     a7, a2, a3
@@ -25179,7 +24588,6 @@
 4000dcc7:       7025a3          movltz  a2, a5, a7
 4000dcca:       0df0            ret.n
 
-
 4000dccc:       9c53            beqz.n  a3, 0x4000dce5
 4000dcce:       602060          neg     a2, a6
 4000dcd1:       7026b3          movgez  a2, a6, a7
@@ -25193,7 +24601,6 @@
 4000dcdf:       7024a3          movltz  a2, a4, a7
 4000dce2:       0df0            ret.n
 
-
 4000dce4:       0000000044495630				; ??
 
 4000dcec:       0c02            movi.n  a2, 0			; ??
@@ -25203,8 +24610,6 @@
 ;
 ; __umulsidi3 does longlong = long * long
 ; Used many places.
-
-
 
   __umulsidi3:
 4000dcf0:       12c1e0          addi    a1, a1, -32
@@ -25237,14 +24642,11 @@
 4000dd33:       12c120          addi    a1, a1, 32
 4000dd36:       0df0            ret.n
 
-
-
   xthal_get_ccount:
 4000dd38:       20ea03          rsr.ccount      a2
 4000dd3b:       0df0            ret.n
 
 4000dd3d:       000000
-
 
   xthal_set_ccompare:
 4000dd40:       cc42            bnez.n  a2, 0x4000dd48
@@ -25258,7 +24660,6 @@
 ; so this only works when called with a zero argument
 ; as if it allows multiple compare regs, but handles only one.
 
-
   xthal_get_ccompare:
 4000dd4c:       cc42            bnez.n  a2, 0x4000dd54
 4000dd4e:       20f003          rsr.ccompare0   a2
@@ -25268,21 +24669,17 @@
 4000dd54:       0c02            movi.n  a2, 0
 4000dd56:       0df0            ret.n
 
-
-
   xthal_get_interrupt:
 4000dd58:       20e203          rsr.interrupt   a2
 4000dd5b:       0df0            ret.n
 
 4000dd5d:       000000
 
-
   xthal_set_intclear:
 4000dd60:       20e313          wsr.intclear    a2
 4000dd63:       0df0            ret.n
 
 4000dd65:       000000
-
 
   rc4_skip:
 4000dd68:       0c0a            movi.n  a10, 0
@@ -25394,12 +24791,9 @@
 4000de79:       3a11            add.n   a1, a1, a3
 4000de7b:       0df0            ret.n
 
-
 4000de7d:       0c0a            movi.n  a10, 0
 4000de7f:       0c00            movi.n  a0, 0
 4000de81:       06e9ff          j       0x4000de29
-
-
 
   bzero:
 4000de84:       9cc3            beqz.n  a3, 0x4000dea4
@@ -25418,7 +24812,6 @@
 4000dea4:       0df0            ret.n
 
 4000dea6:       0000
-
 
   memcmp:
 4000dea8:       b64436          bltui   a4, 4, 0x4000dee2
@@ -25488,7 +24881,6 @@
 
 4000df45:       000000
 
-
   memcpy:
 4000df48:       205220          or      a5, a2, a2
 4000df4b:       07e2c9          bbsi    a2, 0, 0x4000df18
@@ -25521,7 +24913,6 @@
 4000df8b:       17e415          bbsi    a4, 1, 0x4000dfa4
 4000df8e:       07e422          bbsi    a4, 0, 0x4000dfb4
 4000df91:       0df0            ret.n
-
 
 4000df93:       00
 4000df94:       6803            l32i.n  a6, a3, 0
@@ -25604,7 +24995,6 @@
 4000e047:       0df0            ret.n
 
 4000e049:       000000
-
 
   memmove:
 4000e04c:       8d03            mov.n   a8, a3
@@ -25744,7 +25134,6 @@
 
 4000e18f:       00
 
-
   memset:
 4000e190:       303074          extui   a3, a3, 0, 8
 4000e193:       807311          slli    a7, a3, 8
@@ -25777,8 +25166,6 @@
 4000e1d8:       076402          bbci    a4, 0, 0x4000e1de
 4000e1db:       324500          s8i     a3, a5, 0
 4000e1de:       0df0            ret.n
-
-
 
   strstr:
 4000e1e0:       420200          l8ui    a4, a2, 0
@@ -25814,8 +25201,6 @@
 
 ; unsigned int = unsigned int / unsigned int
 
-
-
   __udivsi3:
 4000e21c:       b62330          bltui   a3, 2, 0x4000e250
 4000e21f:       6d02            mov.n   a6, a2
@@ -25842,7 +25227,6 @@
 4000e250:       8c93            beqz.n  a3, 0x4000e25d
 4000e252:       0df0            ret.n
 
-
 4000e254:       37360c          bltu    a6, a3, 0x4000e264
 4000e257:       0c12            movi.n  a2, 1
 4000e259:       0df0            ret.n
@@ -25855,8 +25239,6 @@
 4000e266:       0df0            ret.n
 
 ; unsigned int = unsigned int % unsigned int
-
-
 
   __umodsi3:
 4000e268:       b62328          bltui   a3, 2, 0x4000e294
@@ -25875,7 +25257,6 @@
 4000e28f:       3022c0          sub     a2, a2, a3
 4000e292:       0df0            ret.n
 
-
 4000e294:       cc53            bnez.n  a3, 0x4000e29d
 
 ; We actually fall through to here !
@@ -25893,7 +25274,6 @@
 
 ; unsigned integer  -> single-precision conversion
 
-
   __floatunsisf:
 4000e2a4:       bc62            beqz.n  a2, 0x4000e2de
 4000e2a6:       0c07            movi.n  a7, 0
@@ -25902,7 +25282,6 @@
 4000e2ab:       00
 
 ; integer -> single-precision conversion
-
 
   __floatsisf:
 4000e2ac:       ace2            beqz.n  a2, 0x4000e2de
@@ -25925,14 +25304,11 @@
 4000e2dc:       8c06            beqz.n  a6, 0x4000e2e0
 4000e2de:       0df0            ret.n
 
-
 4000e2e0:       202141          srli    a2, a2, 1
 4000e2e3:       f02211          slli    a2, a2, 1
 4000e2e6:       0df0            ret.n
 
 ; unsigned integer to double-precision conversion
-
-
 
   __floatunsidf:
 4000e2e8:       ace2            beqz.n  a2, 0x4000e31a
@@ -25942,7 +25318,6 @@
 4000e2ef:       00
 
 ; integer -> double-precision conversion
-
 
   __floatsidf:
 4000e2f0:       ac62            beqz.n  a2, 0x4000e31a
@@ -25961,18 +25336,14 @@
 4000e315:       703320          or      a3, a3, a7
 4000e318:       0df0            ret.n
 
-
 4000e31a:       0c03            movi.n  a3, 0
 4000e31c:       0df0            ret.n
 
 4000e31e:       0000
 
-
   xthal_window_spill_nw:
 4000e320:       0c02            movi.n  a2, 0
 4000e322:       0df0            ret.n
-
-
 
   xthal_window_spill:
 4000e324:       0df0            ret.n

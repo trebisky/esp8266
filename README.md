@@ -4,6 +4,7 @@ Here are a variety of ESP8266 related things.
 2. Projects - my experiments and projects are here.
 3. reverse - reverse engineering, especially the bootrom
 4. zzlua - dead end work with NodeMCU and Lua.
+5. esptool - the ancient python esptool that I still use and hack on
 
 I have put a lot of energy into disassembling and annotating the ESP8266 bootrom.
 
