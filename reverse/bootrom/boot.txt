@@ -2233,6 +2233,9 @@
 ; Format is "%s %s \n"
 ;  a3 points to "ets_main.c"
 ;  a4 = 181 seems fishy for something to pass to a %s
+;  however, this format is used for each and every error
+;  panic throughout the bootrom -- it looks like a coding
+;  error to me, and probably doesn't get exercised much
 
 400010ae:       21c8ff          l32r    a2, [0x3fffd6b8]	; 0x40000fd0
 400010b1:       31c8ff          l32r    a3, [0x3fffd6c0]	; 0x40000fd4
@@ -2560,11 +2563,11 @@
 40001308:       22a000          movi    a2, 0			; a2 = 0
 4000130b:       42a010          movi    a4, 16			; a4 = 16
 4000130e:       12c1a0          addi    a1, a1, -96		; stack space
-40001311:       c2610f          s32i    a12, a1, 60
-40001314:       d26110          s32i    a13, a1, 64
-40001317:       e26111          s32i    a14, a1, 68
-4000131a:       f26112          s32i    a15, a1, 72
-4000131d:       3d01            mov.n   a3, a1			; read 16 bytes here
+40001311:       c2610f          s32i    a12, a1, 60		; save a12
+40001314:       d26110          s32i    a13, a1, 64		; save a13
+40001317:       e26111          s32i    a14, a1, 68		; save a14
+4000131a:       f26112          s32i    a15, a1, 72		; save a15
+4000131d:       3d01            mov.n   a3, a1			; a3 = a1 (stack)
 4000131f:       09e1            s32i.n  a0, a1, 56		; save a0 for return
 
 ; calls SPIRead ( 0, stack, 16 )
@@ -2579,19 +2582,23 @@
 
 ; trouble
 ; could not read first 16 bytes
+
 40001334:       0c12            movi.n  a2, 1			; return 1
-40001336:       c8f1            l32i.n  a12, a1, 60
-40001338:       d22110          l32i    a13, a1, 64
-4000133b:       e22111          l32i    a14, a1, 68
-4000133e:       f22112          l32i    a15, a1, 72
-40001341:       08e1            l32i.n  a0, a1, 56
+40001336:       c8f1            l32i.n  a12, a1, 60		; restore a12
+40001338:       d22110          l32i    a13, a1, 64		; restore a13
+4000133b:       e22111          l32i    a14, a1, 68		; restore a14
+4000133e:       f22112          l32i    a15, a1, 72		; restore a15
+40001341:       08e1            l32i.n  a0, a1, 56		; restore return
 40001343:       12c160          addi    a1, a1, 96
 40001346:       0df0            ret.n
+
+; looking good, continue the load
 
 40001348:       220102          l8ui    a2, a1, 2		; flash mode
 4000134b:       055a03          call0   SPIReadModeCnfig	; 0x400048ec
 4000134e:       3d01            mov.n   a3, a1			; read to here.
 40001350:       1c04            movi.n  a4, 16			; another 16 bytes
+
 40001352:       22010e          l8ui    a2, a1, 14		; buf[12..15] >> section size 
 40001355:       f20108          l8ui    a15, a1, 8		; buf[8..11] >> section addr
 40001358:       d2010b          l8ui    a13, a1, 11		; 
@@ -9416,6 +9423,7 @@
 
 40004b1a:       0000
 
+; ***************************************************************
 ; it looks to me like SPIRead gets called with 3 arguments
 ; a2 is the offset in SPI to read from
 ; a3 is the address to read to
@@ -9431,12 +9439,12 @@
 40004b2a:       4d07            mov.n   a4, a7
 40004b2c:       2802            l32i.n  a2, a2, 0		; flashchip
 40004b2e:       c577ff          call0   sub_42ac		; 0x400042ac
-40004b31:       0c04            movi.n  a4, 0
-40004b33:       3801            l32i.n  a3, a1, 0		; fetch return
+40004b31:       0c04            movi.n  a4, 0			; a4 = 0
+40004b33:       3801            l32i.n  a3, a1, 0		; restore return (but to a3)
 40004b35:       0c10            movi.n  a0, 1			; a0 = 1
-40004b37:       12c110          addi    a1, a1, 16		; stack
+40004b37:       12c110          addi    a1, a1, 16		; restore stack
 40004b3a:       200483          moveqz  a0, a4, a2		; a0 = a4 if a2 == 0
-40004b3d:       2d00            mov.n   a2, a0			; a2 = a0
+40004b3d:       2d00            mov.n   a2, a0			; a2 = a0 -- really restore return
 40004b3f:       0d03            mov.n   a0, a3			; return
 40004b41:       0df0            ret.n
 
