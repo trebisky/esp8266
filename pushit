@@ -1,3 +1,12 @@
 #!/bin/sh
+
 git push origin master
 git push github master
+
+REMOTE="/u1/www/esp8266/bootrom/boot.txt"
+
+#echo $REMOTE
+ssh cholla rm $REMOTE
+scp reverse/bootrom/boot.txt cholla:$REMOTE
+ssh cholla chmod a-w $REMOTE
+

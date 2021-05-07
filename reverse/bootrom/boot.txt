@@ -2058,13 +2058,13 @@
 40000fb8:       3fffdcd0				; l32r
 
 ; This just saves its argument (in a2) to location 3fffdcd0
+; (which is the user code start address)
 ; It will be fetched from there and branched to when the time comes.
 
   ets_set_user_start:
 40000fbc:       31ffff          l32r    a3, [0x3fffdcd0]	; 0x40000fb8
 40000fbf:       2903            s32i.n  a2, a3, 0
 40000fc1:       0df0            ret.n
-
 40000fc3:       00
 
 40000fc4:       60000200				; l32r - IO base address
@@ -2284,9 +2284,12 @@
 
 ; The user code probably won't return, but it might !!
 ; Format follows: "user code done"
+; ets_printf ( "user code done" )
+
 40001100:       21b8ff          l32r    a2, [0x3fffd6dc]	; 0x40000fe0
 40001103:       853c01          call0   ets_printf		; 0x400024cc
 40001106:       c5cfff          call0   ets_run			; 0x40000e04
+
 40001109:       22a000          movi    a2, 0
 4000110c:       c22101          l32i    a12, a1, 4
 4000110f:       d821            l32i.n  a13, a1, 8
@@ -2458,6 +2461,9 @@
 4000123e:       21d8ff          l32r    a2, [0x3fffa000]	; 0x400011a0
 40001241:       31d8ff          l32r    a3, [0x00002000]	; 0x400011a4
 40001244:       4811            l32i.n  a4, a1, 4
+
+; The following call gets a command from the host and handles it
+
 40001246:       051202          call0   UartDwnLdProc		; 0x40003368
 40001249:       c60000          j       0x40001250
 
@@ -2542,7 +2548,9 @@
 40001300:       3fffd750				; l32r
 40001304:       3fffd760				; l32r
 
-; SPI load
+; ================================================
+
+; SPI load  spi_load  SPI_load
 ; called from main()
 
 ; This seems to be what is called to load an app
@@ -2558,7 +2566,9 @@
 4000131a:       f26112          s32i    a15, a1, 72
 4000131d:       3d01            mov.n   a3, a1			; read 16 bytes here
 4000131f:       09e1            s32i.n  a0, a1, 56		; save a0 for return
+
 ; calls SPIRead ( 0, stack, 16 )
+
 40001321:       857f03          call0   SPIRead			; 0x40004b1c
 40001324:       ccc2            bnez.n  a2, 0x40001334
 40001326:       e20101          l8ui    a14, a1, 1		; num segments
@@ -3161,6 +3171,8 @@
 4000189f:       12c110          addi    a1, a1, 16
 400018a2:       0df0            ret.n
 
+; pointless wrappers (as per the str*** family elsewhere)
+
   ets_memset:
 400018a4:       12c1f0          addi    a1, a1, -16
 400018a7:       0901            s32i.n  a0, a1, 0
@@ -3168,7 +3180,6 @@
 400018ac:       0801            l32i.n  a0, a1, 0
 400018ae:       12c110          addi    a1, a1, 16
 400018b1:       0df0            ret.n
-
 400018b3:       00
 
   ets_memcpy:
@@ -3178,7 +3189,6 @@
 400018bc:       0801            l32i.n  a0, a1, 0
 400018be:       12c110          addi    a1, a1, 16
 400018c1:       0df0            ret.n
-
 400018c3:       00
 
   ets_memmove:
@@ -3188,7 +3198,6 @@
 400018cc:       0801            l32i.n  a0, a1, 0
 400018ce:       12c110          addi    a1, a1, 16
 400018d1:       0df0            ret.n
-
 400018d3:       00
 
   ets_memcmp:
@@ -3198,8 +3207,8 @@
 400018dc:       0801            l32i.n  a0, a1, 0
 400018de:       12c110          addi    a1, a1, 16
 400018e1:       0df0            ret.n
-
 400018e3:       00
+
 400018e4:       3fffdd30				; l32r
 
   sub_18e8:
@@ -3271,7 +3280,6 @@
 
   mem_init:
 40001998:       1c03            movi.n  a3, 16
-
 4000199a:       1c06            movi.n  a6, 16
 4000199c:       81d2ff          l32r    a8, [0x3fffdd30]	; 0x400018e4
 4000199f:       0c09            movi.n  a9, 0
@@ -3536,13 +3544,14 @@
 40001c24:       8b29            addi.n  a2, a9, 8
 40001c26:       12c110          addi    a1, a1, 16
 40001c29:       0df0            ret.n
-
 40001c2b:       00
+
+; Only called by zalloc below
 
   mem_calloc:
 40001c2c:       12c1f0          addi    a1, a1, -16
-40001c2f:       026101          s32i    a0, a1, 4
-40001c32:       c26102          s32i    a12, a1, 8
+40001c2f:       026101          s32i    a0, a1, 4		; save a0
+40001c32:       c26102          s32i    a12, a1, 8		; save a12
 40001c35:       3002c1          mul16u  a0, a2, a3
 40001c38:       026100          s32i    a0, a1, 0
 40001c3b:       0020f4          extui   a2, a0, 0, 16
@@ -3553,12 +3562,13 @@
 40001c47:       4801            l32i.n  a4, a1, 0
 40001c49:       85c5ff          call0   ets_memset		; 0x400018a4
 40001c4c:       2d0c            mov.n   a2, a12
-40001c4e:       0811            l32i.n  a0, a1, 4
-40001c50:       c821            l32i.n  a12, a1, 8
+40001c4e:       0811            l32i.n  a0, a1, 4		; restore a0
+40001c50:       c821            l32i.n  a12, a1, 8		; restore a12
 40001c52:       12c110          addi    a1, a1, 16
 40001c55:       0df0            ret.n
-
 40001c57:       00
+
+; never called
 
   mem_zalloc:
 40001c58:       3d02            mov.n   a3, a2
@@ -3569,7 +3579,6 @@
 40001c64:       0801            l32i.n  a0, a1, 0
 40001c66:       12c110          addi    a1, a1, 16
 40001c69:       0df0            ret.n
-
 40001c6b:       00
 
   mem_realloc:
@@ -4710,7 +4719,6 @@
 4000261b:       c02000          memw
 4000261e:       526442          s32i    a5, a4, 0x108		; RTC
 40002621:       0df0            ret.n
-
 40002623:       00
 
 40002624:       c02000          memw
@@ -4728,7 +4736,6 @@
 40002643:       c02000          memw
 40002646:       b26442          s32i    a11, a4, 0x108		; RTC
 40002649:       0df0            ret.n
-
 4000264b:       00
 
 ; Interesting, we get a soft reset by setting a bit
@@ -4743,7 +4750,6 @@
 4000265b:       c02000          memw
 4000265e:       226340          s32i    a2, a3, 0x100
 40002661:       0df0            ret.n
-
 40002663:       00
 
 40002664:       000186a0				; l32r
@@ -5205,8 +5211,14 @@
 40002a7e:       0801            l32i.n  a0, a1, 0
 40002a80:       12c110          addi    a1, a1, 16
 40002a83:       0df0            ret.n
-
 40002a85:       000000
+
+; A bunch of wrappers around various string routines.
+; As near as I can see, these are totally pointless.
+; They simply save space on the stack and then save a0
+; in order to make the call to the wrapped routine.
+; arguments are in a2 (and a3 sometimes)
+; result gets returned in a2
 
   ets_strcpy:
 40002a88:       12c1f0          addi    a1, a1, -16
@@ -5215,7 +5227,6 @@
 40002a90:       0801            l32i.n  a0, a1, 0
 40002a92:       12c110          addi    a1, a1, 16
 40002a95:       0df0            ret.n
-
 40002a97:       00
 
   ets_strncpy:
@@ -5225,7 +5236,6 @@
 40002aa0:       0801            l32i.n  a0, a1, 0
 40002aa2:       12c110          addi    a1, a1, 16
 40002aa5:       0df0            ret.n
-
 40002aa7:       00
 
   ets_strcmp:
@@ -5235,7 +5245,6 @@
 40002ab0:       0801            l32i.n  a0, a1, 0
 40002ab2:       12c110          addi    a1, a1, 16
 40002ab5:       0df0            ret.n
-
 40002ab7:       00
 
   ets_strncmp:
@@ -5245,7 +5254,6 @@
 40002ac0:       0801            l32i.n  a0, a1, 0
 40002ac2:       12c110          addi    a1, a1, 16
 40002ac5:       0df0            ret.n
-
 40002ac7:       00
 
   ets_strlen:
@@ -5255,7 +5263,6 @@
 40002ad0:       0801            l32i.n  a0, a1, 0
 40002ad2:       12c110          addi    a1, a1, 16
 40002ad5:       0df0            ret.n
-
 40002ad7:       00
 
   ets_strstr:
@@ -5265,7 +5272,6 @@
 40002ae0:       0801            l32i.n  a0, a1, 0
 40002ae2:       12c110          addi    a1, a1, 16
 40002ae5:       0df0            ret.n
-
 40002ae7:       00
 
   ets_bzero:
@@ -5275,7 +5281,6 @@
 40002af0:       0801            l32i.n  a0, a1, 0
 40002af2:       12c110          addi    a1, a1, 16
 40002af5:       0df0            ret.n
-
 40002af7:       00
 
   ets_str2macaddr:
@@ -5399,10 +5404,10 @@
 ; *********************** start timer stuff *********************8
 
 ; called from sub_2c04 in 3 places (just below)
-; writes arg to 60000 630
+; writes arg to 6000_0630
 ; This is the Timer 2 "alarm" register aka TIMER_FRC2_ALARM
 ; There are two timers with registers like so.
-; One is at 60000600, Two is at 60000620
+; One is at 6000_0600, Two is at 6000_0620
 ; +0 = load
 ; +4 = count
 ; +8 = control
@@ -5414,7 +5419,6 @@
 40002bfb:       c02000          memw
 40002bfe:       29c3            s32i.n  a2, a3, 48		; iobase + 0x30
 40002c00:       0df0            ret.n
-
 40002c02:       0000
 
 ; -------------
@@ -5566,7 +5570,9 @@
 ; Here if first entry in control structure is NOT -1
 ; (this is a "panic" situation).
 
-; Format: "%s %s "
+; Format: "%s %s\n"
+;
+; ets_printf ( "%s %s\n", "ets_timer.c", 185 );
 
 40002cd9:       21e0ff          l32r    a2, [0x3fffd6b8]	; 0x40002c5c
 40002cdc:       31e1ff          l32r    a3, [0x3fffd878]	; 0x40002c60
@@ -5675,6 +5681,8 @@
 40002d87:       26000e          beqi    a0, -1, 0x40002d99
 
 ; Format: "%s %s "
+; ets_printf ( "%s %s\n", "ets_timer.c", 231 );
+
 40002d8a:       21b4ff          l32r    a2, [0x3fffd6b8]	; 0x40002c5c
 40002d8d:       31b4ff          l32r    a3, [0x3fffd878]	; 0x40002c60
 40002d90:       42a0e7          movi    a4, 231
@@ -6548,6 +6556,7 @@
 ; This does some clever business using a jump table
 ; The table is at 0x3fffcba0 with 12 entries:
 ; Entries at 0 and 1 are invalid
+; These are exactly the "opcodes" used by esptool!
 
 ; 3fffcba0:	40003435 40003435 40003500 400034eb 	; 0 1 2 3
 ; 3fffcbb0:	400034d0 40003440 400034b9 400034a3 	; 4 5 6 7
@@ -21366,19 +21375,27 @@
 
 4000bdc6:       0000
 
+; Compare two strings (pointed to by a2 and a3).
+; The result is returned in a2.
+
   strcmp:
 4000bdc8:       820200          l8ui    a8, a2, 0
 4000bdcb:       920300          l8ui    a9, a3, 0
 4000bdce:       0c3a            movi.n  a10, 3
-4000bdd0:       97984c          bne     a8, a9, 0x4000be20
+4000bdd0:       97984c          bne     a8, a9, 0x4000be20	; quick check for non-match
+
 4000bdd3:       30b220          or      a11, a2, a3
 4000bdd6:       a70b4e          bnone   a11, a10, 0x4000be28
+
 4000bdd9:       30b230          xor     a11, a2, a3
 4000bddc:       a78b30          bany    a11, a10, 0x4000be10
+
 4000bddf:       1b22            addi.n  a2, a2, 1
 4000bde1:       163809          beqz    a8, 0x4000be78
+
 4000bde4:       1b33            addi.n  a3, a3, 1
 4000bde6:       a7023e          bnone   a2, a10, 0x4000be28
+
 4000bde9:       820200          l8ui    a8, a2, 0
 4000bdec:       920300          l8ui    a9, a3, 0
 4000bdef:       1b22            addi.n  a2, a2, 1
@@ -21395,22 +21412,27 @@
 4000be0c:       060600          j       0x4000be28
 
 4000be0f:       00
+
 4000be10:       820200          l8ui    a8, a2, 0
 4000be13:       920300          l8ui    a9, a3, 0
 4000be16:       1b22            addi.n  a2, a2, 1
 4000be18:       979804          bne     a8, a9, 0x4000be20
 4000be1b:       1b33            addi.n  a3, a3, 1
 4000be1d:       56f8fe          bnez    a8, 0x4000be10
+
+; here when two bytes differ
 4000be20:       9028c0          sub     a2, a8, a9
 4000be23:       0df0            ret.n
 
 4000be25:       000000
+
 4000be28:       42a0ff          movi    a4, 255
 4000be2b:       7176d1          l32r    a7, [0x40404040]	; 0x40000404
 4000be2e:       c60000          j       0x4000be35
 
 4000be31:       4b22            addi.n  a2, a2, 4
 4000be33:       4b33            addi.n  a3, a3, 4
+
 4000be35:       8802            l32i.n  a8, a2, 0
 4000be37:       9803            l32i.n  a9, a3, 0
 4000be39:       f05811          slli    a5, a8, 1
@@ -21437,6 +21459,8 @@
 4000be6f:       570805          bnone   a8, a5, 0x4000be78
 4000be72:       670802          bnone   a8, a6, 0x4000be78
 4000be75:       7788e8          bany    a8, a7, 0x4000be61
+
+; comparison done, strings match
 4000be78:       0c02            movi.n  a2, 0
 4000be7a:       0df0            ret.n
 
@@ -21537,49 +21561,65 @@
 
 4000bf4b:       00
 
+; Calculate the length of the string in a2
+; return length in a2
+
   strlen:
 4000bf4c:       32c2fc          addi    a3, a2, -4
+
 4000bf4f:       42a0ff          movi    a4, 255
 4000bf52:       5128d1          l32r    a5, [0x0000ff00]	; 0x400003f4
 4000bf55:       6128d1          l32r    a6, [0x00ff0000]	; 0x400003f8
 4000bf58:       7129d1          l32r    a7, [0xff000000]	; 0x400003fc
-4000bf5b:       07e205          bbsi    a2, 0, 0x4000bf64
-4000bf5e:       17e20c          bbsi    a2, 1, 0x4000bf6e
-4000bf61:       c60600          j       0x4000bf80
 
-4000bf64:       820304          l8ui    a8, a3, 4
-4000bf67:       1b33            addi.n  a3, a3, 1
+4000bf5b:       07e205          bbsi    a2, 0, 0x4000bf64	; branch if bit 0 set
+4000bf5e:       17e20c          bbsi    a2, 1, 0x4000bf6e	; branch if bit 1 set
+4000bf61:       c60600          j       0x4000bf80		; neither bit 0 or 1 set
+
+; odd starting address, fetch first byte all by itself
+4000bf64:       820304          l8ui    a8, a3, 4		; fetch first byte
+4000bf67:       1b33            addi.n  a3, a3, 1		; a3++
 4000bf69:       ac38            beqz.n  a8, 0x4000bf90
 4000bf6b:       176311          bbci    a3, 1, 0x4000bf80
+
+; even starting address, but not 4 byte boundary
 4000bf6e:       2b33            addi.n  a3, a3, 2
 4000bf70:       8803            l32i.n  a8, a3, 0
 4000bf72:       67082a          bnone   a8, a6, 0x4000bfa0
 4000bf75:       778807          bany    a8, a7, 0x4000bf80
+
 4000bf78:       3b33            addi.n  a3, a3, 3
 4000bf7a:       2023c0          sub     a2, a3, a2
 4000bf7d:       0df0            ret.n
-
 4000bf7f:       00
-4000bf80:       8813            l32i.n  a8, a3, 4
-4000bf82:       4b33            addi.n  a3, a3, 4
-4000bf84:       47080a          bnone   a8, a4, 0x4000bf92
+
+; loop fetching 32 bit words, then test the 4 bytes
+
+4000bf80:       8813            l32i.n  a8, a3, 4		; a8 = [a3 + 4]
+4000bf82:       4b33            addi.n  a3, a3, 4		; a3 += 4
+4000bf84:       47080a          bnone   a8, a4, 0x4000bf92	; lsb zero
 4000bf87:       57080d          bnone   a8, a5, 0x4000bf98
 4000bf8a:       670812          bnone   a8, a6, 0x4000bfa0
 4000bf8d:       7788ef          bany    a8, a7, 0x4000bf80
-4000bf90:       3b33            addi.n  a3, a3, 3
-4000bf92:       2023c0          sub     a2, a3, a2
+
+; fall through when last byte is null
+; a2 is the original starting address
+; a3 is our working position.
+; the difference is the string length
+
+4000bf90:       3b33            addi.n  a3, a3, 3		; a3 += 3
+4000bf92:       2023c0          sub     a2, a3, a2		; a2 = a3 - a2
 4000bf95:       0df0            ret.n
-
 4000bf97:       00
-4000bf98:       1b33            addi.n  a3, a3, 1
-4000bf9a:       2023c0          sub     a2, a3, a2
+
+4000bf98:       1b33            addi.n  a3, a3, 1		; a3 += 1
+4000bf9a:       2023c0          sub     a2, a3, a2		; a2 = a3 - a2
 4000bf9d:       0df0            ret.n
-
 4000bf9f:       00
-4000bfa0:       2b33            addi.n  a3, a3, 2
-4000bfa2:       2023c0          sub     a2, a3, a2
-4000bfa5:       0df0            ret.n
 
+4000bfa0:       2b33            addi.n  a3, a3, 2		; a3 += 2
+4000bfa2:       2023c0          sub     a2, a3, a2		; a2 = a3 - a2
+4000bfa5:       0df0            ret.n
 4000bfa7:       00
 
   strncmp:

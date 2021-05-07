@@ -12,6 +12,12 @@ info:
 	./esptool -p $(PORT) read_mac
 	./esptool -p $(PORT) flash_id
 
+term:
+	picocom -b 115200 $(PORT)
+
+# THE END
+
+
 
 		
 

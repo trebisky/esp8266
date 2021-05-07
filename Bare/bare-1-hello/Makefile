@@ -41,7 +41,8 @@ SDK_INCDIR	= $(SDK_BASE)/sdk/include
 # linker script used for the linker step
 # /home/user/ESP8266/esp-open-sdk/esp_iot_sdk_v1.4.0/ld/eagle.app.v6.ld
 # /home/user/ESP8266/esp-open-sdk/xtensa-lx106-elf/xtensa-lx106-elf/sysroot/usr/lib/eagle.app.v6.ld
-LD_SCRIPT	= $(SDK_BASE)/sdk/ld/eagle.app.v6.ld
+#LD_SCRIPT	= $(SDK_BASE)/sdk/ld/eagle.app.v6.ld
+LD_SCRIPT	= esp.lds
 
 # contents of /home/user/ESP8266/esp-open-sdk/esp_iot_sdk_v1.4.0/lib
 # libat.a  libcrypto.a  libespnow.a  libjson.a  liblwip_536.a  liblwip.a  libmain.a  libmesh.a  libnet80211.a  libphy.a  libpp.a  libpwm.a  libsmartconfig.a  libssl.a  libupgrade.a  libwpa.a  libwps.a
@@ -62,7 +63,7 @@ LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
 .PHONY: all flash clean info term
 
-TARGET	= timer_blink
+TARGET	= hello
 
 all: $(TARGET)
 
@@ -70,9 +71,9 @@ all: $(TARGET)
 	$(vecho) "CC $<"
 	$(Q) $(CC) $(INCLUDES) $(CFLAGS)  -c $<
 
-#timer_blink: timer_blink.o
+#hello: hello.o
 #	$(vecho) "LD $@"
-#	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) timer_blink.o -Wl,--end-group -o $@
+#	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) hello.o -Wl,--end-group -o $@
 
 # linker flags
 #XLDFLAGS		= -nostdlib -Wl,--no-check-sections -u user_init -Wl,-static
@@ -84,8 +85,8 @@ all: $(TARGET)
 XLIBS		= gcc
 XLIBS		:= $(addprefix -l,$(XLIBS))
 
-timer_blink: timer_blink.o
-	$(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(XLIBS) timer_blink.o -Wl,--end-group -o $@
+hello: hello.o
+	$(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(XLIBS) hello.o -Wl,--end-group -o $@
 
 # This is important -- without the right options it works sometimes,
 # but other times screws up.
@@ -93,6 +94,9 @@ timer_blink: timer_blink.o
 # dio/8m works for my unit #1
 #FLOPS = -fm dio -fs 4m
 FLOPS = -fm dio -fs 8m
+
+image:  $(TARGET)
+	$(ESPTOOL) elf2image $(TARGET)
 
 # This loads our code into the flash on the device itself
 flash:  $(TARGET)
@@ -113,14 +117,11 @@ bootrom.bin:
 #bootrom.dis:
 #	xtensa-lx106-elf-objdump -D -b binary -mxtensa bootrom.bin >bootrom.dis
 
-# Which do you want?  The first line disassembles just my code.
-#  The second disassembles the whole deal, incuding stuff from SDK libraries.
 dis:
-#	xtensa-lx106-elf-objdump -D -mxtensa timer_blink.o >timer_blink.dis
-	xtensa-lx106-elf-objdump -D -mxtensa timer_blink >timer_blink.dis
+	xtensa-lx106-elf-objdump -D -mxtensa hello.o >hello.dis
 
 syms:
-	xtensa-lx106-elf-nm timer_blink | sort >timer_blink.syms
+	xtensa-lx106-elf-nm hello | sort >hello.syms
 
 term:
 	picocom -b 115200 $(PORT)
@@ -129,4 +130,14 @@ clean:
 	$(Q) rm -f $(TARGET)
 	$(Q) rm -f *.o
 	$(Q) rm -f *.bin
-	$(Q) rm -f *.dis
+
+# linker script used for the linker step
+# /home/user/ESP8266/esp-open-sdk/esp_iot_sdk_v1.4.0/ld/eagle.app.v6.ld
+# /home/user/ESP8266/esp-open-sdk/xtensa-lx106-elf/xtensa-lx106-elf/sysroot/usr/lib/eagle.app.v6.ld
+#LD_SCRIPT	= $(SDK_BASE)/sdk/ld/eagle.app.v6.ld
+get_lds:
+	#../ld/eagle.rom.addr.v6.ld
+	#cp $(LD_SCRIPT) esp.lds.X
+	cp $(SDK_BASE)/sdk/ld/eagle.rom.addr.v6.ld rom_syms
+
+# THE END

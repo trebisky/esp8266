@@ -87,6 +87,9 @@ $(TARGET): $(OBJS)
 #FLOPS = -fm dio -fs 4m
 FLOPS = -fm dio -fs 8m
 
+bin:  $(TARGET)
+	$(ESPTOOL) elf2image $(TARGET)
+
 # This loads our code into the flash on the device itself
 flash:  $(TARGET)
 	$(ESPTOOL) elf2image $(TARGET)

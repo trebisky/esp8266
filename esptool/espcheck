@@ -1,0 +1,46 @@
+#!/bin/python3
+
+import serial
+import struct
+
+#import sys
+#import time
+#import argparse
+#import os
+#import subprocess
+#import tempfile
+
+PORT = "/dev/ttyUSB1"
+BAUD = 115200
+ESP_SYNC = 0x08
+
+def check () :
+    print ( "Checking" )
+    #sio = serial.Serial(port)
+    sio = serial.Serial(port=PORT,baudrate=BAUD,timeout=2.0)
+    # We get 115200,8,N,1
+    #sio.baudrate = baud
+#    print ( sio.BAUDRATES )
+#    print ( sio.baudrate )
+#    print ( sio.is_open )
+    return sio
+
+def watch ( sio ) :
+    while ( True ) :
+        x = sio.read(1)
+        print ( x )
+        if x == b'' :
+            break
+
+def sync ( sio ) :
+    sync_str = b'\x07\x07\x12\x20' + 32 * b'\x55'
+    #print ( sync_str )
+    pkt = struct.pack(b'<BBHI', 0x00, ESP_SYNC, len(sync_str), 0) + sync_str
+    sio.write(pkt)
+
+sio = check ()
+while ( True ) :
+    sync ( sio )
+    watch ( sio )
+
+# THE END

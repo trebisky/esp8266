@@ -14,7 +14,8 @@ vecho := @echo
 endif
 
 # The new python job
-ESPTOOL		= esptool
+#ESPTOOL		= esptool
+ESPTOOL		= esptoolv3
 #PORT		= /dev/ttyUSB0
 PORT		= /dev/ttyUSB1
 
@@ -81,6 +82,10 @@ $(TARGET): $(TARGET).o
 # works for nodemcu board ...
 #FLOPS = -fm dio -fs 8m
 
+# I found this necessary 5-3-2021 with my nodemcu board and the esptoolv3
+#FLOPS = -fm dio -fs 4MB
+FLOPS = -fm dio
+
 # This loads our code into the flash on the device itself
 flash:	$(TARGET)
 	$(ESPTOOL) elf2image $(TARGET)
@@ -89,8 +94,8 @@ flash:	$(TARGET)
 
 # This is a good way to verify that the boot loader on the ESP8266 is running
 info:
-	esptool -p $(PORT) read_mac
-	esptool -p $(PORT) flash_id
+	$(ESPTOOL) -p $(PORT) read_mac
+	$(ESPTOOL) -p $(PORT) flash_id
 
 # Fetch the boot loader (not generally useful)
 bootrom.bin:
