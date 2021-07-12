@@ -1,16 +1,5 @@
-# Makefile for ESP8266 Tmon project
-#
+# Makefile for ESP8266 development
 # Tom Trebisky  12-26-2015
-# Tom Trebisky  1-25-2017
-#
-# For the Tmon gadget
-#
-# --- to burn new code:
-# 1) remove the reset line from pin 3 !!! ***
-# 2) Connect via good USB cable.
-# 3) Verify proper PORT setting below
-# 4) use "make info" to verify communications
-# 5) make flash will burn the code.
 
 # tjt - be verbose
 V = 1
@@ -26,9 +15,9 @@ endif
 
 # The new python job
 #ESPTOOL		= esptool
-ESPTOOL		= esptoolv3 --no-stub
-PORT		= /dev/ttyUSB0
-#PORT		= /dev/ttyUSB1
+ESPTOOL		= esptoolv3
+#PORT		= /dev/ttyUSB0
+PORT		= /dev/ttyUSB1
 
 # base directory of the ESP8266 SDK package, absolute
 ##SDK_BASE	?= /opt/Espressif/sdk/
@@ -73,9 +62,7 @@ LDFLAGS		= -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
 
 .PHONY: all flash clean info term
 
-TARGET	= tmon
-
-OBJS = tmon.o dht_tt_subs.o
+TARGET = adc
 
 all: $(TARGET)
 
@@ -83,34 +70,27 @@ all: $(TARGET)
 	$(vecho) "CC $<"
 	$(Q) $(CC) $(INCLUDES) $(CFLAGS)  -c $<
 
-$(TARGET): $(OBJS)
+$(TARGET): $(TARGET).o
 	$(vecho) "LD $@"
-	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) $(OBJS) -Wl,--end-group -o $@
+	$(Q) $(LD) -L$(SDK_LIBDIR) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $(LIBS) $< -Wl,--end-group -o $@
 
 # This is important -- without the right options it works sometimes,
 # but other times screws up.
 # Flash options - anything with a 12E module will be dio
 # dio/8m works for my unit #1
 #FLOPS = -fm dio -fs 4m
-FLOPS = -fm dio -fs 8MB
+# works for nodemcu board ...
+#FLOPS = -fm dio -fs 8m
 
-# My hand wired board has a 3 pin header for the USB to serial dongle.
-# Ground is next to the board edge
-# Next is Rx on the ESP (goes to Tx on the USB, i.e. purple wire)
-# Next is Tx on the ESP (goes to Rx on the USB, i.e. red wire)
-#
-# Also you must remove the jumper from GPIO16 to reset
-# Also you must install the jumper to ground GPIO0
-# (i.e. just move the jumper from the reset spot to the center GPIO0 spot)
-# then reconnect the battery for a reset.
-#
-# If nothing works, double check the USB device since linux reboots
-# and such can re-enumerate and rename things.
+# I found this necessary 5-3-2021 with my nodemcu board and the esptoolv3
+#FLOPS = -fm dio -fs 4MB
+FLOPS = -fm dio
 
 # This loads our code into the flash on the device itself
 flash:	$(TARGET)
 	$(ESPTOOL) elf2image $(TARGET)
-	-$(ESPTOOL) --port $(PORT) write_flash $(FLOPS) 0x00000 $(TARGET)-0x00000.bin 0x40000 $(TARGET)-0x40000.bin
+	#$(ESPTOOL) --port $(PORT) write_flash $(FLOPS) 0x00000 $(TARGET)-0x00000.bin 0x40000 $(TARGET)-0x40000.bin
+	$(ESPTOOL) --port $(PORT) --no-stub write_flash $(FLOPS) 0x00000 $(TARGET)-0x00000.bin 0x40000 $(TARGET)-0x40000.bin
 
 # This is a good way to verify that the boot loader on the ESP8266 is running
 info:
@@ -119,26 +99,16 @@ info:
 
 # Fetch the boot loader (not generally useful)
 bootrom.bin:
-	#$(ESPTOOL) -p $(PORT) dump_mem 0x40000000 65536 esp8266_rom.bin
-	$(ESPTOOL) -p $(PORT) dump_mem 0x40000000 65536 bootrom.bin
+	#esptool -p $(PORT) dump_mem 0x40000000 65536 esp8266_rom.bin
+	esptool -p $(PORT) dump_mem 0x40000000 65536 bootrom.bin
 
-bootrom.dis:
-	xtensa-lx106-elf-objdump -D -b binary -mxtensa bootrom.bin >bootrom.dis
+dis:
+	xtensa-lx106-elf-objdump -D -mxtensa $(TARGET) >$(TARGET).dis
 
 term:
 	picocom -b 115200 $(PORT)
-
-SFILES = tserver Makefile *.c
-
-save:
-#	cp *.c tlog Makefile version1
-	cp *.c tserver Makefile version1
-
-ship:
-	tar czvf tmon_v2.tar.gz $(SFILES)
 
 clean:
 	$(Q) rm -f $(TARGET)
 	$(Q) rm -f *.o
 	$(Q) rm -f *.bin
-	$(Q) rm -f *.gz

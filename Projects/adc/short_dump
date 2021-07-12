@@ -1,0 +1,36 @@
+#!/bin/ruby
+
+# script to disassemble a short patch of code
+# beginning at a specified address
+# we give the address as an offset in hex into the rom.
+
+if ARGV.size < 1
+    puts "Insert coin"
+    exit
+end
+
+#elf = "bootsym.elf"
+elf = "adc"
+
+dis = "xtensa-lx106-elf-objdump -mxtensa -d #{elf} -z "
+
+# This was from working with the bootrom
+#off = 0xe0
+#base = 0x40000000
+#off = ARGV[0].hex
+#addr = base + off
+
+addr = ARGV[0].hex
+
+count = 512
+ss = "%08x" % (addr)
+es = "%08x" % (addr + count)
+
+range = "--start-address=0x#{ss} --stop-address=0x#{es}"
+
+
+cmd = dis + range
+#puts cmd
+system cmd
+
+# THE END

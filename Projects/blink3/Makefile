@@ -17,7 +17,8 @@ endif
 #ESPTOOL		= esptool
 ESPTOOL		= esptoolv3
 #PORT		= /dev/ttyUSB0
-PORT		= /dev/ttyUSB1
+#PORT		= /dev/ttyUSB1
+PORT		= /dev/ttyUSB2
 
 # base directory of the ESP8266 SDK package, absolute
 ##SDK_BASE	?= /opt/Espressif/sdk/

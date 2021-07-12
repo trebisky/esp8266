@@ -226,6 +226,7 @@ setup_server ( void )
 int dht_hum;
 int dht_tc;
 int dht_status;
+int battery;
 
 unsigned long start_time;
 
@@ -300,6 +301,7 @@ send_temps ( void *arg )
     // os_printf ( "temperature (F) = %d\n", dht_tf );
 
     dht_count = os_sprintf ( dht_msg, "%d %d %d %d %d\n", time, 0, dht_hum, dht_tc, dht_tf );
+    dht_count = os_sprintf ( dht_msg, "%d %d %d %d %d\n", time, battery, dht_hum, dht_tc, dht_tf );
     os_printf ( "TCP sending %d bytes\n", dht_count );
     espconn_send ( arg, dht_msg, dht_count );
 }
@@ -439,8 +441,13 @@ start_timer ( void )
 void
 harvest_data ( void )
 {
+    unsigned short adc;
 
 #ifdef notdef
+    /* I have since learned that you cannot read v33
+       if you have anything connected to the adc pin.
+       You have to choose, one or the other.
+   */
     unsigned short v33;
     unsigned short adc;
 
@@ -450,6 +457,19 @@ harvest_data ( void )
     //os_printf ( "Vdd33 = %d\n", v33 );
     //os_printf ( "ADC = %d\n", adc );
 #endif
+
+    /* The 10 bit ADC gives a value 0-1023 with 1 volt full scale.
+     * I have a resistor divider with a 330K and a 100K resistor.
+     * The 330K actually more like 320K, the 100k is spot on.
+     * I measure the battery as 4.11 and the meter shows 0.959 on
+     *  the ADC pin.  This yields a scale factor of 4.28
+     */
+
+#define BATTERY_SCALE	418
+    adc = system_adc_read ();
+    os_printf ( "ADC = %d\n", adc );
+    battery = adc * BATTERY_SCALE;
+    battery /= 1023;
 
     dht_status = dht_sensor ( DHT_GPIO, &dht_tc, &dht_hum );
 
