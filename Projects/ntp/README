@@ -1,0 +1,25 @@
+This is just an idea at this point, but what I want is an NTP managed clock
+mounted on my wall that always shows the correct time.
+
+Why you cannot just buy such a thing is a puzzle to me.
+
+I purchased a clock on AliExpress with the idea of hacking it and using its display:
+
+https://www.aliexpress.com/item/1005002468423895.html
+
+Price was $10.  It is a nice unit with an inscrutable interface.
+
+1. General setting
+Long press "SET" button to set "12/24H"→“Time”→"Year"→"Date"→"℃" by "+" and "-" buttons .(tap"set" button to enter next setting)
+2. Display mode setting
+Long press “+" button to switch display mode:
+1) Display Time Only
+2) Time, Date, Temperature Cycle Display
+Alarm settings:
+1.Tap "-" button to open/close alarm
+2.Long press "-" button to enter alarm setting
+3.Start snooze: when the alarm clcok rings, tap any key to start snooze ,alarm indicator light flashes slowly
+4.Turn off the alarm: when the alarm clock rings, long press any key to turn off alarm, enter the next alarm state
+
+Display the file "clock.webp"
+
