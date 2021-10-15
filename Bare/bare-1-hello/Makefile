@@ -33,6 +33,7 @@ SDK_BIN = $(SDK_BASE)/xtensa-lx106-elf/bin
 CC		= xtensa-lx106-elf-gcc
 AR		= xtensa-lx106-elf-ar
 LD		= xtensa-lx106-elf-gcc
+NM		= xtensa-lx106-elf-nm
 
 # various paths from the SDK used in this project
 SDK_LIBDIR	= $(SDK_BASE)/sdk/lib

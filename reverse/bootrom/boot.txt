@@ -159,7 +159,9 @@
 ; How do things get started?  The reset vector goes to 0x40000080.
 ;
 ; Early on, it sets the vector base to 0x40000000 (right here!!)
-; Which means there is no way for software to mess with the basic vector table.
+; Which is how it is for the bootrom.
+; User code may set a new Vec_base value later and do
+; as it pleases.
 
   Vec_base:
 40000000:       00000000000000000000000000000000
