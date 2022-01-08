@@ -16,7 +16,7 @@ from tkinter import *
 import datetime
 
 import urllib.request
-import json
+#import json
 
 # First dnf install python3-ephem
 import ephem
@@ -92,10 +92,11 @@ def conv_data ( data ) :
     for l in data :
         w = l.split()
         yy.append ( float(w[6])/10.0 )
+        last_hum = float(w[4])/10.0
 
     y = np.array ( yy )
     x = np.arange ( 0.0, len(yy)*1.0, 1.0 )
-    return ( x, y )
+    return ( x, y, last_hum )
 
 def set_data_range () :
     global start_time
@@ -110,12 +111,13 @@ def set_data_range () :
 def gather_data () :
     global xx, yy
     global cur_temp_str
+    global cur_hum_str
     global cur_date_str
     global cur_time_str
 
     d = read_data ( start_time )
     # print ( len(d) )
-    xx,yy = conv_data ( d )
+    xx,yy,hh = conv_data ( d )
 
     w = d[-1].split()
     battery = float(w[3]) / 100.0
@@ -142,6 +144,7 @@ def gather_data () :
     cur_date_str.set( cd )
     cur_time_str.set( ct )
     cur_temp_str.set( str(yy[-1]) )
+    cur_hum_str.set( str(hh) + " %" )
 
     high_str.set( str ( np.amax ( yy )) + " high" )
     low_str.set( str ( np.amin ( yy )) + " low" )
@@ -289,6 +292,7 @@ root = Tk()
 root.protocol("WM_DELETE_WINDOW", on_exit)
 
 cur_temp_str = StringVar()
+cur_hum_str = StringVar()
 cur_date_str = StringVar()
 cur_time_str = StringVar()
 
@@ -358,6 +362,7 @@ Button(f1a,text="Exit",command=on_exit).pack(side=LEFT)
 Label ( f1b, textvariable = cur_date_str ).pack(side=TOP)
 Label ( f1b, textvariable = cur_time_str ).pack(side=TOP)
 Label ( f1b, textvariable = cur_temp_str ).pack(side=TOP)
+Label ( f1b, textvariable = cur_hum_str ).pack(side=TOP)
 Label ( f1b, textvariable = sunrise_str ).pack(side=TOP)
 Label ( f1b, textvariable = sunset_str ).pack(side=TOP)
 Label ( f1b, textvariable = high_str ).pack(side=TOP)
