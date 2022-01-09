@@ -11,6 +11,7 @@
 import numpy as np
 # If I import datetime as datetime while also importing numpy
 # all hell breaks loose with numpy.
+
 from tkinter import *
 
 import datetime
@@ -70,17 +71,21 @@ how_many_days = 2
 # receiving (linux) side, which should be NTP disciplined.
 
 # It is pretty painful reading the entire file to get the data
-# at the end, but it will do for now.
-# This simply reads the records for the past 2 days into a list
+# at the end, but it did work for the first versions.
+# Now we take care to read only the records for the relevant
+# days (at most 7 days worth of data) into a list.
 
 def read_data ( start ) :
     f = open ( temp_file, "r" )
     data = []
+
+    # skip until we see the first line we want
     for line in f:
         if line.startswith ( start ) :
             data.append ( line.rstrip() )
             break
 
+    # read the rest to EOF, skipping trassh lines
     for line in f:
         if line[0].isdigit() :
             data.append ( line.rstrip() )
@@ -110,9 +115,8 @@ def conv_data ( data ) :
         last_hum = float(w[4])/10.0
 
     y = np.array ( yy )
-    #x = np.arange ( 0.0, len(yy)*1.0, 1.0 )
-    x = xx
-    return ( x, y, last_hum )
+    #xx = np.arange ( 0.0, len(yy)*1.0, 1.0 )
+    return ( xx, y, last_hum )
 
 def set_data_range () :
     global start_time
@@ -159,11 +163,25 @@ def set_data_range () :
         tick_array.append ( t0 + day + day + day + day + day + day )
         return;
 
+# xx and yy are now numpy arrays
+# xx in particular is a datetime64 value, which is handy
+def get_prior ( xx, yy ) :
+
+    search = xx[-1] - np.timedelta64(1,'D')
+
+    for i in range(len(xx)):
+        if xx[i] >= search :
+            return yy[i]
+
+    # This should never happen
+    return yy[-1]
+
 # In python, assignment is local unless specified global
 # references though are assumed global
 def gather_data () :
     global xx, yy
     global cur_temp_str
+    global prior_temp_str
     global cur_hum_str
     global cur_date_str
     global cur_time_str
@@ -171,6 +189,8 @@ def gather_data () :
     d = read_data ( start_time )
     # print ( len(d) )
     xx,yy,hh = conv_data ( d )
+
+    prior = get_prior ( xx, yy )
 
     w = d[-1].split()
     battery = float(w[3]) / 100.0
@@ -196,7 +216,8 @@ def gather_data () :
 
     cur_date_str.set( cd )
     cur_time_str.set( ct )
-    cur_temp_str.set( str(yy[-1]) )
+    cur_temp_str.set( " Today: " + str(yy[-1]) + "F" )
+    prior_temp_str.set( "Yesterday: " + str(prior) + "F" )
     cur_hum_str.set( str(hh) + " %" )
 
     high_str.set( str ( np.amax ( yy )) + " high" )
@@ -352,6 +373,7 @@ root = Tk()
 root.protocol("WM_DELETE_WINDOW", on_exit)
 
 cur_temp_str = StringVar()
+prior_temp_str = StringVar()
 cur_hum_str = StringVar()
 cur_date_str = StringVar()
 cur_time_str = StringVar()
@@ -421,6 +443,7 @@ Button(f1a,text="Exit",command=on_exit).pack(side=LEFT)
 
 Label ( f1b, textvariable = cur_date_str ).pack(side=TOP)
 Label ( f1b, textvariable = cur_time_str ).pack(side=TOP)
+Label ( f1b, textvariable = prior_temp_str ).pack(side=TOP)
 Label ( f1b, textvariable = cur_temp_str ).pack(side=TOP)
 Label ( f1b, textvariable = cur_hum_str ).pack(side=TOP)
 Label ( f1b, textvariable = sunrise_str ).pack(side=TOP)
