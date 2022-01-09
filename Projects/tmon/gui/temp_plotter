@@ -87,24 +87,77 @@ def read_data ( start ) :
 
     return data
 
+# A data line looks like the following.
+#   04-07-2017 17:19:02 18 0 144 308 874
+# We need this to feed to numpy datetime
+#   x = np.datetime64('2019-08-19T20:05:02')
+# So, we just need to strip off the year and move
+# it to the front
+def mk_dt64 ( d, t ) :
+    dw = d.split ( '-' )
+    dd = dw[2] + '-' + dw[0] + '-' + dw[1]
+    time_string = dd + "T" + t
+    #print ( time_string )
+    return np.datetime64 ( time_string )
+
 def conv_data ( data ) :
     yy = []
+    xx = []
     for l in data :
         w = l.split()
+        xx.append ( mk_dt64 ( w[0], w[1] ) )
         yy.append ( float(w[6])/10.0 )
         last_hum = float(w[4])/10.0
 
     y = np.array ( yy )
-    x = np.arange ( 0.0, len(yy)*1.0, 1.0 )
+    #x = np.arange ( 0.0, len(yy)*1.0, 1.0 )
+    x = xx
     return ( x, y, last_hum )
 
 def set_data_range () :
     global start_time
+    global tick_array
 
     today = datetime.date.today()
+
+    # This really isn't yesterday any more
     yesterday = today - datetime.timedelta(days=how_many_days-1)
+
     start_time = yesterday.strftime('%m-%d-%Y')
     #print ( start_time )
+
+    # The rest of this routine sets up the tick array
+    # 1-8-2022  This is crude but effective.
+    # it works, but begs for more elegant coding.
+
+    # For ticks we want a start time like this,
+    #  to feed to numpy datatime64()
+    start_time_dt64 = yesterday.strftime('%Y-%m-%d')
+    t0 = np.datetime64 ( start_time_dt64 )
+    day = np.timedelta64(1,'D')
+
+    tick_array = []
+    tick_array.append ( t0 );
+
+    if how_many_days == 1 :
+        h12 = np.timedelta64(12,'h')
+        tick_array.append ( t0 + h12 )
+        return
+
+    if how_many_days == 2 :
+        tick_array.append ( t0 + day )
+        return;
+
+    if how_many_days == 3 :
+        tick_array.append ( t0 + day )
+        tick_array.append ( t0 + day + day )
+        return;
+
+    if how_many_days == 7 :
+        tick_array.append ( t0 + day + day )
+        tick_array.append ( t0 + day + day + day + day )
+        tick_array.append ( t0 + day + day + day + day + day + day )
+        return;
 
 # In python, assignment is local unless specified global
 # references though are assumed global
@@ -250,6 +303,7 @@ def update_graph () :
     gather_data ()
     fig.clear ()
     plt.plot ( xx, yy )
+    plt.xticks ( tick_array )
     fig.canvas.draw ()
 
 def new_day () :
@@ -287,6 +341,12 @@ def ticker () :
 
     # tail recursion
     root.after ( 1000, ticker )
+
+# ---- for testing
+#set_data_range ()
+#gather_data ()
+#exit ()
+# ---- for testing
 
 root = Tk()
 root.protocol("WM_DELETE_WINDOW", on_exit)
