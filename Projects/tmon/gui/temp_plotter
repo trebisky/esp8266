@@ -8,6 +8,11 @@
 # date and time, battery status from the remote.
 # sunrise/sunset calculated using pyephem
 
+# TODO 1-16-2022
+# add a live cursor that shows time and temperature in a box as it moves
+#  along with a vertical line.
+# display a red dot at the time/temp 24 hours ago.
+
 import numpy as np
 # If I import datetime as datetime while also importing numpy
 # all hell breaks loose with numpy.
@@ -37,6 +42,8 @@ import matplotlib.pyplot as plt
 # --------------------------------------------------------
 
 temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_log99"
+
+# default is 48 hour plot
 how_many_days = 2
 
 # As of 10-9-2021 the temps file has 1986270 lines
@@ -165,16 +172,52 @@ def set_data_range () :
 
 # xx and yy are now numpy arrays
 # xx in particular is a datetime64 value, which is handy
+#
+# This fails when we are displaying a 24 hour plot
+# as the xx array won't have the expected data.
+
 def get_prior ( xx, yy ) :
 
     search = xx[-1] - np.timedelta64(1,'D')
+    #print ('search: {}, {}'.format(search, xx[0]))
+
+    if how_many_days == 1 :
+        return prior_24 ( search )
 
     for i in range(len(xx)):
         if xx[i] >= search :
             return yy[i]
 
     # This should never happen
-    return yy[-1]
+    # (but it did until we added prior_24()
+    return yy[0]
+
+# This is used to gather 48 hours of data so we
+# can find the correct "prior" data from 24 hours ago
+# when we only have the current 24 hours displayed
+
+def prior_24 ( search ) :
+
+    today = datetime.date.today()
+
+    # In this particular case (getting 48 hours of data)
+    # this actually is yesterday
+    yesterday = today - datetime.timedelta(days=1)
+
+    start_time = yesterday.strftime('%m-%d-%Y')
+    #print ( "Start 48: ", start_time )
+
+    d48 = read_data ( start_time )
+    x48, y48, h48 = conv_data ( d48 )
+    #print ( "First 48: ", x48[0] )
+
+    for i in range(len(x48)):
+        if x48[i] >= search :
+            return y48[i]
+
+    # should never happen
+    return y48[0]
+
 
 # In python, assignment is local unless specified global
 # references though are assumed global
@@ -315,12 +358,39 @@ def get_sr_ss () :
 last_size = os.path.getsize(temp_file)
 #print ( "Orig data: " + str(last_size) )
 
+### Careful measurement (using the cursor itself)
+### Shows that the actual data is displayed within
+### cursor locations:
+###   x = 100 to 555
+###   y = 60 to 426
+##
+##def on_motion(event):
+##    x, y = event.x, event.y
+##    if x < 100 or x > 555 :
+##        return
+##
+##    print('Cursor: {}, {}'.format(x, y))
+##    x, y = event.x, event.y
+##    print('Data: {} {}'.format(xx[0],xx[-1]))
+##    range = xx[-1] - xx[0]
+##    print ( 'Range: {}'.format(range) )
+##    fract = (event.x - 100) / (555-100)
+##    pos = xx[0] + fract * range
+##    print ( 'Pos: {}'.format(pos) )
+##
+##    #fig.clear ()
+##    #plt.plot ( xx, yy )
+##    #plt.xticks ( tick_array )
+##    #fig.canvas.draw ()
+
 def on_exit () :
     # print ( "Goodbye" )
     root.destroy ()
     sys.exit ()
 
 def update_graph () :
+    global my_line;
+
     gather_data ()
     fig.clear ()
     plt.plot ( xx, yy )
@@ -337,6 +407,7 @@ def new_day () :
 # This would be ideal to use, and there is a pyinotify module,
 # but it seems to have fallen into disuse and no decent
 # documentation is available anywhere.
+#
 # There is also a facility called "watchdog" that accomplishes
 # similar things, but I threw in the towel and just poll on
 # an interval, and use stat()
@@ -429,6 +500,7 @@ f1b.pack(side=BOTTOM)
 
 def radio_sel () :
     global how_many_days
+
     how_many_days = radio_var.get ()
     set_data_range ()
     update_graph ()
@@ -451,6 +523,8 @@ Label ( f1b, textvariable = sunset_str ).pack(side=TOP)
 Label ( f1b, textvariable = high_str ).pack(side=TOP)
 Label ( f1b, textvariable = low_str ).pack(side=TOP)
 Label ( f1b, textvariable = battery_str ).pack(side=TOP)
+
+#plot_canvas.bind('<Motion>', on_motion)
 
 root.after ( 1000, ticker )
 root.mainloop ()
