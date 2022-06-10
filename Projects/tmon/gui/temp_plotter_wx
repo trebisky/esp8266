@@ -9,7 +9,8 @@ import os
 # First dnf install python3-ephem
 import ephem
 
-wsize = ( 400, 300 )
+#wsize = ( 400, 300 )
+wsize = ( 800, 500 )
 temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_log99"
 
 timer_delay = 1000    # milliseconds
@@ -127,7 +128,7 @@ class Temp_Data () :
         #print ('search: {}, {}'.format(search, self.xx[0]))
 
         if self.num_days == 1 :
-            return prior_24 ( search )
+            return self.prior_24 ( search )
 
         for i in range(len(self.xx)):
             if self.xx[i] >= search :
@@ -205,23 +206,148 @@ class Temp_Data () :
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
+# wxPython has some severe brain damage as far as greying out text when you move
+# the mouse out of the window.  They don't understand the concept that this is
+# an information display, not some active control with interaction.
+#
+# https://stackoverflow.com/questions/17764457/make-disabled-text-render-black
+#
+# I also want to center text inside an area of fixed size, so I may as well
+# dive in.  I am taking the code posted by Hesky Fisher in the above post.
+#
+#    Thanks Hesky !!
+#
+# It does not inherit the proper background color, but that is OK
+#
+
+class MyStaticText ( wx.Control ):
+    def __init__(self, parent, id=wx.ID_ANY, label="", 
+                 pos=wx.DefaultPosition, size=wx.DefaultSize, 
+                 style=0, validator=wx.DefaultValidator, 
+                 name="MyStaticText"):
+        wx.Control.__init__(self, parent, id, pos, size, style|wx.NO_BORDER,
+                              validator, name)
+        wx.Control.SetLabel(self, label)
+        self.InheritAttributes()
+        self.SetInitialSize(size)
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
+
+    def OnPaint(self, event):
+        dc = wx.BufferedPaintDC(self)
+        self.Draw(dc)
+
+    def Draw(self, dc):
+        width, height = self.GetClientSize()
+
+        if not width or not height:
+            return
+
+        backBrush = wx.Brush(wx.WHITE, wx.SOLID)
+        dc.SetBackground(backBrush)
+        dc.Clear()
+
+        dc.SetTextForeground(wx.BLACK)
+        dc.SetFont(self.GetFont())
+        label = self.GetLabel()
+        dc.DrawText(label, 0, 0)
+
+    def OnEraseBackground(self, event):
+        pass
+
+    def SetLabel(self, label):
+        # TJT - I prefix some space here.
+        wx.Control.SetLabel(self, "    " + label)
+        #wx.Control.SetLabel(self, label)
+        self.InvalidateBestSize()
+        self.SetSize(self.GetBestSize())
+        self.Refresh()
+
+    def SetFont(self, font):
+        wx.Control.SetFont(self, font)
+        self.InvalidateBestSize()
+        self.SetSize(self.GetBestSize())
+        self.Refresh()
+
+    def DoGetBestSize(self):
+        label = self.GetLabel()
+        font = self.GetFont()
+
+        if not font:
+            font = wx.SystemSettings.GetFont(wx.SYS_DEFAULT_GUI_FONT)
+
+        dc = wx.ClientDC(self)
+        dc.SetFont(font)
+
+        textWidth, textHeight = dc.GetTextExtent(label)
+        best = wx.Size(textWidth, textHeight)
+        self.CacheBestSize(best)
+        return best
+
+    def AcceptsFocus(self):
+        return False
+
+    def SetForegroundColour(self, colour):
+        wx.Control.SetForegroundColour(self, colour)
+        self.Refresh()
+
+    def SetBackgroundColour(self, colour):
+        wx.Control.SetBackgroundColour(self, colour)
+        self.Refresh()
+
+    def GetDefaultAttributes(self):
+        return wx.StaticText.GetClassDefaultAttributes()
+
+    def ShouldInheritColours(self):
+        return True
+
+#class MyText ( wx.StaticText ) :
+class BadText () :
+        def __init__ ( self, init_msg, panel, box ) :
+            #self.t_cur_date = wx.StaticText ( self, wx.ID_ANY, "-A-")
+            t = wx.StaticText ( self, wx.ID_ANY, "-A-")
+            box.Add ( t, 1, wx.EXPAND )
+            return t
+
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
 # The left panel has the graph
 class Left_Panel ( wx.Panel ) :
         def __init__ ( self, parent, data ) :
             wx.Panel.__init__ ( self, parent )
             self.data = data
+
             self.SetBackgroundColour ( wx.RED )
+            self.Bind ( wx.EVT_SIZE, self.onResize )
+
+            self.width = None
+            self.height = None
+
+        # We get 3 resize events just starting up.
+        def onResize ( self, event ) :
+            print ( "resize" )
+            self.width = event.Size.width
+            self.height = event.Size.height
+            print ( "width", event.Size.width )
+            print ( "height", event.Size.height )
 
         # Called by timer (or button)
         def update ( self ) :
+            print ( "left update" )
             pass
+
+bogus = "          ---"
 
 # The right panel has text information and two useless buttons
 class Right_Panel ( wx.Panel ) :
-        def __init__ ( self, parent, data ) :
+        def __init__ ( self, parent, data, left ) :
             wx.Panel.__init__ ( self, parent )
+
             self.data = data
-            self.SetBackgroundColour ( wx.GREEN )
+            self.left = left
+
+            #self.SetBackgroundColour ( wx.GREEN )
 
             rsz = wx.BoxSizer ( wx.VERTICAL )
             self.SetSizer ( rsz )
@@ -230,6 +356,17 @@ class Right_Panel ( wx.Panel ) :
 #            Radiobutton(f1r, text="48 hour", variable=self.radio_var, value=2, command=self.radio_sel).pack()
 #            Radiobutton(f1r, text="72 hour", variable=self.radio_var, value=3, command=self.radio_sel).pack()
 #            Radiobutton(f1r, text="week", variable=self.radio_var, value=7, command=self.radio_sel).pack()
+            self.r1 = wx.RadioButton ( self, 1, label="24 hour", pos=(10,10), style=wx.RB_GROUP )
+            rsz.Add ( self.r1, 1, wx.EXPAND )
+            self.r2 = wx.RadioButton ( self, 2, label="48 hour", pos=(10,30) )
+            rsz.Add ( self.r2, 1, wx.EXPAND )
+            self.r3 = wx.RadioButton ( self, 3, label="72 hour", pos=(10,50) )
+            rsz.Add ( self.r3, 1, wx.EXPAND )
+            self.r4 = wx.RadioButton ( self, 7, label="week", pos=(10,70) )
+            rsz.Add ( self.r4, 1, wx.EXPAND )
+            self.r2.SetValue ( True )
+
+            self.Bind ( wx.EVT_RADIOBUTTON, self.onRadio )
 
             bup = wx.Panel ( self, -1 )
             self.b_up = wx.Button ( bup, wx.ID_ANY, "Update")
@@ -242,27 +379,53 @@ class Right_Panel ( wx.Panel ) :
             bup.SetSizer ( bus )
             rsz.Add ( bup, 1, wx.EXPAND )
 
-            self.t_cur_date = wx.StaticText ( self, wx.ID_ANY, "-A-")
+            #self.t_cur_date = wx.StaticText ( self, wx.ID_ANY, bogus )
+            self.t_cur_date = MyStaticText ( self, wx.ID_ANY, bogus )
             rsz.Add ( self.t_cur_date, 1, wx.EXPAND )
-            self.t_cur_time = wx.StaticText ( self, wx.ID_ANY, "---")
-            rsz.Add ( self.t_cur_time, 1, wx.EXPAND )
-            self.t_prior_temp = wx.StaticText ( self, wx.ID_ANY, "---")
+            #self.t_cur_time = MyStaticText ( self, wx.ID_ANY, bogus )
+            #rsz.Add ( self.t_cur_time, 1, wx.EXPAND )
+            self.t_prior_temp = MyStaticText ( self, wx.ID_ANY, bogus )
             rsz.Add ( self.t_prior_temp, 1, wx.EXPAND )
-            self.t_cur_temp = wx.StaticText ( self, wx.ID_ANY, "---")
+            self.t_cur_temp = MyStaticText ( self, wx.ID_ANY, bogus )
             rsz.Add ( self.t_cur_temp, 1, wx.EXPAND )
-            self.t_cur_hum = wx.StaticText ( self, wx.ID_ANY, "---")
+            self.t_cur_hum = MyStaticText ( self, wx.ID_ANY, bogus )
             rsz.Add ( self.t_cur_hum, 1, wx.EXPAND )
 
-            self.t_sunrise = wx.StaticText ( self, wx.ID_ANY, "---")
+            self.t_sunrise = MyStaticText ( self, wx.ID_ANY, bogus )
             rsz.Add ( self.t_sunrise, 1, wx.EXPAND )
-            self.t_sunset = wx.StaticText ( self, wx.ID_ANY, "---")
+            self.t_sunset = MyStaticText ( self, wx.ID_ANY, bogus )
             rsz.Add ( self.t_sunset, 1, wx.EXPAND )
-            self.t_high = wx.StaticText ( self, wx.ID_ANY, "---")
+            self.t_high = MyStaticText ( self, wx.ID_ANY, bogus )
             rsz.Add ( self.t_high, 1, wx.EXPAND )
-            self.t_low = wx.StaticText ( self, wx.ID_ANY, "---")
+            self.t_low = MyStaticText ( self, wx.ID_ANY, bogus )
             rsz.Add ( self.t_low, 1, wx.EXPAND )
-            self.t_battery = wx.StaticText ( self, wx.ID_ANY, "-Z-")
+            self.t_battery = MyStaticText ( self, wx.ID_ANY, bogus )
             rsz.Add ( self.t_battery, 1, wx.EXPAND )
+
+            self.data.set_data_range ( 2 )
+            self.data.gather_data ()
+            self.update ( True )
+            self.left.update ();
+
+        def onRadio ( self, event ) :
+            rb = event.GetEventObject ()
+            lab = rb.GetLabel ()
+            print ( "radio ", lab )
+            #val = rb.GetValue ()    # is always true
+            #print ( "radio ", val )
+            if lab.startswith ( '24' ) :
+                x = 1;
+            if lab.startswith ( '48' ) :
+                x = 2;
+            if lab.startswith ( '72' ) :
+                x = 3;
+            if lab.startswith ( 'we' ) :
+                x = 7;
+
+            self.data.set_data_range ( x )
+            self.data.gather_data ()
+            self.update ( True )
+            self.left.update ()
 
         # Called by timer (or button)
         def update ( self, new_data ) :
@@ -271,8 +434,11 @@ class Right_Panel ( wx.Panel ) :
             # dt_now = datetime.datetime.today()
             #print ( dt_now )
 
-            self.t_cur_date.SetLabel ( dt_now.strftime( "%B %d %Y") )
-            self.t_cur_time.SetLabel ( dt_now.strftime("%H:%M:%S") )
+            # day_and_time = dt_now.strftime( "%B %d %Y")
+            day_and_time = dt_now.strftime( "%B %d %Y") + "  " + dt_now.strftime("%H:%M:%S")
+
+            self.t_cur_date.SetLabel ( day_and_time )
+            #self.t_cur_time.SetLabel ( dt_now.strftime("%H:%M:%S") )
 
             if ( not new_data ) :
                 return
@@ -298,18 +464,19 @@ class Right_Panel ( wx.Panel ) :
             sys.exit ()
 
         def onUpdate ( self, event ) :
-            self.update ()
+            self.update ( True )
+            self.left.update ()
 
 
 class Temp_Frame (wx.Frame):
  
-        def __init__ ( self, parent, title, data ):
+        def PORK__init__ ( self, parent, title, data ):
             wx.Frame.__init__(self, None, wx.ID_ANY, title, size=wsize )
             #top = wx.Frame.__init__(self, None, wx.ID_ANY, title, pos=(a,b), size=wsize )
 
             self.data = data
             self.lpanel = Left_Panel ( self, data )
-            self.rpanel = Right_Panel ( self, data )
+            self.rpanel = Right_Panel ( self, data, self.lpanel )
 
             sz = wx.BoxSizer ( wx.HORIZONTAL )
             sz.Add ( self.lpanel, 1, wx.EXPAND )
@@ -321,8 +488,32 @@ class Temp_Frame (wx.Frame):
             self.Bind ( wx.EVT_TIMER, self.timer_update, self.timer )
             self.timer.Start ( timer_delay )
 
+        def __init__ ( self, parent, title, data ):
+            wx.Frame.__init__(self, None, wx.ID_ANY, title, size=wsize )
+            #top = wx.Frame.__init__(self, None, wx.ID_ANY, title, pos=(a,b), size=wsize )
+
+            self.data = data
+
+            splitter = wx.SplitterWindow ( self, -1 )
+
+            self.lpanel = Left_Panel ( splitter, data )
+            self.rpanel = Right_Panel ( splitter, data, self.lpanel )
+
+            #sz = wx.BoxSizer ( wx.HORIZONTAL )
+            #sz.Add ( self.lpanel, 1, wx.EXPAND )
+            #sz.Add ( self.rpanel, 1, wx.EXPAND )
+            #self.SetSizer ( sz )
+
+            splitter.SplitVertically ( self.lpanel, self.rpanel )
+            splitter.SetMinimumPaneSize ( 400 )
+
+            self.timer = wx.Timer ( self )
+            self.Bind ( wx.EVT_TIMER, self.timer_update, self.timer )
+            self.timer.Start ( timer_delay )
+
+        # Called at 1 Hz
         def timer_update ( self, event ) :
-            print ( "Tick" )
+            #print ( "Tick" )
             if data.new_data () :
                 self.lpanel.update ()
                 self.rpanel.update ( True )
@@ -338,8 +529,6 @@ class Temp_GUI ( wx.App ):
 
 
 data = Temp_Data ( temp_file )
-data.set_data_range ( 2 )
-data.gather_data ()
 
 app = Temp_GUI ( data )
 app.MainLoop()
