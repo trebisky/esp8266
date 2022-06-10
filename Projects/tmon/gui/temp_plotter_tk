@@ -1,0 +1,532 @@
+#!/bin/python3
+
+# "tktemps"  Tom Trebisky 10-9-2021
+#
+# Graph several days of temperature data at the Castellon house.
+# Also show a bunch of current information.
+# Current temperature, high and low over the period.
+# date and time, battery status from the remote.
+# sunrise/sunset calculated using pyephem
+
+# TODO 1-16-2022
+# add a live cursor that shows time and temperature in a box as it moves
+#  along with a vertical line.
+# display a red dot at the time/temp 24 hours ago.
+
+import numpy as np
+# If I import datetime as datetime while also importing numpy
+# all hell breaks loose with numpy.
+
+from tkinter import *
+
+import datetime
+
+import urllib.request
+#import json
+
+# First dnf install python3-ephem
+import ephem
+
+import sys
+import os
+
+# Seems to be an abandoned project, documentation has vanished.
+#import pyinotify
+
+import matplotlib
+matplotlib.use('TkAgg')
+
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+
+# --------------------------------------------------------
+
+temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_log99"
+
+# default is 48 hour plot
+how_many_days = 2
+
+# As of 10-9-2021 the temps file has 1986270 lines
+# and is about 65 megabytes in size.
+#
+# Data begins at 4-7-2017, but there are lots of gaps,
+# especially the first few years.
+# Data is taken once a minute
+
+# A typical line looks like this:
+# 10-09-2021 07:33:51 17 388 440 198 676
+# But there is some other chatter, such as:
+# Listening on port 2001
+# Battery DEAD
+# There are also some hashmark prefixed comments like:
+# # Water got into cable and corroded the lower end,
+# # putting this out of service for over a week.
+# checking for an initial digit bypasses all of these
+
+#
+# Fields are:
+# 1 - day
+# 2 - time
+# 3 - delay getting wifi setup (seconds*100)
+# 4 - battery voltage (v*100) 388
+# 5 - humidity (h*10) 440
+# 6 - temperature (c*10) 198
+# 7 - temperature (F*10) 676
+#
+# The delay number is of little interest.
+# Note that the time stamps are generated on the
+# receiving (linux) side, which should be NTP disciplined.
+
+# It is pretty painful reading the entire file to get the data
+# at the end, but it did work for the first versions.
+# Now we take care to read only the records for the relevant
+# days (at most 7 days worth of data) into a list.
+
+def read_data ( start ) :
+    f = open ( temp_file, "r" )
+    data = []
+
+    # skip until we see the first line we want
+    for line in f:
+        if line.startswith ( start ) :
+            data.append ( line.rstrip() )
+            break
+
+    # read the rest to EOF, skipping trassh lines
+    for line in f:
+        if line[0].isdigit() :
+            data.append ( line.rstrip() )
+
+    return data
+
+# A data line looks like the following.
+#   04-07-2017 17:19:02 18 0 144 308 874
+# We need this to feed to numpy datetime
+#   x = np.datetime64('2019-08-19T20:05:02')
+# So, we just need to strip off the year and move
+# it to the front
+def mk_dt64 ( d, t ) :
+    dw = d.split ( '-' )
+    dd = dw[2] + '-' + dw[0] + '-' + dw[1]
+    time_string = dd + "T" + t
+    #print ( time_string )
+    return np.datetime64 ( time_string )
+
+def conv_data ( data ) :
+    yy = []
+    xx = []
+    for l in data :
+        w = l.split()
+        xx.append ( mk_dt64 ( w[0], w[1] ) )
+        yy.append ( float(w[6])/10.0 )
+        last_hum = float(w[4])/10.0
+
+    y = np.array ( yy )
+    #xx = np.arange ( 0.0, len(yy)*1.0, 1.0 )
+    return ( xx, y, last_hum )
+
+def set_data_range () :
+    global start_time
+    global tick_array
+
+    today = datetime.date.today()
+
+    # This really isn't yesterday any more
+    yesterday = today - datetime.timedelta(days=how_many_days-1)
+
+    start_time = yesterday.strftime('%m-%d-%Y')
+    #print ( start_time )
+
+    # The rest of this routine sets up the tick array
+    # 1-8-2022  This is crude but effective.
+    # it works, but begs for more elegant coding.
+
+    # For ticks we want a start time like this,
+    #  to feed to numpy datatime64()
+    start_time_dt64 = yesterday.strftime('%Y-%m-%d')
+    t0 = np.datetime64 ( start_time_dt64 )
+    day = np.timedelta64(1,'D')
+
+    tick_array = []
+    tick_array.append ( t0 );
+
+    if how_many_days == 1 :
+        h12 = np.timedelta64(12,'h')
+        tick_array.append ( t0 + h12 )
+        return
+
+    if how_many_days == 2 :
+        tick_array.append ( t0 + day )
+        return;
+
+    if how_many_days == 3 :
+        tick_array.append ( t0 + day )
+        tick_array.append ( t0 + day + day )
+        return;
+
+    if how_many_days == 7 :
+        tick_array.append ( t0 + day + day )
+        tick_array.append ( t0 + day + day + day + day )
+        tick_array.append ( t0 + day + day + day + day + day + day )
+        return;
+
+# xx and yy are now numpy arrays
+# xx in particular is a datetime64 value, which is handy
+#
+# This fails when we are displaying a 24 hour plot
+# as the xx array won't have the expected data.
+
+def get_prior ( xx, yy ) :
+
+    search = xx[-1] - np.timedelta64(1,'D')
+    #print ('search: {}, {}'.format(search, xx[0]))
+
+    if how_many_days == 1 :
+        return prior_24 ( search )
+
+    for i in range(len(xx)):
+        if xx[i] >= search :
+            return yy[i]
+
+    # This should never happen
+    # (but it did until we added prior_24()
+    return yy[0]
+
+# This is used to gather 48 hours of data so we
+# can find the correct "prior" data from 24 hours ago
+# when we only have the current 24 hours displayed
+
+def prior_24 ( search ) :
+
+    today = datetime.date.today()
+
+    # In this particular case (getting 48 hours of data)
+    # this actually is yesterday
+    yesterday = today - datetime.timedelta(days=1)
+
+    start_time = yesterday.strftime('%m-%d-%Y')
+    #print ( "Start 48: ", start_time )
+
+    d48 = read_data ( start_time )
+    x48, y48, h48 = conv_data ( d48 )
+    #print ( "First 48: ", x48[0] )
+
+    for i in range(len(x48)):
+        if x48[i] >= search :
+            return y48[i]
+
+    # should never happen
+    return y48[0]
+
+
+# In python, assignment is local unless specified global
+# references though are assumed global
+def gather_data () :
+    global xx, yy
+    global cur_temp_str
+    global prior_temp_str
+    global cur_hum_str
+    global cur_date_str
+    global cur_time_str
+
+    d = read_data ( start_time )
+    # print ( len(d) )
+    xx,yy,hh = conv_data ( d )
+
+    prior = get_prior ( xx, yy )
+
+    w = d[-1].split()
+    battery = float(w[3]) / 100.0
+    battery_str.set( "Battery: " + str(battery) )
+
+    # numpy does something rude and evil
+    #  with the datetime module, but only
+    #  when we do the "import as" thing.
+
+    # This has date, but no time
+    # dt_now = datetime.date.today()
+
+    dt_now = datetime.datetime.now()
+    # dt_now = datetime.datetime.today()
+
+    #print ( dt_now )
+
+    ct = dt_now.strftime("%H:%M:%S")
+    #print ( ct )
+
+    cd = dt_now.strftime( "%B %d %Y" )
+    #print ( cd )
+
+    cur_date_str.set( cd )
+    cur_time_str.set( ct )
+    cur_temp_str.set( " Today: " + str(yy[-1]) + "F" )
+    prior_temp_str.set( "Yesterday: " + str(prior) + "F" )
+    cur_hum_str.set( str(hh) + " %" )
+
+    high_str.set( str ( np.amax ( yy )) + " high" )
+    low_str.set( str ( np.amin ( yy )) + " low" )
+
+def gather_data_RANDOM () :
+    global xx, yy
+
+    N = 100
+    xx = np.arange ( 0.0, N*1.0, 1.0 )
+    yy = np.random.rand(N)
+    current_temp = yy[-1]
+
+# ----------------------------------------
+# ----------------------------------------
+
+# Here is what the raw JSON from the sunrise-sunset site looks like --
+# {'results': {'sunrise': '6:18:43 AM', 'sunset': '5:51:02 PM', 'solar_noon': '12:04:52 PM', 'day_length': '11:32:19', 'civil_twilight_begin': '5:54:09 AM', 'civil_twilight_end': '6:15:35 PM', 'nautical_twilight_begin': '5:24:12 AM', 'nautical_twilight_end': '6:45:33 PM', 'astronomical_twilight_begin': '4:54:12 AM', 'astronomical_twilight_end': '7:15:33 PM'}, 'status': 'OK'}
+
+# No longer used
+def get_sunrise_json () :
+    tucson_lat = "32.2226"
+    tucson_long = "-110.9747"
+
+    #sunrise_url = "https://api.sunrise-sunset.org/json?lat=36.7201600&lng=-4.4203400"
+    sunrise_url = "https://api.sunrise-sunset.org/json?lat=" + tucson_lat + "&lng=" + tucson_long
+    #print ( sunrise_url )
+
+    with urllib.request.urlopen ( sunrise_url ) as url:
+        data = json.loads(url.read().decode())
+
+    # print(data)
+
+    return data['results']
+
+# Needed for JSON sunrise method, no longer used ...
+# Take a HMS string from UTC to local time
+# allow AM/PM on the input, but produce 24 hour output
+def utc_to_local ( utc ) :
+    utc_d = datetime.datetime.strptime(utc, "%H:%M:%S %p")
+    # the 12 shouldn't be needed, but this service is buggy
+    tz = 7 - 12
+    local = utc_d - datetime.timedelta(hours=tz)
+    #local = utc_d.replace(tzinfo=datetime.timezone.utc).astimezone()
+    return local.strftime ( "%H:%M:%S" )
+
+# Take an ephem time in ephem format (UTC) and
+# return a time string in local time
+def utc_to_local_str ( utc ) :
+    #tz = 7 - 12
+    #local = utc- datetime.timedelta(hours=tz)
+    local = ephem.localtime(utc)
+    return local.strftime ( "%H:%M:%S" )
+
+# Here is a function to get sunrise/sunset times via the "ephem" package.
+# another option would be to use the "astroplan" package,
+# Astroplan is an "astropy affiliated" package for the planning of
+# astronomical observing from Cornell University.
+#
+# A bonus tip from my buddy Tim is as follows:
+# for date/time stuff i often use astropy.time to do the parsing and format
+#  translating. provides a higher level interface than datetime.
+
+def get_sunrise_ephem () :
+    # It seems peculiar that it wants the lat/long as strings,
+    # but it most definitely does.
+    obs = ephem.Observer()
+    obs.lat = '32.2226'
+    obs.long = '-110.9747'
+    obs.date = datetime.datetime.utcnow()
+
+    sun = ephem.Sun(obs)
+
+    # These are UTC in ephem date format
+    sr_utc = obs.previous_rising(sun)
+    ss_utc = obs.next_setting(sun)
+
+    sr = utc_to_local_str(sr_utc)
+    ss = utc_to_local_str(ss_utc)
+
+    return sr, ss
+
+
+def get_sr_ss () :
+    #res = get_sunrise_json ()
+    #sr = utc_to_local ( res['sunrise'] )
+    #ss = utc_to_local ( res['sunset'] )
+    #return (sr, ss)
+
+    return get_sunrise_ephem ()
+
+# ----------------------------------------
+# ----------------------------------------
+
+last_size = os.path.getsize(temp_file)
+#print ( "Orig data: " + str(last_size) )
+
+### Careful measurement (using the cursor itself)
+### Shows that the actual data is displayed within
+### cursor locations:
+###   x = 100 to 555
+###   y = 60 to 426
+##
+##def on_motion(event):
+##    x, y = event.x, event.y
+##    if x < 100 or x > 555 :
+##        return
+##
+##    print('Cursor: {}, {}'.format(x, y))
+##    x, y = event.x, event.y
+##    print('Data: {} {}'.format(xx[0],xx[-1]))
+##    range = xx[-1] - xx[0]
+##    print ( 'Range: {}'.format(range) )
+##    fract = (event.x - 100) / (555-100)
+##    pos = xx[0] + fract * range
+##    print ( 'Pos: {}'.format(pos) )
+##
+##    #fig.clear ()
+##    #plt.plot ( xx, yy )
+##    #plt.xticks ( tick_array )
+##    #fig.canvas.draw ()
+
+def on_exit () :
+    # print ( "Goodbye" )
+    root.destroy ()
+    sys.exit ()
+
+def update_graph () :
+    global my_line;
+
+    gather_data ()
+    fig.clear ()
+    plt.plot ( xx, yy )
+    plt.xticks ( tick_array )
+    fig.canvas.draw ()
+
+def new_day () :
+    sr, ss = get_sr_ss ()
+    sunrise_str.set ( "Sunrise: " + sr )
+    sunset_str.set ( "Sunset: " + ss )
+
+# Linux has an inotify(2) system call to register requests
+# to be notified of filesystem changes.
+# This would be ideal to use, and there is a pyinotify module,
+# but it seems to have fallen into disuse and no decent
+# documentation is available anywhere.
+#
+# There is also a facility called "watchdog" that accomplishes
+# similar things, but I threw in the towel and just poll on
+# an interval, and use stat()
+# which may play better with the Tk event loop anyway.
+def ticker () :
+    global last_size
+    global current_day
+
+    #print ( " - tick" )
+    new_size = os.path.getsize(temp_file)
+    if new_size != last_size :
+        #print ( "New data: " + str(new_size) )
+        update_graph ()
+        last_size = new_size
+
+    # detect when we roll over to a new day
+    # Using the 1-31 valued day of month will do
+    day = datetime.date.today().day
+    if day != current_day :
+        current_day = day
+        set_data_range ()
+        new_day ()
+
+    # tail recursion
+    root.after ( 1000, ticker )
+
+# ---- for testing
+#set_data_range ()
+#gather_data ()
+#exit ()
+# ---- for testing
+
+root = Tk()
+root.protocol("WM_DELETE_WINDOW", on_exit)
+
+cur_temp_str = StringVar()
+prior_temp_str = StringVar()
+cur_hum_str = StringVar()
+cur_date_str = StringVar()
+cur_time_str = StringVar()
+
+sunrise_str = StringVar()
+sunset_str = StringVar()
+
+high_str = StringVar()
+low_str = StringVar()
+battery_str = StringVar()
+
+radio_var = IntVar( value = how_many_days )
+
+# This is the day of the month (i.e. 13 for October 13)
+# and will suffice to tell when the day rolls over
+current_day = datetime.date.today().day
+
+# XXX - also need to detect when day rolls over and call this.
+set_data_range ()
+new_day ()
+
+fig = plt.figure(1)
+plt.ion()
+
+#gather_data ()
+#plt.plot ( xx, yy )
+
+canvas = FigureCanvasTkAgg(fig, master=root)
+plot_canvas = canvas.get_tk_widget()
+
+update_graph ()
+
+def update():
+    # print ( "beep" )
+    update_graph ()
+
+#plot_widget.grid(row=0, column=0)
+#tk.Button(root,text="Update",command=update).grid(row=1, column=0)
+#tk.Button(root,text="Exit",command=on_exit).grid(row=2, column=0)
+
+plot_canvas.pack(side=LEFT)
+f1 = Frame(root)
+f1.pack(side=LEFT)
+
+# If you want a variable to reference a widget, you cannot tack pack()
+# onto the end because that will return None
+f1r = Frame(f1)
+f1r.pack(side=TOP)
+f1a = Frame(f1)
+f1a.pack(side=TOP)
+f1b = Frame(f1)
+f1b.pack(side=BOTTOM)
+
+def radio_sel () :
+    global how_many_days
+
+    how_many_days = radio_var.get ()
+    set_data_range ()
+    update_graph ()
+
+Radiobutton(f1r, text="24 hour", variable=radio_var, value=1, command=radio_sel).pack()
+Radiobutton(f1r, text="48 hour", variable=radio_var, value=2, command=radio_sel).pack()
+Radiobutton(f1r, text="72 hour", variable=radio_var, value=3, command=radio_sel).pack()
+Radiobutton(f1r, text="week", variable=radio_var, value=7, command=radio_sel).pack()
+
+Button(f1a,text="Update",command=update).pack(side=LEFT)
+Button(f1a,text="Exit",command=on_exit).pack(side=LEFT)
+
+Label ( f1b, textvariable = cur_date_str ).pack(side=TOP)
+Label ( f1b, textvariable = cur_time_str ).pack(side=TOP)
+Label ( f1b, textvariable = prior_temp_str ).pack(side=TOP)
+Label ( f1b, textvariable = cur_temp_str ).pack(side=TOP)
+Label ( f1b, textvariable = cur_hum_str ).pack(side=TOP)
+Label ( f1b, textvariable = sunrise_str ).pack(side=TOP)
+Label ( f1b, textvariable = sunset_str ).pack(side=TOP)
+Label ( f1b, textvariable = high_str ).pack(side=TOP)
+Label ( f1b, textvariable = low_str ).pack(side=TOP)
+Label ( f1b, textvariable = battery_str ).pack(side=TOP)
+
+#plot_canvas.bind('<Motion>', on_motion)
+
+root.after ( 1000, ticker )
+root.mainloop ()
+
+# THE END
