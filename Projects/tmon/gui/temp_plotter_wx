@@ -19,6 +19,7 @@ right_size =250
 split_pos = xsize - right_size
 
 temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_log99"
+demo_file = "./temp_demo_data"
 
 # Start up showing 2 days by default
 default_days = 2
@@ -67,8 +68,15 @@ def get_sunrise_ephem () :
 
 class Temp_Data () :
 
-    def __init__ ( self, file ) :
-        self.file = file
+    def __init__ ( self ) :
+
+        if os.path.exists ( temp_file ) :
+            self.file = temp_file
+        elif os.path.exists ( demo_file ) :
+            self.file = demo_file
+        else :
+            print ( "No data file, sorry ..." )
+            sys.exit ()
 
         self.last_size = 0
         self.info = {}
@@ -211,7 +219,7 @@ class Temp_Data () :
 
             if days :
                 self.num_days = days
-                print ( "Set days = ", days )
+                #print ( "Set days = ", days )
 
             today = datetime.date.today()
             self.start_time = today - datetime.timedelta(days=self.num_days-1)
@@ -256,23 +264,75 @@ class Temp_Data () :
 
             return self.info
 
-    def snork_data ( self ) :
-            n = len(self.xx)
-            print ( n, " points waiting to be plotted" )
-
     # Given an x position in pixel counts
     # return a time and temperature
     def lookup ( self, x, w ) :
-        print ( "lookup" )
-        ndata = len(self.xx)
+
+        nxy = len(self.xx)
+        delta = np.timedelta64(70,'s')
+        # We can calculate a time nicely based on
+        # the x mouse location.
         xf = x / w
         tx = self.xmin + self.xrange * xf
-        ii = int(xf * ndata)
-        print ( "lookup xf, tx ", xf, tx )
-        print ( "lookup ii, x, y ", ii, self.xx[ii], self.yy[ii] )
-        return tx, 0.0
+        # print ( "Lookup: ", x, tx )
 
-    # self.x, self.y = data.getxy ( self.width, self.height)
+        # Getting the temperature is more interesting
+        # since there can be holes in the data.
+        for i in range(nxy) :
+            if self.xx[i] > tx :
+                break
+
+        # print ( "cur: ", self.xx[i], self.yy[i] )
+        # print ( "pre: ", self.xx[i-1], self.yy[i-1] )
+
+        ypre = None
+        ycur = None
+
+        if i == 0 :
+            i = 1
+        if i >= nxy :
+            i = nxy - 1
+
+        sum = 0.0
+        div = 0.0
+        if (tx - self.xx[i-1]) < delta :
+            sum += self.yy[i-1]
+            div += 1.0
+
+        if (self.xx[i] - tx) < delta :
+            sum += self.yy[i]
+            div += 1.0
+
+        if div > 0.5 :
+            val = sum / div
+        else :
+            val = None
+
+
+        td = np.datetime_as_string(tx, unit='D')
+        tm = np.datetime_as_string(tx, unit='m' )
+
+        # Nasty!
+        # Date:  2022-06-10
+        # Time:  2022-06-10T21:38
+        # print ( "Date: ", td )
+        # print ( "Time: ", tm )
+
+        t = tx.astype(datetime.datetime)
+        ttd = t.strftime ( '%m/%d/%Y')
+        ttm = t.strftime ( '%H:%M')
+
+        # Much better.
+        # Date:  06/10/2022
+        # Time:  06:26
+        print ( "Date: ", ttd )
+        print ( "Time: ", ttm )
+
+        print ( "Temperature: ", str(val) )
+
+        return ttd, ttm, str(val)
+
+    # scale data for plotting on the screen
     def getxy ( self, width, height ) :
         rxy = []
 
@@ -280,7 +340,27 @@ class Temp_Data () :
         ybot = 20
         high = height - (ytop + ybot)
 
+        x_expect = None
+
+        #delta  <class 'datetime.timedelta'>
+        #tol = datetime.timedelta(seconds=20)
+        #delta = datetime.timedelta(seconds=60)
+
+        #array  <class 'numpy.datetime64'>
+        tol = np.timedelta64(20,'s')
+        delta = np.timedelta64(60,'s')
+
         for i in range(len(self.xx)) :
+            # Deal with holes (missing data)
+            if x_expect and ( self.xx[i] > x_expect + tol) :
+                #print ( "HOLE" )
+                rxy.append ( None )
+
+            #if x_expect :
+            #    #while self.xx[i] < x_expect - tol or self.xx[i] > x_expect + tol :
+            #    while self.xx[i] < x_expect - tol :
+            #        rxy.append ( (0,9999) )
+
             xf = (self.xx[i] - self.xmin) / self.xrange
             yf = (self.yy[i] - self.ymin) / self.yrange
             #print ( "xf ", xf )
@@ -288,6 +368,10 @@ class Temp_Data () :
             ix = np.int_ ( width * xf )
             iy = ybot + np.int_ ( high * (1.0-yf) )
             rxy.append ( (ix,iy) )
+
+            #print ( 'array ', type(self.xx[i]) )
+            #print ( 'delta ', type(delta) )
+            x_expect = self.xx[i] + delta
 
         return rxy
 
@@ -425,23 +509,21 @@ class Left_Panel ( wx.Panel ) :
             self.xy = None
 
         # We get 3 resize events just starting up.
+        # we need this to refresh after resize
+        # also to post width for Move checks
         def onResize ( self, event ) :
-            print ( "resize" )
+            #print ( "resize" )
             self.width = event.Size.width
             self.height = event.Size.height
-            print ( "width", event.Size.width )
-            print ( "height", event.Size.height )
+            # print ( "width", event.Size.width )
+            # print ( "height", event.Size.height )
             self.update ();
 
         # left mouse click
         def OnLeft ( self, event ) :
             x, _ = event.GetPosition ()
-            print ( "Click: ", x )
-            t,y = self.data.lookup ( x, self.width )
-
-            td = np.datetime_as_string(t, unit='D')
-            tm = np.datetime_as_string(t, unit='m' )
-            print ( "Lookup: ", td, tm, y )
+            #print ( "Click: ", x )
+            stuff = self.data.lookup ( x, self.width )
 
         def OnMove ( self, event ) :
             x,_ = event.GetPosition ()
@@ -473,7 +555,7 @@ class Left_Panel ( wx.Panel ) :
             lastxy = None
 
             for xy in self.xy :
-                if lastxy :
+                if xy and lastxy :
                     dc.DrawLine ( lastxy[0], lastxy[1], xy[0], xy[1] )
                 lastxy = xy
 
@@ -491,12 +573,11 @@ class Left_Panel ( wx.Panel ) :
 
         # Called by timer (or button)
         def update ( self ) :
-            print ( "left update" )
-            self.data.snork_data ()
+            #print ( "left update" )
             w, h = self.GetSize()
-            print ( "w,h = ", w, h )
+            #print ( "w,h = ", w, h )
+
             if w < 100 or h < 100 :
-                print ( "ignoring" )
                 return
 
             self.xy = self.data.getxy ( w, h )
@@ -675,8 +756,8 @@ class Temp_Frame (wx.Frame):
         # Called at 1 Hz
         def timer_update ( self, event ) :
             #print ( "Tick" )
-            if data.new_data () :
-                print ( "Data arrived" )
+            if self.data.new_data () :
+                #print ( "Data arrived" )
                 self.data.gather_data ( None )
                 self.lpanel.update ()
                 self.rpanel.update ( True )
@@ -684,16 +765,14 @@ class Temp_Frame (wx.Frame):
                 self.rpanel.update ( False )
 
 class Temp_GUI ( wx.App ):
-        def __init__ ( self, data ) :
+        def __init__ ( self ) :
             wx.App.__init__(self)
+            data = Temp_Data ()
             frame = Temp_Frame ( None, "Temp Plotter", data )
             self.SetTopWindow ( frame )
             frame.Show ( True )
 
-
-data = Temp_Data ( temp_file )
-
-app = Temp_GUI ( data )
+app = Temp_GUI ()
 app.MainLoop()
 
 # THE END
