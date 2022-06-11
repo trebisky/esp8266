@@ -14,6 +14,7 @@ wsize = ( 800, 500 )
 temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_log99"
 
 timer_delay = 1000    # milliseconds
+default_days = 2
 
 # ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------
@@ -64,7 +65,10 @@ class Temp_Data () :
 
         self.last_size = 0
         self.info = {}
+        self.num_days = default_days
+        self.initial_seek = None
 
+    # check file size for new data
     def new_data ( self ) :
 
         new_size = os.path.getsize ( self.file )
@@ -75,13 +79,43 @@ class Temp_Data () :
         else :
             return False
 
+    def find_start ( self ) :
+        pos = os.path.getsize ( self.file ) - 500000
+        self.initial_seek = pos
+
+        # We could do all this, carefully adjusting our
+        # starting position, but the above is such a big
+        # win already, that this doesn't seem worth it.
+        #today = datetime.date.today()
+        #start_time = today - datetime.timedelta(days=7-1)
+        #start = xyz.strftime('%m-%d-%Y')
+
+        #f = open ( self.file, "r" )
+        #line = f.readline()
+        #while line:
+        #    loc = f.tell()
+        #    line = f.readline()
+        #    if line.startswith ( start ) :
+        #        data.append ( line.rstrip() )
+        #        break
+        #    skip += 1
 
     # We do read the entire file, but it goes fast enough
     def read_data ( self, xyz ) :
+
+        # added this to attempt a speedup
+        # with this:    10358  lines skipped
+        # without it: 2336916  lines skipped
+        if not self.initial_seek :
+            self.find_start ()
+
         f = open ( self.file, "r" )
-        data = []
 
         start = xyz.strftime('%m-%d-%Y')
+
+        f.seek ( self.initial_seek )
+
+        data = []
 
         # skip until we see the first line we want
         for line in f:
@@ -89,11 +123,14 @@ class Temp_Data () :
                 data.append ( line.rstrip() )
                 break
 
-        # read the rest to EOF, skipping trassh lines
+        # print ( skip, " lines skipped" )
+
+        # read the rest to EOF, skipping trash lines
         for line in f:
             if line[0].isdigit() :
                 data.append ( line.rstrip() )
 
+        f.close ()
         return data
 
     # A data line looks like the following.
@@ -161,7 +198,16 @@ class Temp_Data () :
         # should never happen
         return y48[0]
 
-    def gather_data ( self ) :
+    # This gets called when new data arrives,
+    # or when the display duration changes
+    def gather_data ( self, days ) :
+
+            if days :
+                self.num_days = days
+                print ( "Set days = ", days )
+
+            today = datetime.date.today()
+            self.start_time = today - datetime.timedelta(days=self.num_days-1)
 
             d = self.read_data ( self.start_time )
             # print ( len(d) )
@@ -175,18 +221,18 @@ class Temp_Data () :
             #  except for displaying current value
             self.xx, self.yy, self.hh = self.conv_data ( d )
 
-    def set_data_range ( self, ndays ) :
+            self.xmin = np.amin ( self.xx )
+            self.xmax = np.amax ( self.xx )
+            self.xrange = self.xmax - self.xmin
 
-            self.num_days = ndays
+            self.ymin = np.amin ( self.yy )
+            self.ymax = np.amax ( self.yy )
+            self.yrange = self.ymax - self.ymin
 
-            today = datetime.date.today()
-            self.start_time = today - datetime.timedelta(days=ndays-1)
 
     def get_info ( self ) :
 
             prior = self.get_prior ()
-            hi = np.amax ( self.yy )
-            lo = np.amin ( self.yy )
 
             # We really only need to recalculate these
             #  when the day rolls over.
@@ -197,11 +243,38 @@ class Temp_Data () :
             self.info['today'] = str(self.yy[-1])
             self.info['prior'] = str(prior)
             self.info['hum'] = str(self.hh)
-            self.info['high'] = str(hi)
-            self.info['low'] = str(lo)
+            self.info['high'] = str(self.ymax)
+            self.info['low'] = str(self.ymin)
             self.info['battery'] = str(self.battery)
 
             return self.info
+
+    def snork_data ( self ) :
+            n = len(self.xx)
+            print ( n, " points waiting to be plotted" )
+
+    # Given an x position in pixel counts
+    # return a time and temperature
+    def lookup ( self, x, w ) :
+        print ( "lookup" )
+        xf = x / w
+        tx = self.xmin + self.xrange * xf
+        return tx, 0.0
+
+    # self.x, self.y = data.getxy ( self.width, self.height)
+    def getxy ( self, w, h ) :
+        rxy = []
+
+        for i in range(len(self.xx)) :
+            xf = (self.xx[i] - self.xmin) / self.xrange
+            yf = (self.yy[i] - self.ymin) / self.yrange
+            #print ( "xf ", xf )
+            #print ( "w ", w )
+            ix = np.int_ ( w * xf )
+            iy = np.int_ ( h * (1.0-yf) )
+            rxy.append ( (ix,iy) )
+
+        return rxy
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -318,11 +391,20 @@ class Left_Panel ( wx.Panel ) :
             wx.Panel.__init__ ( self, parent )
             self.data = data
 
-            self.SetBackgroundColour ( wx.RED )
+            #self.SetBackgroundColour ( wx.RED )
+
             self.Bind ( wx.EVT_SIZE, self.onResize )
 
+            self.Bind ( wx.EVT_PAINT, self.OnPaint )
+            self.Bind ( wx.EVT_MOTION, self.OnMove )
+
+            # left mouse click
+            self.Bind(wx.EVT_LEFT_DOWN, self.OnLeft )
+
+            self.curpos = None
             self.width = None
             self.height = None
+            self.xy = None
 
         # We get 3 resize events just starting up.
         def onResize ( self, event ) :
@@ -331,11 +413,79 @@ class Left_Panel ( wx.Panel ) :
             self.height = event.Size.height
             print ( "width", event.Size.width )
             print ( "height", event.Size.height )
+            self.update ();
+
+        # left mouse click
+        def OnLeft ( self, event ) :
+            x, _ = event.GetPosition ()
+            print ( "Click: ", x )
+            t,y = self.data.lookup ( x, self.width )
+            td = np.datetime_as_string(t, unit='D')
+            tm = np.datetime_as_string(t, unit='m' )
+            print ( "Lookup: ", td, tm, y )
+
+        def OnMove ( self, event ) :
+            x,_ = event.GetPosition ()
+
+            if x > 0 and x < self.width :
+                self.curpos = x
+                self.SetCursor ( wx.Cursor(wx.CURSOR_BLANK) )
+            else :
+                self.curpos = None
+                self.SetCursor ( wx.Cursor(wx.CURSOR_PENCIL) )
+
+            # trigger a repaint
+            self.Refresh ()
+
+        def mkVline ( self, x ) :
+
+            dc = wx.PaintDC ( self )
+            dc.SetPen ( wx.Pen(wx.BLACK, 1) )
+
+            dc.DrawLine ( x, 0, x, self.height )
+
+        def plot_em ( self ) :
+            if not self.xy :
+                return
+
+            dc = wx.PaintDC ( self )
+            dc.SetPen ( wx.Pen(wx.BLUE, 2) )
+
+            lastxy = None
+
+            for xy in self.xy :
+                if lastxy :
+                    dc.DrawLine ( lastxy[0], lastxy[1], xy[0], xy[1] )
+                lastxy = xy
+
+        # We get lots of paint events, for reasons I don't understand,
+        # and not simply related to cursor motion.
+        def OnPaint ( self, event ) :
+            #print ( "Paint!" )
+            dc = wx.PaintDC ( self )
+            dc.Clear ()
+
+            if ( self.curpos ) :
+                self.mkVline ( self.curpos )
+
+            self.plot_em ()
 
         # Called by timer (or button)
         def update ( self ) :
             print ( "left update" )
-            pass
+            self.data.snork_data ()
+            w, h = self.GetSize()
+            print ( "w,h = ", w, h )
+            if w < 100 or h < 100 :
+                print ( "ignoring" )
+                return
+
+            self.xy = self.data.getxy ( w, h )
+
+            # trigger a repaint
+            self.Refresh ()
+
+# ----------------------------------------------------------------------------------------------
 
 bogus = "          ---"
 
@@ -352,19 +502,30 @@ class Right_Panel ( wx.Panel ) :
             rsz = wx.BoxSizer ( wx.VERTICAL )
             self.SetSizer ( rsz )
 
-#            Radiobutton(f1r, text="24 hour", variable=self.radio_var, value=1, command=self.radio_sel).pack()
-#            Radiobutton(f1r, text="48 hour", variable=self.radio_var, value=2, command=self.radio_sel).pack()
-#            Radiobutton(f1r, text="72 hour", variable=self.radio_var, value=3, command=self.radio_sel).pack()
-#            Radiobutton(f1r, text="week", variable=self.radio_var, value=7, command=self.radio_sel).pack()
-            self.r1 = wx.RadioButton ( self, 1, label="24 hour", pos=(10,10), style=wx.RB_GROUP )
-            rsz.Add ( self.r1, 1, wx.EXPAND )
-            self.r2 = wx.RadioButton ( self, 2, label="48 hour", pos=(10,30) )
-            rsz.Add ( self.r2, 1, wx.EXPAND )
-            self.r3 = wx.RadioButton ( self, 3, label="72 hour", pos=(10,50) )
-            rsz.Add ( self.r3, 1, wx.EXPAND )
-            self.r4 = wx.RadioButton ( self, 7, label="week", pos=(10,70) )
-            rsz.Add ( self.r4, 1, wx.EXPAND )
-            self.r2.SetValue ( True )
+            # Ought to match radio buttons below
+            self.day_list = [ 1, 2, 3, 7]
+
+            self.r = []
+            rb = wx.RadioButton ( self, 1, label="24 hour", pos=(10,10), style=wx.RB_GROUP )
+            rsz.Add ( rb, 1, wx.EXPAND )
+            self.r.append ( rb )
+
+            rb = wx.RadioButton ( self, 2, label="48 hour", pos=(10,30) )
+            rsz.Add ( rb, 1, wx.EXPAND )
+            self.r.append ( rb )
+
+            rb = wx.RadioButton ( self, 3, label="72 hour", pos=(10,50) )
+            rsz.Add ( rb, 1, wx.EXPAND )
+            self.r.append ( rb )
+
+            rb = wx.RadioButton ( self, 7, label="week", pos=(10,70) )
+            rsz.Add ( rb, 1, wx.EXPAND )
+            self.r.append ( rb )
+
+            # This can (and should) throw an exception if
+            #  the search fails
+            x = self.day_list.index ( default_days )
+            self.r[x].SetValue ( True )
 
             self.Bind ( wx.EVT_RADIOBUTTON, self.onRadio )
 
@@ -402,17 +563,15 @@ class Right_Panel ( wx.Panel ) :
             self.t_battery = MyStaticText ( self, wx.ID_ANY, bogus )
             rsz.Add ( self.t_battery, 1, wx.EXPAND )
 
-            self.data.set_data_range ( 2 )
-            self.data.gather_data ()
+            self.data.gather_data ( default_days )
             self.update ( True )
             self.left.update ();
 
         def onRadio ( self, event ) :
             rb = event.GetEventObject ()
             lab = rb.GetLabel ()
-            print ( "radio ", lab )
+            #print ( "Radio EVENT ****************** ", lab )
             #val = rb.GetValue ()    # is always true
-            #print ( "radio ", val )
             if lab.startswith ( '24' ) :
                 x = 1;
             if lab.startswith ( '48' ) :
@@ -422,8 +581,7 @@ class Right_Panel ( wx.Panel ) :
             if lab.startswith ( 'we' ) :
                 x = 7;
 
-            self.data.set_data_range ( x )
-            self.data.gather_data ()
+            self.data.gather_data ( x )
             self.update ( True )
             self.left.update ()
 
@@ -515,6 +673,8 @@ class Temp_Frame (wx.Frame):
         def timer_update ( self, event ) :
             #print ( "Tick" )
             if data.new_data () :
+                print ( "Data arrived" )
+                self.data.gather_data ( None )
                 self.lpanel.update ()
                 self.rpanel.update ( True )
             else:
