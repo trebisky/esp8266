@@ -6,14 +6,21 @@ import datetime
 import sys
 import os
 
+# This is for sunrise/sunset times
 # First dnf install python3-ephem
 import ephem
 
-#wsize = ( 400, 300 )
-wsize = ( 800, 500 )
+xsize = 800
+ysize = 600
+wsize = ( xsize, ysize )
+
+# The right side needs about 250 pixels
+right_size =250
+split_pos = xsize - right_size
+
 temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_log99"
 
-timer_delay = 1000    # milliseconds
+# Start up showing 2 days by default
 default_days = 2
 
 # ----------------------------------------------------------------------------------------------
@@ -257,21 +264,29 @@ class Temp_Data () :
     # return a time and temperature
     def lookup ( self, x, w ) :
         print ( "lookup" )
+        ndata = len(self.xx)
         xf = x / w
         tx = self.xmin + self.xrange * xf
+        ii = int(xf * ndata)
+        print ( "lookup xf, tx ", xf, tx )
+        print ( "lookup ii, x, y ", ii, self.xx[ii], self.yy[ii] )
         return tx, 0.0
 
     # self.x, self.y = data.getxy ( self.width, self.height)
-    def getxy ( self, w, h ) :
+    def getxy ( self, width, height ) :
         rxy = []
+
+        ytop = 20
+        ybot = 20
+        high = height - (ytop + ybot)
 
         for i in range(len(self.xx)) :
             xf = (self.xx[i] - self.xmin) / self.xrange
             yf = (self.yy[i] - self.ymin) / self.yrange
             #print ( "xf ", xf )
             #print ( "w ", w )
-            ix = np.int_ ( w * xf )
-            iy = np.int_ ( h * (1.0-yf) )
+            ix = np.int_ ( width * xf )
+            iy = ybot + np.int_ ( high * (1.0-yf) )
             rxy.append ( (ix,iy) )
 
         return rxy
@@ -374,6 +389,9 @@ class MyStaticText ( wx.Control ):
     def ShouldInheritColours(self):
         return True
 
+# I was trying to figure out how to encapsulate/override
+# the StaticText widget, but never succeeded.
+# The above is far better
 #class MyText ( wx.StaticText ) :
 class BadText () :
         def __init__ ( self, init_msg, panel, box ) :
@@ -420,6 +438,7 @@ class Left_Panel ( wx.Panel ) :
             x, _ = event.GetPosition ()
             print ( "Click: ", x )
             t,y = self.data.lookup ( x, self.width )
+
             td = np.datetime_as_string(t, unit='D')
             tm = np.datetime_as_string(t, unit='m' )
             print ( "Lookup: ", td, tm, y )
@@ -625,45 +644,29 @@ class Right_Panel ( wx.Panel ) :
             self.update ( True )
             self.left.update ()
 
+# Check every second for new data
+timer_delay = 1000    # milliseconds
 
 class Temp_Frame (wx.Frame):
  
-        def PORK__init__ ( self, parent, title, data ):
-            wx.Frame.__init__(self, None, wx.ID_ANY, title, size=wsize )
-            #top = wx.Frame.__init__(self, None, wx.ID_ANY, title, pos=(a,b), size=wsize )
-
-            self.data = data
-            self.lpanel = Left_Panel ( self, data )
-            self.rpanel = Right_Panel ( self, data, self.lpanel )
-
-            sz = wx.BoxSizer ( wx.HORIZONTAL )
-            sz.Add ( self.lpanel, 1, wx.EXPAND )
-            sz.Add ( self.rpanel, 1, wx.EXPAND )
-
-            self.SetSizer ( sz )
-
-            self.timer = wx.Timer ( self )
-            self.Bind ( wx.EVT_TIMER, self.timer_update, self.timer )
-            self.timer.Start ( timer_delay )
-
         def __init__ ( self, parent, title, data ):
             wx.Frame.__init__(self, None, wx.ID_ANY, title, size=wsize )
             #top = wx.Frame.__init__(self, None, wx.ID_ANY, title, pos=(a,b), size=wsize )
 
             self.data = data
 
-            splitter = wx.SplitterWindow ( self, -1 )
+            #splitter = wx.SplitterWindow ( self, -1 )
+            splitter = wx.SplitterWindow(self, style = wx.SP_LIVE_UPDATE)
 
             self.lpanel = Left_Panel ( splitter, data )
             self.rpanel = Right_Panel ( splitter, data, self.lpanel )
 
-            #sz = wx.BoxSizer ( wx.HORIZONTAL )
-            #sz.Add ( self.lpanel, 1, wx.EXPAND )
-            #sz.Add ( self.rpanel, 1, wx.EXPAND )
-            #self.SetSizer ( sz )
+            # only left side grows
+            splitter.SetSashGravity ( 1.0 )
 
+            splitter.SetMinimumPaneSize ( right_size )
             splitter.SplitVertically ( self.lpanel, self.rpanel )
-            splitter.SetMinimumPaneSize ( 400 )
+            splitter.SetSashPosition ( split_pos, True )
 
             self.timer = wx.Timer ( self )
             self.Bind ( wx.EVT_TIMER, self.timer_update, self.timer )
