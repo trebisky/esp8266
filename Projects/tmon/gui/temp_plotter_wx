@@ -470,9 +470,6 @@ class Temp_Data () :
 # dive in.  I am taking the code posted by Hesky Fisher in the above post.
 #
 #    Thanks Hesky !!
-#
-# It does not inherit the proper background color, but that is OK
-#
 
 class MyStaticText ( wx.Control ):
     def __init__(self, parent, id=wx.ID_ANY, label="", 
@@ -484,6 +481,9 @@ class MyStaticText ( wx.Control ):
         wx.Control.SetLabel(self, label)
         self.InheritAttributes()
         self.SetInitialSize(size)
+
+        self.bg_color = parent.GetBackgroundColour ()
+
         self.Bind(wx.EVT_PAINT, self.OnPaint)
         self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
 
@@ -497,7 +497,9 @@ class MyStaticText ( wx.Control ):
         if not width or not height:
             return
 
-        backBrush = wx.Brush(wx.WHITE, wx.SOLID)
+        # TJT - We should get the background of the parent instead
+        # backBrush = wx.Brush(wx.WHITE, wx.SOLID)
+        backBrush = wx.Brush ( self.bg_color, wx.SOLID)
         dc.SetBackground(backBrush)
         dc.Clear()
 
@@ -510,9 +512,7 @@ class MyStaticText ( wx.Control ):
         pass
 
     def SetLabel(self, label):
-        # TJT - I prefix some space here.
-        wx.Control.SetLabel(self, "    " + label)
-        #wx.Control.SetLabel(self, label)
+        wx.Control.SetLabel(self, label)
         self.InvalidateBestSize()
         self.SetSize(self.GetBestSize())
         self.Refresh()
@@ -555,16 +555,44 @@ class MyStaticText ( wx.Control ):
     def ShouldInheritColours(self):
         return True
 
-# I was trying to figure out how to encapsulate/override
-# the StaticText widget, but never succeeded.
-# The above is far better
-#class MyText ( wx.StaticText ) :
-class BadText () :
-        def __init__ ( self, init_msg, panel, box ) :
-            #self.t_cur_date = wx.StaticText ( self, wx.ID_ANY, "-A-")
-            t = wx.StaticText ( self, wx.ID_ANY, "-A-")
-            box.Add ( t, 1, wx.EXPAND )
-            return t
+# This is my wrapper on the above
+# I had trouble getting this right.
+# The trick is that the __init__ method does a special thing.
+# it effectively returns "self" in a magic way.
+# (and "self" is the value returned by the superclass.)
+class EZtext ( MyStaticText ) :
+        def __init__ ( self, parent, sizer, message ) :
+            #rv = MyStaticText.__init__ ( self, parent, wx.ID_ANY, message )
+            #sizer.Add ( rv, 1, wx.EXPAND )
+            #print ( rv )
+            #print ( type(rv) )
+
+            # prefix some space here
+            padded = "    " + message
+            MyStaticText.__init__ ( self, parent, wx.ID_ANY, padded )
+            sizer.Add ( self, 1, wx.EXPAND )
+
+# -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+
+class Monitor ( wx.Frame ) :
+        def __init__ ( self, parent ) :
+            wx.Frame.__init__(self, None, wx.ID_ANY, "data", size=(100,100) )
+            self.SetBackgroundColour ( wx.RED )
+
+            mp = wx.Panel ( self, -1 )
+            ms = wx.BoxSizer ( wx.HORIZONTAL )
+
+            bogus = "Hot Coffee"
+
+            self.l1 = MyStaticText ( self, wx.ID_ANY, bogus )
+            ms.Add ( self.l1, 1, wx.EXPAND )
+            self.l2 = MyStaticText ( self, wx.ID_ANY, bogus )
+            ms.Add ( self.l2, 1, wx.EXPAND )
+            self.l3 = MyStaticText ( self, wx.ID_ANY, bogus )
+            ms.Add ( self.l3, 1, wx.EXPAND )
+
+            mp.SetSizer ( ms )
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -581,6 +609,9 @@ class Left_Panel ( wx.Panel ) :
             self.xtick_size = 10
             self.ytick_size = 5
             self.font_size = 12
+
+            self.monitor = None
+            self.monitor_up = False
 
             #self.SetBackgroundColour ( wx.RED )
 
@@ -627,6 +658,16 @@ class Left_Panel ( wx.Panel ) :
             #stuff = self.data.lookup ( x-self.lmargin, self.width-self.lmargin )
             stuff = self.data.lookup ( x-self.lmargin )
 
+            if not self.monitor :
+                self.monitor = Monitor ( self )
+
+            if self.monitor_up :
+                self.monitor.Hide ()
+                self.monitor_up = False
+            else :
+                self.monitor.Show ()
+                self.monitor_up = True
+
         def OnMove ( self, event ) :
             x,_ = event.GetPosition ()
 
@@ -640,6 +681,9 @@ class Left_Panel ( wx.Panel ) :
             # trigger a repaint
             self.Refresh ()
 
+        # could this be moved rather than repainted?
+        # we are already working at too low a level,
+        # so that is not possible.
         def mkVline ( self, x ) :
 
             dc = wx.PaintDC ( self )
@@ -795,30 +839,21 @@ class Right_Panel ( wx.Panel ) :
             bus.Add ( self.b_up, 1, wx.EXPAND )
             bus.Add ( self.b_ex, 1, wx.EXPAND )
             bup.SetSizer ( bus )
+
             rsz.Add ( bup, 1, wx.EXPAND )
 
-            #self.t_cur_date = wx.StaticText ( self, wx.ID_ANY, bogus )
-            self.t_cur_date = MyStaticText ( self, wx.ID_ANY, bogus )
-            rsz.Add ( self.t_cur_date, 1, wx.EXPAND )
-            #self.t_cur_time = MyStaticText ( self, wx.ID_ANY, bogus )
-            #rsz.Add ( self.t_cur_time, 1, wx.EXPAND )
-            self.t_prior_temp = MyStaticText ( self, wx.ID_ANY, bogus )
-            rsz.Add ( self.t_prior_temp, 1, wx.EXPAND )
-            self.t_cur_temp = MyStaticText ( self, wx.ID_ANY, bogus )
-            rsz.Add ( self.t_cur_temp, 1, wx.EXPAND )
-            self.t_cur_hum = MyStaticText ( self, wx.ID_ANY, bogus )
-            rsz.Add ( self.t_cur_hum, 1, wx.EXPAND )
+            #self.t_cur_date = MyStaticText ( self, wx.ID_ANY, bogus )
+            #rsz.Add ( self.t_cur_date, 1, wx.EXPAND )
 
-            self.t_sunrise = MyStaticText ( self, wx.ID_ANY, bogus )
-            rsz.Add ( self.t_sunrise, 1, wx.EXPAND )
-            self.t_sunset = MyStaticText ( self, wx.ID_ANY, bogus )
-            rsz.Add ( self.t_sunset, 1, wx.EXPAND )
-            self.t_high = MyStaticText ( self, wx.ID_ANY, bogus )
-            rsz.Add ( self.t_high, 1, wx.EXPAND )
-            self.t_low = MyStaticText ( self, wx.ID_ANY, bogus )
-            rsz.Add ( self.t_low, 1, wx.EXPAND )
-            self.t_battery = MyStaticText ( self, wx.ID_ANY, bogus )
-            rsz.Add ( self.t_battery, 1, wx.EXPAND )
+            self.t_cur_date = EZtext ( self, rsz, bogus )
+            self.t_prior_temp = EZtext ( self, rsz, bogus )
+            self.t_cur_temp = EZtext ( self, rsz, bogus )
+            self.t_cur_hum = EZtext ( self, rsz, bogus )
+            self.t_sunrise = EZtext ( self, rsz, bogus )
+            self.t_sunset = EZtext ( self, rsz, bogus )
+            self.t_high = EZtext ( self, rsz, bogus )
+            self.t_low = EZtext ( self, rsz, bogus )
+            self.t_battery = EZtext ( self, rsz, bogus )
 
             self.data.gather_data ( default_days )
             self.update ( True )
