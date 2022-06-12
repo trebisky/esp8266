@@ -338,12 +338,14 @@ class Temp_Data () :
         # Much better.
         # Date:  06/10/2022
         # Time:  06:26
-        print ( "Date: ", ttd )
-        print ( "Time: ", ttm )
+        #print ( "Date: ", ttd )
+        #print ( "Time: ", ttm )
 
-        print ( "Temperature: ", str(val) )
+        #ttt = str(val)
+        ttt = f"{val:.1f}"
+        #print ( "Temperature: ", str(val) )
 
-        return ttd, ttm, str(val)
+        return ttd, ttm, ttt
 
     # return an array of tick information for the Y axis
     # We may generate marks from 70 to 120
@@ -572,27 +574,49 @@ class EZtext ( MyStaticText ) :
             MyStaticText.__init__ ( self, parent, wx.ID_ANY, padded )
             sizer.Add ( self, 1, wx.EXPAND )
 
+        def SetLabel ( self, msg ) :
+            padded = "    " + msg
+            super().SetLabel ( padded )
+
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
 
+# This is the little box that pops up with information
+# at the cursor position
 class Monitor ( wx.Frame ) :
         def __init__ ( self, parent ) :
-            wx.Frame.__init__(self, None, wx.ID_ANY, "data", size=(100,100) )
-            self.SetBackgroundColour ( wx.RED )
+            #wx.Frame.__init__(self, None, wx.ID_ANY, "data", size=(100,100) )
+            wx.Frame.__init__(self, None, wx.ID_ANY, "data", size=(100,100), style=wx.NO_BORDER )
+
+            # This always returns 0,0 (as a wx.Point)
+            pos = parent.GetPosition ()
+            #print ( pos )
+            #print ( type(pos) )
+
+            # Given 0,0, this goes to screen center
+            # non-zero values are from top left of screen
+            #self.SetPosition ( wx.Point(100, 100) )
+            self.SetPosition ( wx.Point(0, 0) )
+
+            #self.SetBackgroundColour ( wx.RED )
 
             mp = wx.Panel ( self, -1 )
-            ms = wx.BoxSizer ( wx.HORIZONTAL )
+            ms = wx.BoxSizer ( wx.VERTICAL )
 
-            bogus = "Hot Coffee"
+            bogus = "Hot --"
 
-            self.l1 = MyStaticText ( self, wx.ID_ANY, bogus )
-            ms.Add ( self.l1, 1, wx.EXPAND )
-            self.l2 = MyStaticText ( self, wx.ID_ANY, bogus )
-            ms.Add ( self.l2, 1, wx.EXPAND )
-            self.l3 = MyStaticText ( self, wx.ID_ANY, bogus )
-            ms.Add ( self.l3, 1, wx.EXPAND )
+            EZtext ( mp, ms, " " )
+            self.date = EZtext ( mp, ms, bogus )
+            self.time = EZtext ( mp, ms, bogus )
+            self.temp = EZtext ( mp, ms, bogus )
 
             mp.SetSizer ( ms )
+
+        def update ( self, stuff ) :
+            
+            self.date.SetLabel ( stuff[0] )
+            self.time.SetLabel ( stuff[1] )
+            self.temp.SetLabel ( stuff[2] )
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -655,7 +679,6 @@ class Left_Panel ( wx.Panel ) :
             if x < self.lmargin :
                 return
 
-            #stuff = self.data.lookup ( x-self.lmargin, self.width-self.lmargin )
             stuff = self.data.lookup ( x-self.lmargin )
 
             if not self.monitor :
@@ -668,6 +691,8 @@ class Left_Panel ( wx.Panel ) :
                 self.monitor.Show ()
                 self.monitor_up = True
 
+            self.monitor.update ( stuff )
+
         def OnMove ( self, event ) :
             x,_ = event.GetPosition ()
 
@@ -677,6 +702,10 @@ class Left_Panel ( wx.Panel ) :
             else :
                 self.curpos = None
                 self.SetCursor ( wx.Cursor(wx.CURSOR_PENCIL) )
+
+            if self.monitor_up :
+                stuff = self.data.lookup ( x-self.lmargin )
+                self.monitor.update ( stuff )
 
             # trigger a repaint
             self.Refresh ()
@@ -845,6 +874,7 @@ class Right_Panel ( wx.Panel ) :
             #self.t_cur_date = MyStaticText ( self, wx.ID_ANY, bogus )
             #rsz.Add ( self.t_cur_date, 1, wx.EXPAND )
 
+            EZtext ( self, rsz, " " )
             self.t_cur_date = EZtext ( self, rsz, bogus )
             self.t_prior_temp = EZtext ( self, rsz, bogus )
             self.t_cur_temp = EZtext ( self, rsz, bogus )
