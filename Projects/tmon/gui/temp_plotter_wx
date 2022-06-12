@@ -5,6 +5,7 @@ import numpy as np
 import datetime
 import sys
 import os
+import math
 
 # This is for sunrise/sunset times
 # First dnf install python3-ephem
@@ -94,6 +95,8 @@ class Temp_Data () :
         else :
             return False
 
+    # This gives a hint of a good place to
+    # seek into the file and start reading.
     def find_start ( self ) :
         pos = os.path.getsize ( self.file ) - 500000
         self.initial_seek = pos
@@ -332,13 +335,57 @@ class Temp_Data () :
 
         return ttd, ttm, str(val)
 
+    # return an array of tick information for the Y axis
+    # We may generate marks from 70 to 120
+    def getticks ( self ) :
+        return self.tick_array
+
+    # return an array of positions to mark the X axis.
+    def get_xticks ( self, width, lmargin ) :
+
+        #today = datetime.date.today()
+        #self.start_time = today - datetime.timedelta(days=self.num_days-1)
+        wid = width - lmargin
+
+        #day = datetime.timedelta(days=1)
+        day = np.timedelta64(1,'D')
+
+        # This is a plain old Python datetime
+        # but everything else is a numpy time.
+        #xxx = self.start_time
+        # Using this keeps us in the numpy world
+        xxx = self.xx[0]
+
+        rv = []
+        for i in range ( self.num_days - 1 ) :
+            xxx += day
+            xf = (xxx - self.xmin) / self.xrange
+            ix = lmargin + int ( wid * xf )
+            rv.append ( ix )
+
+        return rv
+
     # scale data for plotting on the screen
-    def getxy ( self, width, height ) :
+    #
+    # XXX - it is awkward passing geometry from
+    #  the panel object to the data object like
+    #  this.  There ought to be a better way.
+    def getxy ( self, width, height, lmargin ) :
         rxy = []
 
-        ytop = 20
-        ybot = 20
-        high = height - (ytop + ybot)
+        # getticks() will also use these
+        self.ytop = math.ceil ( (self.ymax+1.0) / 10.0) * 10.
+        self.ybot = math.floor ( (self.ymin-1.0) / 10.0) * 10.
+        #print ( "Y bot, top: ", self.ybot, self.ytop )
+        yrang = self.ytop - self.ybot
+
+        # unused pixels at top/bottom of panel
+        top_margin = 20
+        bot_margin = 20
+
+        # height in pixels that we will scale onto
+        high = height - (top_margin + bot_margin)
+        wid = width - lmargin
 
         x_expect = None
 
@@ -362,16 +409,30 @@ class Temp_Data () :
             #        rxy.append ( (0,9999) )
 
             xf = (self.xx[i] - self.xmin) / self.xrange
-            yf = (self.yy[i] - self.ymin) / self.yrange
+            #yf = (self.yy[i] - self.ymin) / self.yrange
+            yf = (self.yy[i] - self.ybot) / yrang
+
             #print ( "xf ", xf )
             #print ( "w ", w )
-            ix = np.int_ ( width * xf )
-            iy = ybot + np.int_ ( high * (1.0-yf) )
+            ix = lmargin + np.int_ ( wid * xf )
+            iy = bot_margin + np.int_ ( high * (1.0-yf) )
             rxy.append ( (ix,iy) )
 
             #print ( 'array ', type(self.xx[i]) )
             #print ( 'delta ', type(delta) )
             x_expect = self.xx[i] + delta
+
+        # Generate tick array here
+        nticks = int ( self.ytop - self.ybot )
+
+        self.tick_array = []
+        y = self.ybot
+        for i in range ( nticks ) :
+            yf = (y - self.ybot) / yrang
+            iy = bot_margin + np.int_ ( high * (1.0-yf) )
+            label = str ( int(y) )
+            self.tick_array.append ( (iy, label) )
+            y += 10.0
 
         return rxy
 
@@ -493,6 +554,10 @@ class Left_Panel ( wx.Panel ) :
             wx.Panel.__init__ ( self, parent )
             self.data = data
 
+            self.lmargin = 40
+            self.tick_size = 5
+            self.font_size = 12
+
             #self.SetBackgroundColour ( wx.RED )
 
             self.Bind ( wx.EVT_SIZE, self.onResize )
@@ -521,14 +586,19 @@ class Left_Panel ( wx.Panel ) :
 
         # left mouse click
         def OnLeft ( self, event ) :
-            x, _ = event.GetPosition ()
             #print ( "Click: ", x )
-            stuff = self.data.lookup ( x, self.width )
+
+            x, _ = event.GetPosition ()
+
+            if x < self.lmargin :
+                return
+
+            stuff = self.data.lookup ( x-self.lmargin, self.width-self.lmargin )
 
         def OnMove ( self, event ) :
             x,_ = event.GetPosition ()
 
-            if x > 0 and x < self.width :
+            if x > self.lmargin and x < self.width :
                 self.curpos = x
                 self.SetCursor ( wx.Cursor(wx.CURSOR_BLANK) )
             else :
@@ -543,7 +613,40 @@ class Left_Panel ( wx.Panel ) :
             dc = wx.PaintDC ( self )
             dc.SetPen ( wx.Pen(wx.BLACK, 1) )
 
-            dc.DrawLine ( x, 0, x, self.height )
+            dc.DrawLine ( x, 0, x, self.height-1 )
+
+        def mkHline ( self, y ) :
+
+            dc = wx.PaintDC ( self )
+            dc.SetPen ( wx.Pen(wx.BLACK, 1) )
+
+            dc.DrawLine ( self.lmargin, y, self.width-1, y )
+
+        def xtick ( self, x ) :
+
+            dc = wx.PaintDC ( self )
+            dc.SetPen ( wx.Pen(wx.BLACK, 1) )
+
+            dc.DrawLine ( x, self.height-self.tick_size-1, x, self.height-1 )
+
+        # The position is the upper left corner of the rectangle
+        #  that holds the text
+        def mtext ( self, yy, msg ) :
+
+            dc = wx.PaintDC ( self )
+            dc.SetPen ( wx.Pen(wx.BLACK, 1) )
+
+            dc.DrawLine ( self.lmargin-self.tick_size, yy, self.lmargin, yy )
+
+            #font = wx.Font(18, wx.ROMAN, wx.ITALIC, wx.BOLD)
+            font = wx.Font ( self.font_size, wx.ROMAN, wx.NORMAL, wx.NORMAL)
+            dc.SetFont(font)
+            tsize = dc.GetTextExtent ( msg )
+            #print ( tsize )
+            #x = self.lmargin + 2
+            x = self.lmargin - (tsize[0] + 2 + self.tick_size)
+            y = int ( yy - tsize[1]/2 )
+            dc.DrawText ( msg, x, y )
 
         def plot_em ( self ) :
             if not self.xy :
@@ -569,7 +672,25 @@ class Left_Panel ( wx.Panel ) :
             if ( self.curpos ) :
                 self.mkVline ( self.curpos )
 
+            w, h = self.GetSize()
+
+            self.mkVline ( self.lmargin )
+
+            #self.mtext ( 0, "140" )
+            #self.mtext ( 100, "140" )
+            #self.mtext ( 150, "140" )
+            #self.mtext ( 250, "140" )
+            # This is 164x19 pixels with a size 12 font
+            # self.mtext ( 300, "Marvin the Alligator" )
+            #self.mtext ( h-30, "140" )
+
             self.plot_em ()
+            for (ii,ll) in self.ticks :
+                self.mtext ( ii, ll )
+
+            self.mkHline ( self.height-1 )
+            for ix in self.xticks :
+                self.xtick ( ix )
 
         # Called by timer (or button)
         def update ( self ) :
@@ -580,7 +701,9 @@ class Left_Panel ( wx.Panel ) :
             if w < 100 or h < 100 :
                 return
 
-            self.xy = self.data.getxy ( w, h )
+            self.xy = self.data.getxy ( w, h, self.lmargin )
+            self.ticks = self.data.getticks ()
+            self.xticks = self.data.get_xticks ( w, self.lmargin )
 
             # trigger a repaint
             self.Refresh ()
