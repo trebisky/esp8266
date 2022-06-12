@@ -40,10 +40,11 @@ def utc_to_local_str ( utc ) :
 # another option would be to use the "astroplan" package,
 # Astroplan is an "astropy affiliated" package for the planning of
 # astronomical observing from Cornell University.
-#
+
 # A bonus tip from my buddy Tim is as follows:
 # for date/time stuff i often use astropy.time to do the parsing and format
 #  translating. provides a higher level interface than datetime.
+# (I neglected this advice and was tangled up in the tower of Babel)
 
 def get_sunrise_ephem () :
     # It seems peculiar that it wants the lat/long as strings,
@@ -83,6 +84,13 @@ class Temp_Data () :
         self.info = {}
         self.num_days = default_days
         self.initial_seek = None
+
+        # entirely bogus, but avoids errors
+        # at startup to have values set.
+        #self.xoff = 0
+        #self.yoff = 0
+        #self.ysize = 10
+        #self.ysize = 10
 
     # check file size for new data
     def new_data ( self ) :
@@ -269,13 +277,15 @@ class Temp_Data () :
 
     # Given an x position in pixel counts
     # return a time and temperature
-    def lookup ( self, x, w ) :
+    #def lookup ( self, x, w ) :
+    def lookup ( self, x ) :
 
         nxy = len(self.xx)
         delta = np.timedelta64(70,'s')
         # We can calculate a time nicely based on
         # the x mouse location.
-        xf = x / w
+        #xf = x / w
+        xf = x / self.xsize
         tx = self.xmin + self.xrange * xf
         # print ( "Lookup: ", x, tx )
 
@@ -341,11 +351,12 @@ class Temp_Data () :
         return self.tick_array
 
     # return an array of positions to mark the X axis.
-    def get_xticks ( self, width, lmargin ) :
+    #def get_xticks ( self, width, lmargin ) :
+    def get_xticks ( self ) :
 
         #today = datetime.date.today()
         #self.start_time = today - datetime.timedelta(days=self.num_days-1)
-        wid = width - lmargin
+        #wid = width - lmargin
 
         #day = datetime.timedelta(days=1)
         day = np.timedelta64(1,'D')
@@ -360,7 +371,7 @@ class Temp_Data () :
         for i in range ( self.num_days - 1 ) :
             xxx += day
             xf = (xxx - self.xmin) / self.xrange
-            ix = lmargin + int ( wid * xf )
+            ix = self.xoff + int ( self.xsize * xf )
             rv.append ( ix )
 
         return rv
@@ -370,7 +381,8 @@ class Temp_Data () :
     # XXX - it is awkward passing geometry from
     #  the panel object to the data object like
     #  this.  There ought to be a better way.
-    def getxy ( self, width, height, lmargin ) :
+    #def getxy ( self, width, height, lmargin ) :
+    def getxy ( self ) :
         rxy = []
 
         # getticks() will also use these
@@ -380,12 +392,13 @@ class Temp_Data () :
         yrang = self.ytop - self.ybot
 
         # unused pixels at top/bottom of panel
-        top_margin = 20
-        bot_margin = 20
+        #top_margin = 20
+        #bot_margin = 20
 
         # height in pixels that we will scale onto
-        high = height - (top_margin + bot_margin)
-        wid = width - lmargin
+        # high = height - (top_margin + bot_margin)
+        #high = height
+        # wid = width - lmargin
 
         x_expect = None
 
@@ -414,8 +427,8 @@ class Temp_Data () :
 
             #print ( "xf ", xf )
             #print ( "w ", w )
-            ix = lmargin + np.int_ ( wid * xf )
-            iy = bot_margin + np.int_ ( high * (1.0-yf) )
+            ix = self.xoff + np.int_ ( self.xsize * xf )
+            iy = self.yoff + np.int_ ( self.ysize * (1.0-yf) )
             rxy.append ( (ix,iy) )
 
             #print ( 'array ', type(self.xx[i]) )
@@ -429,12 +442,20 @@ class Temp_Data () :
         y = self.ybot
         for i in range ( nticks ) :
             yf = (y - self.ybot) / yrang
-            iy = bot_margin + np.int_ ( high * (1.0-yf) )
+            iy = self.yoff + np.int_ ( self.ysize * (1.0-yf) )
             label = str ( int(y) )
             self.tick_array.append ( (iy, label) )
             y += 10.0
 
         return rxy
+
+    # This is how I keep this object informed
+    # about things the left panel knows about
+    def viewport ( self, xoff, yoff, xsize, ysize ) :
+        self.xoff = xoff
+        self.yoff = yoff
+        self.xsize = xsize
+        self.ysize = ysize
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -554,8 +575,11 @@ class Left_Panel ( wx.Panel ) :
             wx.Panel.__init__ ( self, parent )
             self.data = data
 
-            self.lmargin = 40
-            self.tick_size = 5
+            self.lmargin = 40   # left only
+            self.ymargin = 10   # top and bottom
+
+            self.xtick_size = 10
+            self.ytick_size = 5
             self.font_size = 12
 
             #self.SetBackgroundColour ( wx.RED )
@@ -580,8 +604,15 @@ class Left_Panel ( wx.Panel ) :
             #print ( "resize" )
             self.width = event.Size.width
             self.height = event.Size.height
+
+            xsize = self.width-self.lmargin
+            ysize = self.height - self.ymargin * 2
+
+            self.data.viewport ( self.lmargin, self.ymargin, xsize, ysize )
+
             # print ( "width", event.Size.width )
             # print ( "height", event.Size.height )
+
             self.update ();
 
         # left mouse click
@@ -593,7 +624,8 @@ class Left_Panel ( wx.Panel ) :
             if x < self.lmargin :
                 return
 
-            stuff = self.data.lookup ( x-self.lmargin, self.width-self.lmargin )
+            #stuff = self.data.lookup ( x-self.lmargin, self.width-self.lmargin )
+            stuff = self.data.lookup ( x-self.lmargin )
 
         def OnMove ( self, event ) :
             x,_ = event.GetPosition ()
@@ -627,7 +659,7 @@ class Left_Panel ( wx.Panel ) :
             dc = wx.PaintDC ( self )
             dc.SetPen ( wx.Pen(wx.BLACK, 1) )
 
-            dc.DrawLine ( x, self.height-self.tick_size-1, x, self.height-1 )
+            dc.DrawLine ( x, self.height-self.xtick_size-1, x, self.height-1 )
 
         # The position is the upper left corner of the rectangle
         #  that holds the text
@@ -636,7 +668,7 @@ class Left_Panel ( wx.Panel ) :
             dc = wx.PaintDC ( self )
             dc.SetPen ( wx.Pen(wx.BLACK, 1) )
 
-            dc.DrawLine ( self.lmargin-self.tick_size, yy, self.lmargin, yy )
+            dc.DrawLine ( self.lmargin-self.ytick_size, yy, self.lmargin, yy )
 
             #font = wx.Font(18, wx.ROMAN, wx.ITALIC, wx.BOLD)
             font = wx.Font ( self.font_size, wx.ROMAN, wx.NORMAL, wx.NORMAL)
@@ -644,7 +676,7 @@ class Left_Panel ( wx.Panel ) :
             tsize = dc.GetTextExtent ( msg )
             #print ( tsize )
             #x = self.lmargin + 2
-            x = self.lmargin - (tsize[0] + 2 + self.tick_size)
+            x = self.lmargin - (tsize[0] + 2 + self.ytick_size)
             y = int ( yy - tsize[1]/2 )
             dc.DrawText ( msg, x, y )
 
@@ -672,7 +704,7 @@ class Left_Panel ( wx.Panel ) :
             if ( self.curpos ) :
                 self.mkVline ( self.curpos )
 
-            w, h = self.GetSize()
+            #w, h = self.GetSize()
 
             self.mkVline ( self.lmargin )
 
@@ -695,15 +727,17 @@ class Left_Panel ( wx.Panel ) :
         # Called by timer (or button)
         def update ( self ) :
             #print ( "left update" )
+
+            # This must be a method in the superclass (Panel)
             w, h = self.GetSize()
             #print ( "w,h = ", w, h )
 
             if w < 100 or h < 100 :
                 return
 
-            self.xy = self.data.getxy ( w, h, self.lmargin )
+            self.xy = self.data.getxy ()
             self.ticks = self.data.getticks ()
-            self.xticks = self.data.get_xticks ( w, self.lmargin )
+            self.xticks = self.data.get_xticks ()
 
             # trigger a repaint
             self.Refresh ()
@@ -845,6 +879,7 @@ class Right_Panel ( wx.Panel ) :
             sys.exit ()
 
         def onUpdate ( self, event ) :
+            print ( "Useless update button was pushed" )
             self.update ( True )
             self.left.update ()
 
