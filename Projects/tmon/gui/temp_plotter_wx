@@ -68,6 +68,14 @@ def get_sunrise_ephem () :
 # ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------
 
+# As of 6-10-2022 my temperature data "log" file has about 4.5 years of data
+# 78309751 bytes (78M), 2339523 lines, 1625 days, 4.5 years
+# This averages to about 34 bytes per line.
+# So ...
+# 1 week is 7*24*60 lines -- 342,720 bytes of data
+# Based on this, I see 500,000 bytes back from the end of the file
+# and start reading there, rather than reading 78 megabytes from the very start.
+
 class Temp_Data () :
 
     def __init__ ( self ) :
