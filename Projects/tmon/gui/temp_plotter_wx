@@ -1,5 +1,19 @@
 #!/bin/python3
 
+# plot temperature data from my weather station.
+# I invoke this as "temp_plotter".
+# I wrote a first "draft" of this using Tk, but then
+# switched to wx, which I like a lot better
+#
+# July 2022  Tom Trebisky
+#
+# In January 2024 after an upgrade to Fedora 39, I had to do
+# a fair bit of maintenance as features stopped working.
+#  this is python 3.12.1 -- python3-ephem 4.1.4
+#
+# 1 - fix a deprecation warning about utcnow()
+# 2 - my "Monitor" subwindow must now be bigger to see temperature
+
 import wx
 import numpy as np
 import datetime
@@ -9,6 +23,7 @@ import math
 
 # This is for sunrise/sunset times
 # First dnf install python3-ephem
+# Apparently this is also called "PyEphem"
 import ephem
 
 xsize = 800
@@ -20,10 +35,20 @@ right_size =250
 split_pos = xsize - right_size
 
 temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_log99"
+#temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_dead"
 demo_file = "./temp_demo_data"
 
 # Start up showing 2 days by default
-default_days = 2
+#default_days = 2
+#default_days = 7
+default_days = 1
+
+# 6-24-2022 -- several bugs showed up when my Wifi access point was offline for a few days.
+# exactly the same as if I had a dead battery for several days.
+# -- we need to display "DEAD battery" in a prominent way in such a case.
+# -- we need to display missing data up to end of plot.
+# -- we need to start up, even if the range we want to display starts in
+#    the middle of a "DEAD" zone.
 
 # ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------
@@ -42,9 +67,14 @@ def utc_to_local_str ( utc ) :
 # astronomical observing from Cornell University.
 
 # A bonus tip from my buddy Tim is as follows:
-# for date/time stuff i often use astropy.time to do the parsing and format
+# for date/time stuff I often use astropy.time to do the parsing and format
 #  translating. provides a higher level interface than datetime.
 # (I neglected this advice and was tangled up in the tower of Babel)
+
+# In January of 2024 I began getting deprecation warnings about datetime.utcnow()
+# You can read endless jabber about how python once allowed timezone aware timestamps
+# and "naive" timestamps without a timezone that are expected to be in the local
+# timezone, which is then obtained from the system.
 
 def get_sunrise_ephem () :
     # It seems peculiar that it wants the lat/long as strings,
@@ -52,7 +82,8 @@ def get_sunrise_ephem () :
     obs = ephem.Observer()
     obs.lat = '32.2226'
     obs.long = '-110.9747'
-    obs.date = datetime.datetime.utcnow()
+#    obs.date = datetime.datetime.utcnow()
+    obs.date = datetime.datetime.now(datetime.UTC)
 
     sun = ephem.Sun(obs)
 
@@ -92,6 +123,8 @@ class Temp_Data () :
         self.info = {}
         self.num_days = default_days
         self.initial_seek = None
+
+        self.battery_is_ok = True
 
         # entirely bogus, but avoids errors
         # at startup to have values set.
@@ -134,7 +167,9 @@ class Temp_Data () :
         #        break
         #    skip += 1
 
-    # We do read the entire file, but it goes fast enough
+    # We used to simply read the entire file, which meant plowing
+    # through years of old data, but now we seek to a location
+    # nearer to the end, which does yield a significant speedup.
     def read_data ( self, xyz ) :
 
         # added this to attempt a speedup
@@ -151,6 +186,11 @@ class Temp_Data () :
 
         data = []
 
+        # XXX - this fails (bug) if there is no data
+        # for that "target", which may happen if we had
+        # a dead battery (or wifi access point offline) for
+        # several days.
+
         # skip until we see the first line we want
         for line in f:
             if line.startswith ( start ) :
@@ -166,6 +206,25 @@ class Temp_Data () :
 
         f.close ()
         return data
+
+    # Read last line in file, see if it says "Battery DEAD"
+    def check_battery ( self ) :
+        pos = os.path.getsize ( self.file ) - 200
+        f = open ( self.file, "r" )
+        f.seek ( pos )
+        for line in f:
+            lline = line
+        f.close ()
+
+        #print ( "last line: ", lline )
+        self.battery_is_ok = not lline.startswith ( 'Battery DEAD' )
+        #if ll.startswith ( 'Battery DEAD' ) :
+        #    self.battery_is_ok = False
+        #else:
+        #    self.battery_is_ok = True
+
+    def is_dead ( self ) : 
+        return not self.battery_is_ok
 
     # A data line looks like the following.
     #   04-07-2017 17:19:02 18 0 144 308 874
@@ -244,7 +303,12 @@ class Temp_Data () :
             self.start_time = today - datetime.timedelta(days=self.num_days-1)
 
             d = self.read_data ( self.start_time )
-            # print ( len(d) )
+
+            #print ( "Fetched data: ", len(d) )
+
+            if len(d) < 1 :
+                print ( "No data for specified range" )
+                exit ()
 
             # We don't need battery data
             # to plot, just the current value
@@ -486,13 +550,14 @@ class MyStaticText ( wx.Control ):
                  pos=wx.DefaultPosition, size=wx.DefaultSize, 
                  style=0, validator=wx.DefaultValidator, 
                  name="MyStaticText"):
-        wx.Control.__init__(self, parent, id, pos, size, style|wx.NO_BORDER,
-                              validator, name)
+        wx.Control.__init__(self, parent, id, pos, size, style|wx.NO_BORDER, validator, name)
+
         wx.Control.SetLabel(self, label)
         self.InheritAttributes()
         self.SetInitialSize(size)
 
         self.bg_color = parent.GetBackgroundColour ()
+        self.fg_color = wx.BLACK
 
         self.Bind(wx.EVT_PAINT, self.OnPaint)
         self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
@@ -513,10 +578,15 @@ class MyStaticText ( wx.Control ):
         dc.SetBackground(backBrush)
         dc.Clear()
 
-        dc.SetTextForeground(wx.BLACK)
+        #dc.SetTextForeground(wx.BLACK)
+        dc.SetTextForeground ( self.fg_color )
         dc.SetFont(self.GetFont())
         label = self.GetLabel()
         dc.DrawText(label, 0, 0)
+
+    def SetFGColour(self, colour):
+        self.fg_color = colour
+        self.Refresh()
 
     def OnEraseBackground(self, event):
         pass
@@ -551,13 +621,14 @@ class MyStaticText ( wx.Control ):
     def AcceptsFocus(self):
         return False
 
-    def SetForegroundColour(self, colour):
-        wx.Control.SetForegroundColour(self, colour)
-        self.Refresh()
-
-    def SetBackgroundColour(self, colour):
-        wx.Control.SetBackgroundColour(self, colour)
-        self.Refresh()
+# Does not work.
+#    def SetForegroundColour(self, colour):
+#        wx.Control.SetForegroundColour(self, colour)
+#        self.Refresh()
+#
+#    def SetBackgroundColour(self, colour):
+#        wx.Control.SetBackgroundColour(self, colour)
+#        self.Refresh()
 
     def GetDefaultAttributes(self):
         return wx.StaticText.GetClassDefaultAttributes()
@@ -591,10 +662,14 @@ class EZtext ( MyStaticText ) :
 
 # This is the little box that pops up with information
 # at the cursor position
+# For some reason, in January 2024, I had to increase the size of the box
+# from 100 to 120 to see the temperature.  It sort of looks like some
+# invisible element is now using space at the top of the box.
 class Monitor ( wx.Frame ) :
         def __init__ ( self, parent ) :
             #wx.Frame.__init__(self, None, wx.ID_ANY, "data", size=(100,100) )
-            wx.Frame.__init__(self, None, wx.ID_ANY, "data", size=(100,100), style=wx.NO_BORDER )
+            ##wx.Frame.__init__(self, None, wx.ID_ANY, "data", size=(100,100), style=wx.NO_BORDER )
+            wx.Frame.__init__(self, None, wx.ID_ANY, "data", size=(100,120), style=wx.NO_BORDER )
 
             # This always returns 0,0 (as a wx.Point)
             pos = parent.GetPosition ()
@@ -933,9 +1008,16 @@ class Right_Panel ( wx.Panel ) :
 
             info = self.data.get_info()
 
-            self.t_cur_temp.SetLabel ( " Today: " + info['today'] + "F" )
-            self.t_prior_temp.SetLabel ( "Yesterday: " + info['prior'] + "F" )
-            self.t_cur_hum.SetLabel ( info['hum'] + " %" )
+            if self.data.is_dead () :
+                self.t_prior_temp.SetLabel ( " --- --- " )
+                self.t_cur_temp.SetLabel ( " -  DEAD battery - " )
+                #self.t_cur_temp.SetForegroundColour ( wx.RED )
+                self.t_cur_temp.SetFGColour ( wx.RED )
+                self.t_cur_hum.SetLabel ( " --- --- " )
+            else :
+                self.t_cur_temp.SetLabel ( " Today: " + info['today'] + "F" )
+                self.t_prior_temp.SetLabel ( "Yesterday: " + info['prior'] + "F" )
+                self.t_cur_hum.SetLabel ( info['hum'] + " %" )
 
             self.t_sunrise.SetLabel ( "Sunrise: " + info['sunrise'] )
             self.t_sunset.SetLabel ( "Sunset: " + info['sunset'] )
@@ -989,6 +1071,7 @@ class Temp_Frame (wx.Frame):
             #print ( "Tick" )
             if self.data.new_data () :
                 #print ( "Data arrived" )
+                self.data.check_battery ()
                 self.data.gather_data ( None )
                 self.lpanel.update ()
                 self.rpanel.update ( True )
