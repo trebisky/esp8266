@@ -1,0 +1,154 @@
+#!/bin/python3
+
+logfile = "logs/temp_log99"
+
+# As of 8-11-2024 this file contains 3407687 lines
+# -- The first lines look like:
+# Listening on port 2001
+# 04-07-2017 17:19:02 18 0 144 308 874
+# 04-07-2017 17:20:02 17 0 144 308 874
+# -- The last look like:
+# 08-11-2024 15:11:50 19 373 263 375 995
+# 08-11-2024 15:12:49 19 373 263 376 996
+# 08-11-2024 15:13:49 18 373 261 375 995
+#
+# So we take data once per minute.
+# One day is 24*60 = 1440 records
+# One year is 525600 records
+# Call this 1/2 million per year and me must
+# have about 7 years of data, which is about right.
+
+# -- here is a typical line. --
+# 08-11-2024 15:13:49 18 373 261 375 995
+# The fields are:
+# 0,1 - date and time
+# 2 - delay in counts since last reading
+# 3 - unknown at this time
+# 4 - Humid * 10
+# 5 - Temp C * 10
+# 6 - Temp F * 10
+
+class Trendy :
+    def __init__ ( self ) :
+        self.cur_day = None
+        self.max = -999.0
+        self.num = 0
+        self.data = []
+        self.msum = {}
+        self.mnum= {}
+
+    def process ( self, line ) :
+        #print ( line )
+        info = line.split ()
+        day = info[0]
+        temp_f = float(info[6]) / 10.0
+
+        if self.cur_day == None :
+            #print ( f"{day} {temp_f}" )
+            self.cur_day = day
+            self.max = -999.0;
+            self.num = 0
+
+        if day == self.cur_day :
+            self.num += 1
+            if temp_f > self.max :
+                self.max = temp_f
+        else :
+            if self.num > 999 :
+                #print ( f"{self.cur_day} {self.max} {self.num}" )
+                self.data.append ( ( self.cur_day, self.max ) )
+            self.cur_day = day
+            self.max = temp_f
+            self.num = 1
+            #if len(self.data) > 10 :
+            #    exit ()
+
+    # One value per month
+    def tally_one ( self, day, temp ) :
+        #tag = day[0:4]
+        tag = day[0:2]
+        if tag in self.msum :
+            self.msum[tag] += temp
+            self.mnum[tag] += 1
+        else :
+            self.msum[tag] = temp
+            self.mnum[tag] = 1
+
+    # Twovalues per month (split into two 2 week halves)
+    def tally_two( self, day, temp ) :
+        mtag = day[0:2]
+        xx = day.split("-")
+        mday = int(xx[1])
+        if mday < 15 :
+            tag = mtag + "-A"
+        else :
+            tag = mtag + "-B"
+
+        if tag in self.msum :
+            self.msum[tag] += temp
+            self.mnum[tag] += 1
+        else :
+            self.msum[tag] = temp
+            self.mnum[tag] = 1
+
+    def show_one ( self ) :
+        for m in range(12) :
+            key = f"{m+1:02d}"
+            avg = self.msum[key] / self.mnum[key]
+            print ( f"{key} {avg:.1f}" )
+
+    def show_two( self ) :
+        for m in range(12) :
+            mkey = f"{m+1:02d}"
+            key = mkey + "-A"
+            avg = self.msum[key] / self.mnum[key]
+            print ( f"{key} {avg:.1f}" )
+            key = mkey + "-B"
+            avg = self.msum[key] / self.mnum[key]
+            print ( f"{key} {avg:.1f}" )
+
+    def finish ( self ) :
+        print ( len(self.data) )
+
+        for d in self.data :
+            day, tf = d
+            #self.tally_one ( day, tf )
+            self.tally_two( day, tf )
+
+        #self.show_one ()
+        self.show_two()
+
+
+def main () :
+    tt = Trendy ()
+    with open ( logfile) as file:
+        for line in file:
+            if not line[0].isdigit() :
+                continue
+            if "BAD" in line :
+                continue
+            tt.process ( line )
+    tt.finish ()
+    print ( "Done" )
+
+# Checking that each line begins with a digit avoids all the
+# various "trash" lines in the file.
+def diag () :
+    count = 0
+    with open ( logfile) as file:
+        for line in file:
+            if not line[0].isdigit() :
+                continue
+            xx = line.split()
+            if len(xx) != 7 :
+                print ( line )
+                exit ()
+            count += 1
+
+    print ( count )
+
+# ---------------------------
+
+main ()
+
+# THE END
