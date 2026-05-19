@@ -34,7 +34,8 @@ wsize = ( xsize, ysize )
 right_size =250
 split_pos = xsize - right_size
 
-temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_log99"
+temp_file = "/u2/Projects/ESP8266/Projects/tmon/logs/temp_log99"
+#temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_log99"
 #temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_dead"
 demo_file = "./temp_demo_data"
 
@@ -239,14 +240,23 @@ class Temp_Data () :
         #print ( time_string )
         return np.datetime64 ( time_string )
 
+    # items 4 and 6 may be "BAD" and what then?
+    # 05-18-2026 19:55:09 18 0 BAD BAD BAD
+    # The code below is an improvement, but a
+    # prolonged period of missing data will
+    # yield an empty list and more problems.
     def conv_data ( self, data ) :
         yy = []
         xx = []
         for l in data :
             w = l.split()
-            xx.append ( self.mk_dt64 ( w[0], w[1] ) )
-            yy.append ( float(w[6])/10.0 )
-            last_hum = float(w[4])/10.0
+            if w[6] == "BAD" :
+                continue
+            else :
+                xx.append ( self.mk_dt64 ( w[0], w[1] ) )
+                yy.append ( float(w[6])/10.0 )
+            if w[4] != "BAD" :
+                last_hum = float(w[4])/10.0
 
         y = np.array ( yy )
         #xx = np.arange ( 0.0, len(yy)*1.0, 1.0 )

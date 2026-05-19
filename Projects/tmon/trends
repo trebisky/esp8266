@@ -28,6 +28,8 @@ logfile = "logs/temp_log99"
 # 5 - Temp C * 10
 # 6 - Temp F * 10
 
+
+
 class Trendy :
     def __init__ ( self ) :
         self.cur_day = None
@@ -36,12 +38,18 @@ class Trendy :
         self.data = []
         self.msum = {}
         self.mnum= {}
+        self.recent = True
 
     def process ( self, line ) :
         #print ( line )
         info = line.split ()
         day = info[0]
         temp_f = float(info[6]) / 10.0
+
+        day_parts = day.split ( '-' )
+        #if self.recent and int(day_parts[2]) < 2022 :
+        if self.recent and int(day_parts[2]) < 2021 :
+            return
 
         if self.cur_day == None :
             #print ( f"{day} {temp_f}" )
