@@ -19,7 +19,18 @@ function setupTelnetServer()
 
         node.output(s_output, 0)
 
+        local authenticated = false
         sock:on("receive",function(sock, input)
+                if not authenticated then
+                    local pwd = input:match("^(.-)[\r\n]+$") or input
+                    if pwd == TELNET_PASSWORD then
+                        authenticated = true
+                        sock:send("Authentication successful.\n> ")
+                    else
+                        sock:send("Password: ")
+                    end
+                    return
+                end
                 node.input(input)
             end)
 
@@ -28,7 +39,7 @@ function setupTelnetServer()
                 inUse = false
             end)
 
-        sock:send("Welcome to NodeMCU world.\n> ")
+        sock:send("Password: ")
     end
 
     telnetServer = net.createServer(net.TCP, 180)
