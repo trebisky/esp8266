@@ -26,9 +26,18 @@ import math
 # Apparently this is also called "PyEphem"
 import ephem
 
-xsize = 800
-ysize = 600
+# This is how the GUI starts up.
+
+xsize = 2000
+ysize = 800
+#xsize = 800
+#ysize = 600
 wsize = ( xsize, ysize )
+
+# Start up showing a week by default
+#default_days = 1
+#default_days = 2
+default_days = 7
 
 # The right side needs about 250 pixels
 right_size =250
@@ -38,11 +47,6 @@ temp_file = "/u2/Projects/ESP8266/Projects/tmon/logs/temp_log99"
 #temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_log99"
 #temp_file = "/u1/Projects/ESP8266/Projects/tmon/logs/temp_dead"
 demo_file = "./temp_demo_data"
-
-# Start up showing 2 days by default
-#default_days = 2
-#default_days = 7
-default_days = 1
 
 # 6-24-2022 -- several bugs showed up when my Wifi access point was offline for a few days.
 # exactly the same as if I had a dead battery for several days.
