@@ -1,7 +1,27 @@
 #!/bin/sh
 
-git push origin master
-git push github master
+# Origin used to be cholla, but I no longer
+# run a git server there.
+# I should fiddle with git and make "origin" the
+# repo on github.
+# -- git push origin master
+#
+# git remote -v
+# github	git@github.com:trebisky/esp8266.git (fetch)
+# github	git@github.com:trebisky/esp8266.git (push)
+# origin	tom@cholla:/mmt/tom/esp8266.git (fetch)
+# origin	tom@cholla:/mmt/tom/esp8266.git (push)
+
+# These commands fixed things:
+# git remote set-url origin git@github.com:trebisky/esp8266.git
+# git remote rm github
+
+# After all this, the only purpose of this script is to update
+# a file on my web page
+
+# ---
+
+# git push originmaster
 
 REMOTE="/u1/www/esp8266/bootrom/boot.txt"
 
