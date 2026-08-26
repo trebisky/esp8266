@@ -13,6 +13,44 @@
 #
 # 1 - fix a deprecation warning about utcnow()
 # 2 - my "Monitor" subwindow must now be bigger to see temperature
+#
+# In August 2026 I am adding the "red dot" to mark 24 hours prior.
+# Here are some notes as to how this is organized:
+#
+#  Temp_Data class holds and handles the data
+#  various classes override wx stuff to give me behaviors
+#   that I want and are not directly offered by wx
+#  Left_Panel holds the graph
+#  Right Panel hold the controls
+#  Temp_Frame holds the left and right panels
+#  Temp_Gui is required by wx as the top level
+#
+#  The "plot_em" method in Left_Panel actually plots the points
+#  I introduce the "markxy" field in Left_Panel
+#  plot_em finds the data scaled to pixel coordinates in "xy"
+#  This scaled info is provided by data.getxy()
+#
+#  Paint events redraw the graph.  Many things can trigger these.
+#  A common (but not the only case) is when the timer gets new data.
+#  So valid information must always be available for a paint event,
+#  which is what calls plot_em() -- and thus plot_dot()
+#
+#  New data is discovered by a timer event.
+#  This will yield a lpanel.update() which scales data by a
+#  call to data.getxy() then triggers a repaint by calling Refresh()
+#  The data must already be resident in "data" for this to work.
+#
+#  On a timer event (tick) the data.new_data() method is called.
+#  This is a boolean and checks if the data file has grown
+#  If so, gather_data() is called, then left and right updates
+#  gather_data() loads the xx, yy, and hh arrays.
+#
+#  Currently, a right update calls data.get_info() which 
+#  calls data.get_prior() to get just the temp for 24 hours ago.
+#
+# I introduce a method "set_prior() which gets called after
+# every call to gather_data().  It has the job to find and
+# post the information for 24 hours prior.
 
 import wx
 import numpy as np
@@ -130,6 +168,9 @@ class Temp_Data () :
         self.initial_seek = None
 
         self.battery_is_ok = True
+
+        self.prior_xx = None
+        self.prior_yy = None
 
         # entirely bogus, but avoids errors
         # at startup to have values set.
@@ -266,25 +307,44 @@ class Temp_Data () :
         #xx = np.arange ( 0.0, len(yy)*1.0, 1.0 )
         return ( xx, y, last_hum )
 
-    def get_prior ( self ) :
+    # Return temperature (in degrees) 24 hours ago
+    # Used by the right info window
+    def get_prior_temp ( self ) :
+        return self.prior_yy
 
+    # Used by the left window to show position
+    #  of the above
+    def priorxy ( self ) :
+        print ( self.prior_xx )
+        return self.scalexy ( self.prior_xx, self.prior_yy )
+
+    # this used to be "get_prior", but now we just
+    #  post information for others to get.
+    def set_prior ( self ) :
         search = self.xx[-1] - np.timedelta64(1,'D')
         #print ('search: {}, {}'.format(search, self.xx[0]))
 
         if self.num_days == 1 :
-            return self.prior_24 ( search )
+            pp = self.prior_24 ( search )
+            self.prior_xx, self.prior_yy = pp
+            return
 
         for i in range(len(self.xx)):
             if self.xx[i] >= search :
-                return self.yy[i]
+                self.prior_xx = self.xx[i]
+                self.prior_yy = self.yy[i]
+                return
 
         # This should never happen
         # (but it did until we added prior_24()
-        return self.yy[0]
+        self.prior_xx = self.xx[0]
+        self.prior_yy = self.yy[0]
+        return 
 
     # This is used to gather 48 hours of data so we
     # can find the correct "prior" data from 24 hours ago
     # when we only have the current 24 hours displayed
+    # Only used by get_prior_temp() above
 
     def prior_24 ( self, search ) :
 
@@ -300,10 +360,10 @@ class Temp_Data () :
 
         for i in range(len(x48)):
             if x48[i] >= search :
-                return y48[i]
+                return ( x48[i], y48[i] )
 
         # should never happen
-        return y48[0]
+        return ( x48[0], y48[0] )
 
     # This gets called when new data arrives,
     # or when the display duration changes
@@ -344,7 +404,7 @@ class Temp_Data () :
 
     def get_info ( self ) :
 
-            prior = self.get_prior ()
+            prior = self.get_prior_temp ()
 
             # We really only need to recalculate these
             #  when the day rolls over.
@@ -464,12 +524,27 @@ class Temp_Data () :
 
         return rv
 
+    # scale a single point to pixel values
+    def scalexy ( self, xxx, yyy ) :
+
+        xf = (xxx - self.xmin) / self.xrange
+        #yf = (yyy - self.ymin) / self.yrange
+        yf = (yyy - self.ybot) / self.yrang
+
+        #print ( "xf ", xf )
+        #print ( "w ", w )
+        ix = self.xoff + np.int_ ( self.xsize * xf )
+        iy = self.yoff + np.int_ ( self.ysize * (1.0-yf) )
+
+        return (ix,iy)
+
     # scale data for plotting on the screen
     #
     # XXX - it is awkward passing geometry from
     #  the panel object to the data object like
     #  this.  There ought to be a better way.
     #def getxy ( self, width, height, lmargin ) :
+
     def getxy ( self ) :
         rxy = []
 
@@ -477,7 +552,7 @@ class Temp_Data () :
         self.ytop = math.ceil ( (self.ymax+1.0) / 10.0) * 10.
         self.ybot = math.floor ( (self.ymin-1.0) / 10.0) * 10.
         #print ( "Y bot, top: ", self.ybot, self.ytop )
-        yrang = self.ytop - self.ybot
+        self.yrang = self.ytop - self.ybot
 
         # unused pixels at top/bottom of panel
         #top_margin = 20
@@ -509,15 +584,16 @@ class Temp_Data () :
             #    while self.xx[i] < x_expect - tol :
             #        rxy.append ( (0,9999) )
 
-            xf = (self.xx[i] - self.xmin) / self.xrange
-            #yf = (self.yy[i] - self.ymin) / self.yrange
-            yf = (self.yy[i] - self.ybot) / yrang
+            ##xf = (self.xx[i] - self.xmin) / self.xrange
+            ###yf = (self.yy[i] - self.ymin) / self.yrange
+            ##yf = (self.yy[i] - self.ybot) / yrang
 
             #print ( "xf ", xf )
             #print ( "w ", w )
-            ix = self.xoff + np.int_ ( self.xsize * xf )
-            iy = self.yoff + np.int_ ( self.ysize * (1.0-yf) )
-            rxy.append ( (ix,iy) )
+            ##ix = self.xoff + np.int_ ( self.xsize * xf )
+            ##iy = self.yoff + np.int_ ( self.ysize * (1.0-yf) )
+
+            rxy.append ( self.scalexy ( self.xx[i], self.yy[i] ) )
 
             #print ( 'array ', type(self.xx[i]) )
             #print ( 'delta ', type(delta) )
@@ -529,7 +605,7 @@ class Temp_Data () :
         self.tick_array = []
         y = self.ybot
         for i in range ( nticks ) :
-            yf = (y - self.ybot) / yrang
+            yf = (y - self.ybot) / self.yrang
             iy = self.yoff + np.int_ ( self.ysize * (1.0-yf) )
             label = str ( int(y) )
             self.tick_array.append ( (iy, label) )
@@ -748,6 +824,7 @@ class Left_Panel ( wx.Panel ) :
             self.width = None
             self.height = None
             self.xy = None
+            self.markxy = None
 
         # We get 3 resize events just starting up.
         # we need this to refresh after resize
@@ -850,6 +927,18 @@ class Left_Panel ( wx.Panel ) :
             y = int ( yy - tsize[1]/2 )
             dc.DrawText ( msg, x, y )
 
+        def plot_dot ( self, xy ) :
+            dc = wx.PaintDC ( self )
+
+            #color = wx.Colour('RED')
+            color = wx.RED
+            dc.SetPen ( wx.Pen(color, 2) )
+            dc.SetBrush ( wx.Brush(color) )
+            # The pen does the outline, the brush does the fill
+
+            # radius of 2 pixels
+            dc.DrawCircle ( xy[0], xy[1], 2)
+
         def plot_em ( self ) :
             if not self.xy :
                 return
@@ -863,6 +952,10 @@ class Left_Panel ( wx.Panel ) :
                 if xy and lastxy :
                     dc.DrawLine ( lastxy[0], lastxy[1], xy[0], xy[1] )
                 lastxy = xy
+
+            # Mark end of data
+            if self.markxy :
+                self.plot_dot ( self.markxy )
 
         # We get lots of paint events, for reasons I don't understand,
         # and not simply related to cursor motion.
@@ -906,6 +999,7 @@ class Left_Panel ( wx.Panel ) :
                 return
 
             self.xy = self.data.getxy ()
+            self.markxy = self.data.priorxy ()
             self.ticks = self.data.getticks ()
             self.xticks = self.data.get_xticks ()
 
@@ -983,6 +1077,7 @@ class Right_Panel ( wx.Panel ) :
             self.t_battery = EZtext ( self, rsz, bogus )
 
             self.data.gather_data ( default_days )
+            self.data.set_prior ()
             self.update ( True )
             self.left.update ();
 
@@ -1001,6 +1096,7 @@ class Right_Panel ( wx.Panel ) :
                 x = 7;
 
             self.data.gather_data ( x )
+            self.data.set_prior ()
             self.update ( True )
             self.left.update ()
 
@@ -1087,6 +1183,7 @@ class Temp_Frame (wx.Frame):
                 #print ( "Data arrived" )
                 self.data.check_battery ()
                 self.data.gather_data ( None )
+                self.data.set_prior ()
                 self.lpanel.update ()
                 self.rpanel.update ( True )
             else:
