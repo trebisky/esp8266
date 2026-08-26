@@ -49,8 +49,9 @@
 #  calls data.get_prior() to get just the temp for 24 hours ago.
 #
 # I introduce a method "set_prior() which gets called after
-# every call to gather_data().  It has the job to find and
-# post the information for 24 hours prior.
+#  every call to gather_data().  It has the job to find and
+#  post the information for 24 hours prior.
+#  Now get_priorxy() gives us what we need for the dot.
 
 import wx
 import numpy as np
@@ -315,7 +316,7 @@ class Temp_Data () :
     # Used by the left window to show position
     #  of the above
     def priorxy ( self ) :
-        print ( self.prior_xx )
+        #print ( self.prior_xx )
         return self.scalexy ( self.prior_xx, self.prior_yy )
 
     # this used to be "get_prior", but now we just
