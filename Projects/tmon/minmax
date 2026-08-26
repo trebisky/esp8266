@@ -1,0 +1,281 @@
+#!/bin/python
+
+# This has data begining 4-7-2017 through the present
+temp_file = "/Projects/ESP8266/Projects/tmon/logs/temp_log99"
+
+# 04-07-2017 17:24:00 18 0 144 306 870
+# 04-07-2017 17:24:59 18 0 145 306 870
+# 04-07-2017 17:25:58 17 0 145 305 869
+# 08-19-2026 08:43:55 18 369 338 367 980
+# 08-19-2026 08:44:54 19 369 334 368 982
+# 08-19-2026 08:45:54 18 369 332 368 982
+# 08-19-2026 08:46:53 18 369 326 369 984
+
+# If a read times out, the server places this line:
+# Battery DEAD
+# We may also have lines like this:
+# 05-18-2026 19:41:13 18 0 BAD BAD BAD
+
+# There is also chatter like this,
+# Listening on port 2001
+# as well as comments prefixed with #
+# A good bet is just to check if the first
+# character is numeric.
+
+# the timestamp (date/time) are added by the receiving server
+
+# Fields are:
+#  date
+#  time
+#  delay since last reading
+#  battery voltage
+#  humidity
+#  temp-C
+#  temp-F
+
+# Currently (8-19-2026) --
+#  4414810  lines
+def count_em () :
+
+    f = open ( temp_file, "r" )
+
+    n = 0
+    for line in f:
+        n += 1
+
+    print ( n, " lines" )
+    f.close ()
+
+pushline = None
+
+# readline returns an empty string at end of file
+def get_line ( f ) :
+    global pushline
+    while True :
+        if pushline != None :
+            rv = pushline
+            pushline = None
+        else :
+            rv = f.readline().strip()
+        if rv == "" :
+            return None
+        if rv[0].isdigit () :
+            break
+    return rv
+
+def push_line ( ll ) :
+    global pushline
+    pushline = ll
+
+# Count all lines that are not rubbish
+def count_valid () :
+    f = open ( temp_file, "r" )
+
+    n = 0
+    while True :
+        line = get_line ( f )
+        if line == None :
+            break
+        n += 1
+
+    print ( n, " valid lines"  )
+    f.close ()
+
+def get_day ( f ) :
+
+    data = []
+
+    line = get_line ( f )
+    if line == None :
+        return None
+    w = line.split ()
+    day = w[0]
+    # print ( "Day: ", day )
+
+    while True :
+        line = get_line ( f )
+        if line == None :
+            break
+        w = line.split ()
+        if w[0] != day :
+            break
+        if "BAD" not in line :
+            data.append ( line )
+
+    push_line ( line )
+    return (day, data)
+
+def minmax ( data ) :
+    tmin = 999.0
+    tmax = 0.0
+    for line in data :
+        w = line.split ()
+        tf = float ( w[6] ) / 10.0
+        if tf < tmin :
+            tmin = tf
+        if tf > tmax :
+            tmax = tf
+    return ( tmin, tmax )
+
+def show_day ( day, data ) :
+        (min,max) = minmax ( data )
+        print ( day, " ", len(data), " ", min, " ", max )
+        # never happens
+        # if len(data) < 1 :
+        #   print ( day, " No data" )
+
+def day_by_day () :
+    f = open ( temp_file, "r" )
+
+    while True :
+        dinfo = get_day ( f )
+        if dinfo == None :
+            break
+        (day,dd) = dinfo
+        show_day ( day, dd )
+
+    f.close ()
+
+def get_md ( day ) :
+    w = day.split ( "-" )
+    return ( w[0], w[1] )
+
+def get_yr ( day ) :
+    w = day.split ( "-" )
+    return w[2]
+
+class Info () :
+    def __init__ ( self, name ) :
+        self.name = name
+        self.max_sum = 0.0
+        self.min_sum = 0.0
+        self.num = 0;
+
+    def insert ( self, min, max ) :
+        self.min_sum += min
+        self.max_sum += max
+        self.num += 1
+
+    def show ( self ) :
+        tmin = self.min_sum / self.num
+        tmax = self.max_sum / self.num
+        #print ( self.name, " ", tmin, " ", tmax )
+        print ( f'{self.name:>3} {tmin:8.2f} {tmax:8.2f}' )
+
+def summAB () :
+    f = open ( temp_file, "r" )
+    tag_list = []
+    info_hash = {}
+
+    # Idiot python idiom to get 1..12
+    for i in range(1, 13) :
+        tag = str(i) + "A"
+        tag_list.append ( tag )
+        tag = str(i) + "B"
+        tag_list.append ( tag )
+
+    for t in tag_list :
+        #print ( "Tag: ", t )
+        inf = Info ( t )
+        info_hash[t] = inf
+
+    while True :
+        dinfo = get_day ( f )
+        if dinfo == None :
+            break
+        (day,dd) = dinfo
+        (min,max) = minmax ( dd )
+        #show_day ( day, dd )
+        (m,d) = get_md ( day )
+        if int(d) <= 14 :
+            tag = m.lstrip('0') + "A"
+        else :
+            tag = m.lstrip('0') + "B"
+
+        # print ( "I Tag: ", tag )
+        info_hash[tag].insert ( min, max )
+
+    for tag in tag_list :
+        info_hash[tag].show ()
+
+    f.close ()
+
+def summABCD () :
+    f = open ( temp_file, "r" )
+    tag_list = []
+    info_hash = {}
+
+    # Idiot python idiom to get 1..12
+    for i in range(1, 13) :
+        tag_list.append ( str(i) + "A" )
+        tag_list.append ( str(i) + "B" )
+        tag_list.append ( str(i) + "C" )
+        tag_list.append ( str(i) + "D" )
+
+    for t in tag_list :
+        inf = Info ( t )
+        info_hash[t] = inf
+
+    while True :
+        dinfo = get_day ( f )
+        if dinfo == None :
+            break
+        (day,dd) = dinfo
+        (min,max) = minmax ( dd )
+        #show_day ( day, dd )
+        (m,d) = get_md ( day )
+        if int(d) <= 7 :
+            tag = m.lstrip('0') + "A"
+        elif int(d) <= 14 :
+            tag = m.lstrip('0') + "B"
+        elif int(d) <= 21 :
+            tag = m.lstrip('0') + "C"
+        else :
+            tag = m.lstrip('0') + "D"
+
+        # print ( "I Tag: ", tag )
+        info_hash[tag].insert ( min, max )
+
+    for tag in tag_list :
+        info_hash[tag].show ()
+
+    f.close ()
+
+# The question is whether temps are increasing year by year.
+# The idea is to average max/min temperatures for each year
+def years () :
+    f = open ( temp_file, "r" )
+
+    tag_list = []
+    info_hash = {}
+
+    # Idiot python idiom to end with 2026
+    for y in range(2017, 2027) :
+        #print ( y )
+        tag = str(y)
+        tag_list.append ( tag )
+        info_hash[tag] = Info ( tag )
+
+    while True :
+        dinfo = get_day ( f )
+        if dinfo == None :
+            break
+        (day,dd) = dinfo
+        (min,max) = minmax ( dd )
+        y = get_yr ( day )
+        #print ( y )
+        info_hash[y].insert ( min, max )
+
+    for tag in tag_list :
+        info_hash[tag].show ()
+
+    f.close ()
+
+# count_em ()
+# count_valid ()
+# day_by_day ()
+# summAB ()
+#summABCD ()
+years ()
+
+# THE END
